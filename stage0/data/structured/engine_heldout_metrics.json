@@ -1,0 +1,792 @@
+{
+  "generated_at": "2026-08-27T10:42:22.101549+00:00",
+  "evaluation_kind": "heldout_live_generalization",
+  "evaluation_status": "complete",
+  "generalization_claim": true,
+  "evaluation_design": "live scenario evaluation over pairs rejected by a pre-run Stage 0/1 leakage audit; KEGG/RAG/LLM enabled with isolated caches",
+  "case_count": 26,
+  "medications_per_case": {
+    "min": 3,
+    "max": 3
+  },
+  "unique_heldout_pair_count": 40,
+  "gold_positive_pair_occurrences": 20,
+  "warning_occurrences": 15,
+  "pair_detection": {
+    "true_positive": 15,
+    "false_positive": 0,
+    "false_negative": 5,
+    "precision": 1.0,
+    "recall": 0.75,
+    "f1": 0.8571
+  },
+  "severity_accuracy_on_flagged_gold_pairs": {
+    "correct": 10,
+    "total": 15,
+    "value": 0.6667
+  },
+  "high_risk_severity_accuracy": {
+    "definition": "contraindicated or major gold pairs that were flagged",
+    "correct": 4,
+    "total": 9,
+    "value": 0.4444
+  },
+  "citation_coverage": {
+    "definition": "warning has a Chinese source_text span and a source_url",
+    "covered": 6,
+    "total": 15,
+    "value": 0.4
+  },
+  "path_usage": {
+    "warning_occurrences_by_detection_path": {
+      "kegg": 9,
+      "kegg+rag+llm": 6
+    },
+    "fast_path_warning_occurrences": 15,
+    "fallback_path_warning_occurrences": 6,
+    "unique_fast_path_pairs": 10,
+    "unique_fallback_path_pairs": 3,
+    "fast_path_pair_count": 10,
+    "fallback_path_pair_count": 3
+  },
+  "live_execution": {
+    "kegg_enabled": true,
+    "rag_enabled": true,
+    "llm_enabled": true,
+    "isolated_caches": true,
+    "resumed_from_current_isolated_cache": true,
+    "full_live_composite_path_completed": true,
+    "trace": {
+      "kegg_cache_path": "data\\heldout_kegg_ddi_cache.json",
+      "kegg_pair_cache_entries": 40,
+      "kegg_statuses": {
+        "matched": 10,
+        "not_found": 30
+      },
+      "fallback_cache_path": "data\\heldout_ddi_fallback_cache.json",
+      "fallback_pair_cache_entries": 15,
+      "fallback_statuses": {
+        "matched": 3,
+        "not_found": 12
+      },
+      "fallback_attempted_rag_chunks": 28,
+      "llm_call_status": "completed",
+      "llm_provider": "tokendance",
+      "llm_model": "glm-5.3-flash",
+      "llm_controls": {
+        "thinking": "disabled",
+        "max_tokens": 1024,
+        "request_timeout_seconds": 60.0,
+        "sdk_max_retries": 0
+      },
+      "model_key_available": true
+    }
+  },
+  "leakage_audit": {
+    "passed": true,
+    "checked_case_count": 26,
+    "checked_pair_count": 40,
+    "stage1_scoped_pair_count": 75,
+    "shared_kegg_pair_count": 73,
+    "shared_fallback_pair_count": 1,
+    "violations": [],
+    "pairs": [
+      {
+        "pair": [
+          "伊曲康唑",
+          "氨苄西林"
+        ],
+        "kegg_key": "D00204 D00350",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "伊曲康唑",
+          "阿托伐他汀"
+        ],
+        "kegg_key": "D00350 D07474",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "伏立康唑",
+          "氨苄西林"
+        ],
+        "kegg_key": "D00204 D00578",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "伏立康唑",
+          "阿托伐他汀"
+        ],
+        "kegg_key": "D00578 D07474",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "克拉霉素",
+          "氨苄西林"
+        ],
+        "kegg_key": "D00204 D00276",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "克拉霉素",
+          "阿托伐他汀"
+        ],
+        "kegg_key": "D00276 D07474",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "利福平",
+          "华法林"
+        ],
+        "kegg_key": "D00211 D00564",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "利福平",
+          "氨苄西林"
+        ],
+        "kegg_key": "D00204 D00211",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "利福平",
+          "茶碱"
+        ],
+        "kegg_key": "D00211 D00227",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "别嘌醇",
+          "氨氯地平"
+        ],
+        "kegg_key": "D00224 D07450",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "别嘌醇",
+          "氨苄西林"
+        ],
+        "kegg_key": "D00204 D00224",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "别嘌醇",
+          "瑞舒伐他汀"
+        ],
+        "kegg_key": "D00224 D01915",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "别嘌醇",
+          "达格列净"
+        ],
+        "kegg_key": "D00224 D08897",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "华法林",
+          "氨氯地平"
+        ],
+        "kegg_key": "D00564 D07450",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "华法林",
+          "环丙沙星"
+        ],
+        "kegg_key": "D00186 D00564",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "华法林",
+          "甲硝唑"
+        ],
+        "kegg_key": "D00409 D00564",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "华法林",
+          "红霉素"
+        ],
+        "kegg_key": "D00140 D00564",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "地高辛",
+          "氨苄西林"
+        ],
+        "kegg_key": "D00204 D00298",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "地高辛",
+          "维拉帕米"
+        ],
+        "kegg_key": "D00298 D00619",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "奥美拉唑",
+          "氨苄西林"
+        ],
+        "kegg_key": "D00204 D00455",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "奥美拉唑",
+          "茶碱"
+        ],
+        "kegg_key": "D00227 D00455",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "左甲状腺素",
+          "氨苄西林"
+        ],
+        "kegg_key": "D00204 D01010",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "左甲状腺素",
+          "碳酸钙"
+        ],
+        "kegg_key": "D00932 D01010",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "氨氯地平",
+          "甲硝唑"
+        ],
+        "kegg_key": "D00409 D07450",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "氨氯地平",
+          "硫酸亚铁"
+        ],
+        "kegg_key": "D01725 D07450",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "氨氯地平",
+          "红霉素"
+        ],
+        "kegg_key": "D00140 D07450",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "氨氯地平",
+          "达格列净"
+        ],
+        "kegg_key": "D07450 D08897",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "氨氯地平",
+          "阿托伐他汀"
+        ],
+        "kegg_key": "D07450 D07474",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "氨苄西林",
+          "环丙沙星"
+        ],
+        "kegg_key": "D00186 D00204",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "氨苄西林",
+          "瑞舒伐他汀"
+        ],
+        "kegg_key": "D00204 D01915",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "氨苄西林",
+          "碳酸钙"
+        ],
+        "kegg_key": "D00204 D00932",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "氨苄西林",
+          "维拉帕米"
+        ],
+        "kegg_key": "D00204 D00619",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "氨苄西林",
+          "茶碱"
+        ],
+        "kegg_key": "D00204 D00227",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "氨苄西林",
+          "达格列净"
+        ],
+        "kegg_key": "D00204 D08897",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "氨苄西林",
+          "阿托伐他汀"
+        ],
+        "kegg_key": "D00204 D07474",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "环丙沙星",
+          "瑞舒伐他汀"
+        ],
+        "kegg_key": "D00186 D01915",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "环丙沙星",
+          "茶碱"
+        ],
+        "kegg_key": "D00186 D00227",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "瑞舒伐他汀",
+          "甲硝唑"
+        ],
+        "kegg_key": "D00409 D01915",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "硫酸亚铁",
+          "阿托伐他汀"
+        ],
+        "kegg_key": "D01725 D07474",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      },
+      {
+        "pair": [
+          "红霉素",
+          "茶碱"
+        ],
+        "kegg_key": "D00140 D00227",
+        "in_shared_kegg_cache": false,
+        "in_shared_fallback_cache": false,
+        "in_stage1_evidence": false,
+        "both_members_in_ontology": false
+      }
+    ]
+  },
+  "clean_lists": {
+    "total": 6,
+    "returned_no_warning": 6
+  },
+  "acceptance": {
+    "scope": "held-out estimate; not clinical validation",
+    "leakage_audit_passed": true,
+    "live_execution_completed": true,
+    "full_live_composite_path_completed": true,
+    "pair_precision_gte_0_85": true,
+    "pair_recall_gte_0_90": false,
+    "severity_accuracy_gte_0_80": false,
+    "high_risk_severity_accuracy_gte_0_95": false,
+    "citation_coverage_gte_0_90": false
+  },
+  "per_case": [
+    {
+      "case_id": "H01",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "H02",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "H03",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "H04",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "H05",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "H06",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "H07",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "H08",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "H09",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "H10",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "H11",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "H12",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "H13",
+      "gold_pairs": 1,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": [
+        [
+          "环丙沙星",
+          "茶碱"
+        ]
+      ]
+    },
+    {
+      "case_id": "H14",
+      "gold_pairs": 1,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": [
+        [
+          "环丙沙星",
+          "茶碱"
+        ]
+      ]
+    },
+    {
+      "case_id": "H15",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "H16",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "H17",
+      "gold_pairs": 1,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": [
+        [
+          "奥美拉唑",
+          "茶碱"
+        ]
+      ]
+    },
+    {
+      "case_id": "H18",
+      "gold_pairs": 1,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": [
+        [
+          "利福平",
+          "茶碱"
+        ]
+      ]
+    },
+    {
+      "case_id": "H19",
+      "gold_pairs": 1,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": [
+        [
+          "红霉素",
+          "茶碱"
+        ]
+      ]
+    },
+    {
+      "case_id": "H20",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "C21",
+      "gold_pairs": 0,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "C22",
+      "gold_pairs": 0,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "C23",
+      "gold_pairs": 0,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "C24",
+      "gold_pairs": 0,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "C25",
+      "gold_pairs": 0,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "C26",
+      "gold_pairs": 0,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    }
+  ],
+  "limitations": [
+    "This is a small live generalization estimate, not clinical validation or evidence of patient-outcome safety.",
+    "Positive labels were manually authored from cited label excerpts where available; the KEGG-only atorvastatin-voriconazole case has no local Chinese label citation.",
+    "Negative controls are scenario-level controls, not proof that no interaction exists under every dose, route, genotype, or patient condition.",
+    "The local RAG corpus is a curated MNBVC-derived label sample; live model results can vary with provider availability and model version."
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "source": "lengfeng650-star/drug-instructions-sample-20",
+  "license": "Apache-2.0",
+  "requested": 1,
+  "downloaded_pdfs": 0,
+  "events": [
+    {
+      "url": "https://raw.githubusercontent.com/lengfeng650-star/drug-instructions-sample-20/main/metadata/drug_instructions_manifest.jsonl",
+      "path": "data\\raw\\open20_manifest.jsonl",
+      "bytes": 11914,
+      "sha256": "47039227390527bf9f6f3a9c335643fd42784fade705ba445bae19bfb7116bcb"
+    }
+  ],
+  "failures": [
+    {
+      "drug_name": "盐酸多巴酚丁胺注射液",
+      "url": "https://raw.githubusercontent.com/lengfeng650-star/drug-instructions-sample-20/main/data/pdfs/%E5%9B%BD%E8%8D%AF%E5%87%86%E5%AD%97H20244807.pdf",
+      "error": "<urlopen error [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1081)>"
+    }
+  ]
+}

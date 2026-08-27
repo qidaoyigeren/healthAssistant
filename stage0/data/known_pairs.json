@@ -1,0 +1,8 @@
+[
+  {"input_a":"华法林","input_b":"阿司匹林","expected":"出血风险增加；禁忌/慎用"},
+  {"input_a":"辛伐他汀","input_b":"克拉仙","expected":"CYP3A4抑制导致肌病/横纹肌溶解；禁忌"},
+  {"input_a":"格华止","input_b":"碘造影剂","expected":"乳酸酸中毒/肾风险；检查前后停药并复评肾功能"},
+  {"input_a":"硝酸甘油","input_b":"万艾可","expected":"严重低血压；禁忌"},
+  {"input_a":"安体舒通","input_b":"氯化钾","expected":"高钾血症风险"},
+  {"input_a":"地高辛","input_b":"可达龙","expected":"地高辛浓度和毒性风险增加"}
+]

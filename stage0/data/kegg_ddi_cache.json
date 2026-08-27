@@ -1,0 +1,1164 @@
+{
+  "find:lithium": "D00801",
+  "D00340 D00801": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00340",
+        "b": "dr:D00801",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00801",
+        "b": "dr:D00340",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00340+D00801"
+  },
+  "find:carbamazepine": "D00252",
+  "D00252 D00276": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00252",
+        "b": "dr:D00276",
+        "level": "P",
+        "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / CYP induction: CYP3A4"
+      },
+      {
+        "a": "dr:D00276",
+        "b": "dr:D00252",
+        "level": "P",
+        "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / CYP induction: CYP3A4"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00276+D00252"
+  },
+  "D00276 D00434": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00276",
+        "b": "dr:D00434",
+        "level": "P",
+        "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4"
+      },
+      {
+        "a": "dr:D00434",
+        "b": "dr:D00276",
+        "level": "P",
+        "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00276+D00434"
+  },
+  "find:cisapride": "D00274",
+  "D00274 D00276": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404"
+  },
+  "D00276 D00298": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00276",
+        "b": "dr:D00298",
+        "level": "P",
+        "mechanism": "Transporter inhibition: ABCB1"
+      },
+      {
+        "a": "dr:D00298",
+        "b": "dr:D00276",
+        "level": "P",
+        "mechanism": "Transporter inhibition: ABCB1"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00276+D00298"
+  },
+  "D00437 D00944": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404"
+  },
+  "D00298 D00443": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00298",
+        "b": "dr:D00443",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00443",
+        "b": "dr:D00298",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00443+D00298"
+  },
+  "D00298 D00437": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00298",
+        "b": "dr:D00437",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00437",
+        "b": "dr:D00298",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00437+D00298"
+  },
+  "D00109 D07729": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00109",
+        "b": "dr:D07729",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D07729",
+        "b": "dr:D00109",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D07729+D00109"
+  },
+  "find:naproxen": "D00118",
+  "D00118 D07729": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00118",
+        "b": "dr:D07729",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D07729",
+        "b": "dr:D00118",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D07729+D00118"
+  },
+  "find:cyclosporine": "D00184",
+  "D00184 D00434": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00184",
+        "b": "dr:D00434",
+        "level": "P",
+        "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4"
+      },
+      {
+        "a": "dr:D00434",
+        "b": "dr:D00184",
+        "level": "P",
+        "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00434+D00184"
+  },
+  "find:ketoconazole": "D00351",
+  "D00351 D07086": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00351",
+        "b": "dr:D07086",
+        "level": "CI",
+        "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / Transporter inhibition: ABCB1"
+      },
+      {
+        "a": "dr:D07086",
+        "b": "dr:D00351",
+        "level": "CI",
+        "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / Transporter inhibition: ABCB1"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D07086+D00351"
+  },
+  "D00298 D00636": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00298",
+        "b": "dr:D00636",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00636",
+        "b": "dr:D00298",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00298+D00636"
+  },
+  "D00564 D00636": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00564",
+        "b": "dr:D00636",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00636",
+        "b": "dr:D00564",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00636+D00564"
+  },
+  "D00298 D00340": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00298",
+        "b": "dr:D00340",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00340",
+        "b": "dr:D00298",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00340+D00298"
+  },
+  "D00297 D00340": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00297",
+        "b": "dr:D00340",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00340",
+        "b": "dr:D00297",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00340+D00297"
+  },
+  "D00126 D00340": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00126",
+        "b": "dr:D00340",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00340",
+        "b": "dr:D00126",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00340+D00126"
+  },
+  "D00118 D00340": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00118",
+        "b": "dr:D00340",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00340",
+        "b": "dr:D00118",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00340+D00118"
+  },
+  "D00141 D00340": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00141",
+        "b": "dr:D00340",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00340",
+        "b": "dr:D00141",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00340+D00141"
+  },
+  "D00340 D00903": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00340",
+        "b": "dr:D00903",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00903",
+        "b": "dr:D00340",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00340+D00903"
+  },
+  "D00109 D00564": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00109",
+        "b": "dr:D00564",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00564",
+        "b": "dr:D00109",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00109+D00564"
+  },
+  "D00109 D02112": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00109",
+        "b": "dr:D02112",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D02112",
+        "b": "dr:D00109",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00109+D02112"
+  },
+  "D00109 D02837": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00109",
+        "b": "dr:D02837",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D02837",
+        "b": "dr:D00109",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00109+D02837"
+  },
+  "D00109 D00292": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00109",
+        "b": "dr:D00292",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00292",
+        "b": "dr:D00109",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00109+D00292"
+  },
+  "D00109 D00407": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00109",
+        "b": "dr:D00407",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00407",
+        "b": "dr:D00109",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00109+D00407"
+  },
+  "D00088 D00109": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00088",
+        "b": "dr:D00109",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00109",
+        "b": "dr:D00088",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00109+D00088"
+  },
+  "D00351 D00455": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00455+D00351"
+  },
+  "D00350 D00455": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00350",
+        "b": "dr:D00455",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00455",
+        "b": "dr:D00350",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00455+D00350"
+  },
+  "D00322 D00455": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00455+D00322"
+  },
+  "D00109 D00593": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00109",
+        "b": "dr:D00593",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00593",
+        "b": "dr:D00109",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00593+D00109"
+  },
+  "D00510 D00593": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00593+D00510"
+  },
+  "D00285 D00593": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00285",
+        "b": "dr:D00593",
+        "level": "P",
+        "mechanism": "CYP inhibition: CYP2C9"
+      },
+      {
+        "a": "dr:D00593",
+        "b": "dr:D00285",
+        "level": "P",
+        "mechanism": "CYP inhibition: CYP2C9"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00593+D00285"
+  },
+  "D00932 D00939": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00932",
+        "b": "dr:D00939",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00939",
+        "b": "dr:D00932",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00939+D00932"
+  },
+  "D00731 D00939": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00731",
+        "b": "dr:D00939",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00939",
+        "b": "dr:D00731",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00939+D00731"
+  },
+  "D00126 D00443": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00126",
+        "b": "dr:D00443",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00443",
+        "b": "dr:D00126",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00443+D00126"
+  },
+  "D00118 D00443": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00118",
+        "b": "dr:D00443",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00443",
+        "b": "dr:D00118",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00443+D00118"
+  },
+  "D00141 D00443": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00141",
+        "b": "dr:D00443",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00443",
+        "b": "dr:D00141",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00443+D00141"
+  },
+  "D00443 D00903": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00443",
+        "b": "dr:D00903",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00903",
+        "b": "dr:D00443",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00443+D00903"
+  },
+  "D00443 D02060": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00443",
+        "b": "dr:D02060",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D02060",
+        "b": "dr:D00443",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00443+D02060"
+  },
+  "D00443 D00621": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00443",
+        "b": "dr:D00621",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00621",
+        "b": "dr:D00443",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00443+D00621"
+  },
+  "D00400 D00443": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00400",
+        "b": "dr:D00443",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00443",
+        "b": "dr:D00400",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00443+D00400"
+  },
+  "D00184 D00443": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00184",
+        "b": "dr:D00443",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00443",
+        "b": "dr:D00184",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00443+D00184"
+  },
+  "D00126 D00564": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00126",
+        "b": "dr:D00564",
+        "level": "P",
+        "mechanism": "Enzyme: CYP2C9"
+      },
+      {
+        "a": "dr:D00564",
+        "b": "dr:D00126",
+        "level": "P",
+        "mechanism": "Enzyme: CYP2C9"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00126+D00564"
+  },
+  "D00126 D02112": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00126",
+        "b": "dr:D02112",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D02112",
+        "b": "dr:D00126",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00126+D02112"
+  },
+  "D00126 D02837": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00126",
+        "b": "dr:D02837",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D02837",
+        "b": "dr:D00126",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00126+D02837"
+  },
+  "D00126 D00298": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00126+D00298"
+  },
+  "D00126 D00297": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00126+D00297"
+  },
+  "D00126 D00142": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00126",
+        "b": "dr:D00142",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00142",
+        "b": "dr:D00126",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00126+D00142"
+  },
+  "D00126 D03828": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00126",
+        "b": "dr:D03828",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D03828",
+        "b": "dr:D00126",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00126+D03828"
+  },
+  "D00126 D00944": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00126+D00944"
+  },
+  "D00126 D00593": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00126",
+        "b": "dr:D00593",
+        "level": "P",
+        "mechanism": "Enzyme: CYP2C9"
+      },
+      {
+        "a": "dr:D00593",
+        "b": "dr:D00126",
+        "level": "P",
+        "mechanism": "Enzyme: CYP2C9"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00126+D00593"
+  },
+  "D00126 D00335": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00126",
+        "b": "dr:D00335",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00335",
+        "b": "dr:D00126",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00126+D00335"
+  },
+  "D00642 D02358": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D02358+D00642"
+  },
+  "D02260 D02358": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D02260",
+        "b": "dr:D02358",
+        "level": "P",
+        "mechanism": "Enzyme: CYP2D6 / CYP inhibition: CYP2D6"
+      },
+      {
+        "a": "dr:D02358",
+        "b": "dr:D02260",
+        "level": "P",
+        "mechanism": "Enzyme: CYP2D6 / CYP inhibition: CYP2D6"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D02358+D02260"
+  },
+  "D00326 D02358": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D02358+D00326"
+  },
+  "D00567 D02358": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D02358+D00567"
+  },
+  "D02060 D02060": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D02060+D02060"
+  },
+  "D00621 D02060": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00621",
+        "b": "dr:D02060",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D02060",
+        "b": "dr:D00621",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D02060+D00621"
+  },
+  "D00400 D02060": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00400",
+        "b": "dr:D02060",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D02060",
+        "b": "dr:D00400",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D02060+D00400"
+  },
+  "D00184 D02060": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00184",
+        "b": "dr:D02060",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D02060",
+        "b": "dr:D00184",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D02060+D00184"
+  },
+  "D00386 D02060": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00386",
+        "b": "dr:D02060",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D02060",
+        "b": "dr:D00386",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D02060+D00386"
+  },
+  "D00649 D02060": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00649",
+        "b": "dr:D02060",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D02060",
+        "b": "dr:D00649",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D02060+D00649"
+  },
+  "D00216 D00593": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00216",
+        "b": "dr:D00593",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00593",
+        "b": "dr:D00216",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00216+D00593"
+  },
+  "D00216 D00944": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00216",
+        "b": "dr:D00944",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00944",
+        "b": "dr:D00216",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00216+D00944"
+  },
+  "D00216 D03230": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00216",
+        "b": "dr:D03230",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D03230",
+        "b": "dr:D00216",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00216+D03230"
+  },
+  "D00386 D00400": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00386",
+        "b": "dr:D00400",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00400",
+        "b": "dr:D00386",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00400+D00386"
+  },
+  "D00400 D00649": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00400",
+        "b": "dr:D00649",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00649",
+        "b": "dr:D00400",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00400+D00649"
+  },
+  "D00400 D00621": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00400",
+        "b": "dr:D00621",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00621",
+        "b": "dr:D00400",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00400+D00621"
+  },
+  "D00400 D00400": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00400+D00400"
+  },
+  "D00184 D00400": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00184",
+        "b": "dr:D00400",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00400",
+        "b": "dr:D00184",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00400+D00184"
+  },
+  "D00564 D01010": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00564",
+        "b": "dr:D01010",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D01010",
+        "b": "dr:D00564",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D01010+D00564"
+  },
+  "D01010 D05457": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D01010",
+        "b": "dr:D05457",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D05457",
+        "b": "dr:D01010",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D01010+D05457"
+  },
+  "D00515 D02229": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00515",
+        "b": "dr:D02229",
+        "level": "CI",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D02229",
+        "b": "dr:D00515",
+        "level": "CI",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00515+D02229"
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "pairs": {
+    "克拉霉素 | 奥美拉唑": {
+      "status": "matched",
+      "evidence": [
+        {
+          "drug_a": "奥美拉唑",
+          "drug_b": "克拉霉素",
+          "severity": "moderate",
+          "mechanism": null,
+          "effect": "增加中枢神经系统（主要是头痛）及胃肠道不良反应的发生率",
+          "management": null,
+          "source_text": "奥美拉唑与克拉霉素联合用药可增加中枢神经系统（主要是头痛）及胃肠道不良反应的发生率。",
+          "source_url": "https://www.yaozs.com/sms1461/",
+          "origin": "rag+llm",
+          "curated": false
+        },
+        {
+          "drug_a": "奥美拉唑",
+          "drug_b": "克拉霉素",
+          "severity": "moderate",
+          "mechanism": null,
+          "effect": "增加中枢神经系统（主要是头痛）及胃肠道不良反应的发生率",
+          "management": null,
+          "source_text": "奥美拉唑与克拉霉素联合用药可增加中枢神经系统（主要是头痛）及胃肠道不良反应的发生率。",
+          "source_url": "https://www.yaozs.com/sms381/",
+          "origin": "rag+llm",
+          "curated": false
+        },
+        {
+          "drug_a": "奥美拉唑",
+          "drug_b": "克拉霉素",
+          "severity": "moderate",
+          "mechanism": null,
+          "effect": "增加中枢神经系统（主要是头痛）及胃肠道不良反应的发生率",
+          "management": null,
+          "source_text": "奥美拉唑与克拉霉素联合用药可增加中枢神经系统（主要是头痛）及胃肠道不良反应的发生率。",
+          "source_url": "https://www.yaozs.com/sms1532/",
+          "origin": "rag+llm",
+          "curated": false
+        },
+        {
+          "drug_a": "奥美拉唑",
+          "drug_b": "克拉霉素",
+          "severity": "moderate",
+          "mechanism": null,
+          "effect": "增加中枢神经系统（主要是头痛）及胃肠道不良反应的发生率",
+          "management": null,
+          "source_text": "奥美拉唑与克拉霉素联合用药可增加中枢神经系统（主要是头痛）及胃肠道不良反应的发生率。",
+          "source_url": "https://www.yaozs.com/sms1522/",
+          "origin": "rag+llm",
+          "curated": false
+        }
+      ],
+      "attempted_chunk_ids": [
+        "Rb2e80d6aa15a9158",
+        "Rbb0cf672fe580db3",
+        "Rb89709da26e01472",
+        "Ra39ffd21dd70edb6"
+      ],
+      "cached_at": "2026-08-27T08:06:10.663215+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "布洛芬 | 阿司匹林": {
+      "status": "not_found",
+      "evidence": [],
+      "attempted_chunk_ids": [
+        "R5c097caa5a25b642",
+        "Rce70d0bc5e843ed1"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T10:53:56.038679+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    }
+  }
+}

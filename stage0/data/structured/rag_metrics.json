@@ -1,0 +1,1800 @@
+{
+  "evaluation_design": "hand-written Chinese queries with manually assigned relevant local section chunk ids",
+  "query_count": 45,
+  "corpus_labels": 1200,
+  "index_chunks": 4158,
+  "model": "BAAI/bge-small-zh-v1.5",
+  "fusion": {
+    "method": "weighted reciprocal-rank fusion",
+    "bm25_weight": 0.5,
+    "vector_weight": 0.5,
+    "rrf_k": 60
+  },
+  "methods": {
+    "bm25": {
+      "query_count": 45,
+      "recall_at_5": 0.9333,
+      "mrr": 0.7946,
+      "records": [
+        {
+          "query_id": "Q01",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R7f54fcb6851a8bfb",
+            "Rf4ce99b0e579f983",
+            "R68c9d4efd498536f",
+            "R9f3192a9e464ef82",
+            "R3d0f3f672e800b05"
+          ]
+        },
+        {
+          "query_id": "Q02",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 5,
+          "reciprocal_rank": 0.2,
+          "retrieved_at_5": [
+            "R88569c4f8202390e",
+            "Rf1f8ce3b9b2936e8",
+            "R698e20c907204de1",
+            "R773a60003eeeab99",
+            "Rf2604ed2a7983f45"
+          ]
+        },
+        {
+          "query_id": "Q03",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 5,
+          "reciprocal_rank": 0.2,
+          "retrieved_at_5": [
+            "Rff49ba888ab523be",
+            "Rd350ee1bb8d83de7",
+            "R75bb12931882ae52",
+            "R1c94168ba83fd2a1",
+            "Rfc8e3b8b6a0d2d22"
+          ]
+        },
+        {
+          "query_id": "Q04",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R275ff8e91a674401",
+            "Rf79189dc9276a1c1",
+            "Rd33644788025f0de",
+            "Rfd8579fcaeff6621",
+            "R210c505806aaa1fb"
+          ]
+        },
+        {
+          "query_id": "Q05",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R3381c72831765aed",
+            "Rd8e410d474145c92",
+            "R9ac5e40ec19ac34b",
+            "R4ef2c0bb5d7a8c90",
+            "R23ee314da64b5558"
+          ]
+        },
+        {
+          "query_id": "Q06",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R38eb01438e3a1b7c",
+            "R52a2b234655144b2",
+            "R2e53a49ba029bde8",
+            "Rf89f29eea7a6d2c2",
+            "Rb28bc18831db5494"
+          ]
+        },
+        {
+          "query_id": "Q07",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R607e31c34a1f5423",
+            "R6e46eb85108d395c",
+            "R59630345039baf16",
+            "R50849cee9e727c2e",
+            "Rf1203b3a79922d75"
+          ]
+        },
+        {
+          "query_id": "Q08",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rf02486bc5dc8f6b0",
+            "Re235d7efb9293b31",
+            "R9840b19c568f65e3",
+            "R84224ef5da932bd3",
+            "R67356ce8256e9946"
+          ]
+        },
+        {
+          "query_id": "Q09",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R112740f31455484b",
+            "R01f357ccbd656fc2",
+            "R64909c47bfdf251b",
+            "Ra1b5294c17d01de5",
+            "Rba5245146d72330e"
+          ]
+        },
+        {
+          "query_id": "Q10",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R9840b19c568f65e3",
+            "R6f11b1a6e893f4d8",
+            "R0fcbd9209935b65b",
+            "Rbb845cfe2e25fd85",
+            "Rb774c8d66bde17c7"
+          ]
+        },
+        {
+          "query_id": "Q11",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R0420bdfda06afff0",
+            "R780a29fc4764c1cc",
+            "R36defc3e30097548",
+            "Rb3be0670df92d243",
+            "R3847e5df7972977d"
+          ]
+        },
+        {
+          "query_id": "Q12",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 4,
+          "reciprocal_rank": 0.25,
+          "retrieved_at_5": [
+            "R87432bf251ab9907",
+            "R2a64cf95c70c48ff",
+            "Rabda844fb2dfd832",
+            "R3b7a689807b021ee",
+            "R601ef6eb52dcd1eb"
+          ]
+        },
+        {
+          "query_id": "Q13",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rf84662024c0a32cd",
+            "Red85ff6a6ee8387c",
+            "R8b28c8bb525c027b",
+            "R801032b2eb87fa16",
+            "Rceca493bd59de1b5"
+          ]
+        },
+        {
+          "query_id": "Q14",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R0ac8ed880990c857",
+            "R81d850f78de59b2f",
+            "R9a70c43b700f735f",
+            "R6ac9f890741847f3",
+            "R8096bd821511b089"
+          ]
+        },
+        {
+          "query_id": "Q15",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R0e4d9ee4b8407ef4",
+            "Rb189ff4fa1c2f82e",
+            "Re99b84f2d591c7fb",
+            "Rb5ed054d685a26f3",
+            "R6e60dacf642fd604"
+          ]
+        },
+        {
+          "query_id": "Q16",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Re99b84f2d591c7fb",
+            "R2aba8ca3ae1eb8b6",
+            "Rb3125199a0d2400b",
+            "Rec9c7514d236b9bd",
+            "R5a8cad89bf652fd2"
+          ]
+        },
+        {
+          "query_id": "Q17",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R35252bab8dd50ff2",
+            "R632cb654f4f4e2d2",
+            "R241062450a909608",
+            "R4ef6a74f3c00f0d6",
+            "Rd311466aee4c0395"
+          ]
+        },
+        {
+          "query_id": "Q18",
+          "recall_at_5": 0.0,
+          "first_relevant_rank": 16,
+          "reciprocal_rank": 0.0625,
+          "retrieved_at_5": [
+            "R9db07e3da2fd01c1",
+            "Rcb8b5c2d6442ec6a",
+            "Ra9a83d61c756e23c",
+            "R24a871989cb35436",
+            "Rbd7e310ea28a6abb"
+          ]
+        },
+        {
+          "query_id": "Q19",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rd448efeb4e4b350d",
+            "R55822760adbcd353",
+            "R08fc668420131306",
+            "Rcbadcc9070f3dbea",
+            "R2ad204e3fb4f2950"
+          ]
+        },
+        {
+          "query_id": "Q20",
+          "recall_at_5": 0.0,
+          "first_relevant_rank": 22,
+          "reciprocal_rank": 0.045455,
+          "retrieved_at_5": [
+            "R9b7c24766132fd02",
+            "R4202b758f471808b",
+            "Re7a3ae8c515dfe9c",
+            "R195186edc35a156f",
+            "Rc4cd1c1122097d86"
+          ]
+        },
+        {
+          "query_id": "Q21",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R467e3d870a7af1e6",
+            "R6ac9f890741847f3",
+            "R2da48e6672c62900",
+            "R25bb27bbba1b2fc4",
+            "Rcf2546cb2174a584"
+          ]
+        },
+        {
+          "query_id": "Q22",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R8598c0226a0301e7",
+            "Ra57c29aa462a2e55",
+            "Re95bd7eab3a1f2f4",
+            "R02272f1a075387b5",
+            "R822f0bdc40706ba9"
+          ]
+        },
+        {
+          "query_id": "Q23",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 2,
+          "reciprocal_rank": 0.5,
+          "retrieved_at_5": [
+            "R792023c52b4df06f",
+            "R88e6aedfa4a0bb86",
+            "R9d422aad3a0d9b4a",
+            "R9db07e3da2fd01c1",
+            "Rcb8b5c2d6442ec6a"
+          ]
+        },
+        {
+          "query_id": "Q24",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Re2af66b75be57c85",
+            "Ra53184669ed07ebb",
+            "R0ae9c169e5e8399c",
+            "Reaf180a58bd09b76",
+            "Ref224d2d4796cfbe"
+          ]
+        },
+        {
+          "query_id": "Q25",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R9717e3ddec15c8c2",
+            "R01ff428daaa30c34",
+            "R253e57ebad2859cd",
+            "R0620909bb4399bd9",
+            "Recd8987dbfe28ecf"
+          ]
+        },
+        {
+          "query_id": "Q26",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 4,
+          "reciprocal_rank": 0.25,
+          "retrieved_at_5": [
+            "R6c176d920357239c",
+            "R732ff0e68f891cf8",
+            "R2dd166d58bd81c9c",
+            "R56627664292beee3",
+            "R45212ed2f2f80fc9"
+          ]
+        },
+        {
+          "query_id": "Q27",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R6c422cf99f8ae9f7",
+            "R39554c1c6021f7e6",
+            "R5a634cb63e917bc0",
+            "Re7a283c4f2023d09",
+            "R70d0f40ce5d32312"
+          ]
+        },
+        {
+          "query_id": "Q28",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 4,
+          "reciprocal_rank": 0.25,
+          "retrieved_at_5": [
+            "R6b63e8b21aed9885",
+            "R2618191953ba3985",
+            "Rab7dc3aba0b747c4",
+            "Rfd8579fcaeff6621",
+            "Rc3f36f837d202288"
+          ]
+        },
+        {
+          "query_id": "Q29",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 3,
+          "reciprocal_rank": 0.333333,
+          "retrieved_at_5": [
+            "R2644c73cb12b4464",
+            "Re778dc832852181b",
+            "Rebc66c234240a078",
+            "R1c49b6fddb1c9b49",
+            "R82ef231af8569366"
+          ]
+        },
+        {
+          "query_id": "Q30",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 2,
+          "reciprocal_rank": 0.5,
+          "retrieved_at_5": [
+            "Rdc232d8e89ff6033",
+            "Rd4b0047671eca73e",
+            "R4d30b12a224f45c8",
+            "R22bf7610f6fd8613",
+            "R7138c749d8fea7e9"
+          ]
+        },
+        {
+          "query_id": "Q31",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R04a47e8479578035",
+            "R17096ac49fc1bf0e",
+            "Ra7705cb46447e10c",
+            "Re44cea8c40316205",
+            "Rfeb4b8572630a0c2"
+          ]
+        },
+        {
+          "query_id": "Q32",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R9e8ed3a712c2052e",
+            "Rcc4d19b6c2d4a4e8",
+            "R316f9dc46cec58e2",
+            "R0a55dc7351fa51f5",
+            "R5dfd31049d686528"
+          ]
+        },
+        {
+          "query_id": "Q33",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rf79189dc9276a1c1",
+            "R28f84085ca729155",
+            "R1ae952339b8e2655",
+            "R38b2930b43851569",
+            "R366c902664c94a11"
+          ]
+        },
+        {
+          "query_id": "Q34",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rb774c8d66bde17c7",
+            "Rd9c5b5c0a70e117b",
+            "Rae93ad5cb4011add",
+            "Rc15cc5f5cc8f390f",
+            "Rd7cdc370258cfbef"
+          ]
+        },
+        {
+          "query_id": "Q35",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R760396e91ea721ba",
+            "R63100585d0a4bbe3",
+            "Rec003f6edca4dbc9",
+            "R22f114298670a769",
+            "R9a594f578f0d5a23"
+          ]
+        },
+        {
+          "query_id": "Q36",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R5fea8bf0a9bb7aba",
+            "R49b4f97b25424812",
+            "R1b43767ec3ac763f",
+            "R433b9026d73f906e",
+            "R98372f767b1ffebd"
+          ]
+        },
+        {
+          "query_id": "Q37",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rb8bc7c13550768dc",
+            "Rce70d0bc5e843ed1",
+            "R6b93e8e414de9d94",
+            "Rd2ec45428d569a52",
+            "Rd02ec385c9eda52d"
+          ]
+        },
+        {
+          "query_id": "Q38",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R07bbafe1f799923b",
+            "R2d5ab15f6d65ef1f",
+            "R8d9cc0840508557d",
+            "Rd4a21094cb8cf77e",
+            "Rddb7feee1cfe4342"
+          ]
+        },
+        {
+          "query_id": "Q39",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rfbc9fe7a0d9d9ddd",
+            "Rb5ed054d685a26f3",
+            "R9ac6cad6a0791977",
+            "R9ba5d9dff87c3911",
+            "R89368966393f2a05"
+          ]
+        },
+        {
+          "query_id": "Q40",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R9beb2b861dee7b45",
+            "R63100585d0a4bbe3",
+            "R76e8ffb45e96b138",
+            "Rc15cc5f5cc8f390f",
+            "R56627664292beee3"
+          ]
+        },
+        {
+          "query_id": "Q41",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 2,
+          "reciprocal_rank": 0.5,
+          "retrieved_at_5": [
+            "R4782de9040e10c2a",
+            "R9fa366d316d5e5e7",
+            "R9acedf8e76af25f5",
+            "R7cbcff4cd9cb5879",
+            "Rdbe2d4ac79a853f1"
+          ]
+        },
+        {
+          "query_id": "Q42",
+          "recall_at_5": 0.0,
+          "first_relevant_rank": 6,
+          "reciprocal_rank": 0.166667,
+          "retrieved_at_5": [
+            "R253e57ebad2859cd",
+            "R2bc9218a60ab4a6e",
+            "R01ff428daaa30c34",
+            "R9717e3ddec15c8c2",
+            "Rb26278ba1ccd241c"
+          ]
+        },
+        {
+          "query_id": "Q43",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 2,
+          "reciprocal_rank": 0.5,
+          "retrieved_at_5": [
+            "R42875be848dff7cc",
+            "R33a621fedc378d50",
+            "R55f0d7a563be5430",
+            "R61338611500d2991",
+            "Rf1abaeb240da3e99"
+          ]
+        },
+        {
+          "query_id": "Q44",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R6de2fca3cbbe4c48",
+            "Rba5245146d72330e",
+            "R275ff8e91a674401",
+            "Rf5b0fba3786d5633",
+            "Rfc4571c9ae789214"
+          ]
+        },
+        {
+          "query_id": "Q45",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R5cbbd51192236b04",
+            "R47a7c33b18ad8ce0",
+            "R340f232e34ea3f4d",
+            "R5fea8bf0a9bb7aba",
+            "R366c902664c94a11"
+          ]
+        }
+      ]
+    },
+    "vector": {
+      "query_count": 45,
+      "recall_at_5": 0.8222,
+      "mrr": 0.7181,
+      "records": [
+        {
+          "query_id": "Q01",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R7f54fcb6851a8bfb",
+            "R032caa0455b0c435",
+            "Ra99c53107deef426",
+            "R0962c5dc2b7661d0",
+            "Re0101358fcd96d8e"
+          ]
+        },
+        {
+          "query_id": "Q02",
+          "recall_at_5": 0.0,
+          "first_relevant_rank": 28,
+          "reciprocal_rank": 0.035714,
+          "retrieved_at_5": [
+            "R68144ab590b27343",
+            "R18befde2dcee90d0",
+            "R36b18ef811e196eb",
+            "Rafca54e23ae5ab39",
+            "Rcae7c3af0c3efccc"
+          ]
+        },
+        {
+          "query_id": "Q03",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rfc8e3b8b6a0d2d22",
+            "R75bb12931882ae52",
+            "Rd350ee1bb8d83de7",
+            "Rff49ba888ab523be",
+            "R1c94168ba83fd2a1"
+          ]
+        },
+        {
+          "query_id": "Q04",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 2,
+          "reciprocal_rank": 0.5,
+          "retrieved_at_5": [
+            "R3d13cf0df6e179c0",
+            "R275ff8e91a674401",
+            "R28cc3ccb0d7a759f",
+            "R6e3191eb4835ed4f",
+            "R75bb12931882ae52"
+          ]
+        },
+        {
+          "query_id": "Q05",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R3381c72831765aed",
+            "R9ac5e40ec19ac34b",
+            "R4ef2c0bb5d7a8c90",
+            "Rd8e410d474145c92",
+            "R6439cf9dbefdbc81"
+          ]
+        },
+        {
+          "query_id": "Q06",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R38eb01438e3a1b7c",
+            "R52a2b234655144b2",
+            "R2b29c156a8699dae",
+            "R92caa8db253b4eb9",
+            "R6f4c8f7c4cd0d144"
+          ]
+        },
+        {
+          "query_id": "Q07",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R607e31c34a1f5423",
+            "R63100585d0a4bbe3",
+            "R9e8da627ea1d374c",
+            "R03d52290434e37aa",
+            "Rb4bd86e64c253484"
+          ]
+        },
+        {
+          "query_id": "Q08",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rf02486bc5dc8f6b0",
+            "Re235d7efb9293b31",
+            "R84224ef5da932bd3",
+            "R9840b19c568f65e3",
+            "R131d6283343cd296"
+          ]
+        },
+        {
+          "query_id": "Q09",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 2,
+          "reciprocal_rank": 0.5,
+          "retrieved_at_5": [
+            "R01f357ccbd656fc2",
+            "R112740f31455484b",
+            "R64909c47bfdf251b",
+            "Rbd9c9199cf2a16a7",
+            "R2f70e57036502937"
+          ]
+        },
+        {
+          "query_id": "Q10",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R9840b19c568f65e3",
+            "R50ca4377a9b0a890",
+            "R699608d1fe522853",
+            "R0bc7a9414ab96461",
+            "R78eed01bd7d5d91a"
+          ]
+        },
+        {
+          "query_id": "Q11",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R0420bdfda06afff0",
+            "Rb5ed054d685a26f3",
+            "R9d0b46559e949ceb",
+            "R7487ba551bc6c3b1",
+            "R0572eac7cb7f7b88"
+          ]
+        },
+        {
+          "query_id": "Q12",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 4,
+          "reciprocal_rank": 0.25,
+          "retrieved_at_5": [
+            "Rabda844fb2dfd832",
+            "R2a64cf95c70c48ff",
+            "R87432bf251ab9907",
+            "R3b7a689807b021ee",
+            "Rc94c8bf1da37b811"
+          ]
+        },
+        {
+          "query_id": "Q13",
+          "recall_at_5": 0.0,
+          "first_relevant_rank": 6,
+          "reciprocal_rank": 0.166667,
+          "retrieved_at_5": [
+            "R33a621fedc378d50",
+            "Rd0fc3ff40cbc76f2",
+            "R73c77ddec47cc3d9",
+            "R42875be848dff7cc",
+            "R0db7a28f18a07931"
+          ]
+        },
+        {
+          "query_id": "Q14",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 3,
+          "reciprocal_rank": 0.333333,
+          "retrieved_at_5": [
+            "R2da48e6672c62900",
+            "R25bb27bbba1b2fc4",
+            "R0ac8ed880990c857",
+            "R467e3d870a7af1e6",
+            "R81d850f78de59b2f"
+          ]
+        },
+        {
+          "query_id": "Q15",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R0e4d9ee4b8407ef4",
+            "Re99b84f2d591c7fb",
+            "R9e8da627ea1d374c",
+            "R03d52290434e37aa",
+            "Rc71052a146d8d2fa"
+          ]
+        },
+        {
+          "query_id": "Q16",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Re99b84f2d591c7fb",
+            "R47c7bdfe7e7cc3ee",
+            "R137319a5569eda29",
+            "Rc0442aafc450902f",
+            "Rde2362b7643a3736"
+          ]
+        },
+        {
+          "query_id": "Q17",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 2,
+          "reciprocal_rank": 0.5,
+          "retrieved_at_5": [
+            "R632cb654f4f4e2d2",
+            "R35252bab8dd50ff2",
+            "R241062450a909608",
+            "R78b5dc56497aa50d",
+            "R92c37b9baf7b5faa"
+          ]
+        },
+        {
+          "query_id": "Q18",
+          "recall_at_5": 0.0,
+          "first_relevant_rank": 27,
+          "reciprocal_rank": 0.037037,
+          "retrieved_at_5": [
+            "Rdaf9f2fb6064c546",
+            "R958a8a2568416cf5",
+            "R62d8f1e75fc0f05a",
+            "R8e11d5a746659218",
+            "Rcd3c881c447229fd"
+          ]
+        },
+        {
+          "query_id": "Q19",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rd448efeb4e4b350d",
+            "R1c111c08e7898eee",
+            "Rd3abb453d1f03ad2",
+            "R9f5b138e51adb91f",
+            "R2e82adfbbbf8ee4b"
+          ]
+        },
+        {
+          "query_id": "Q20",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R4d989e5ac99ec063",
+            "R5a0478a122ed0ba9",
+            "R8e3bb79297dc01d4",
+            "Rcb5f443d02fe6caf",
+            "R2a6e7887d8aa27a7"
+          ]
+        },
+        {
+          "query_id": "Q21",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R467e3d870a7af1e6",
+            "R0ac8ed880990c857",
+            "Rcf2546cb2174a584",
+            "R25bb27bbba1b2fc4",
+            "R2da48e6672c62900"
+          ]
+        },
+        {
+          "query_id": "Q22",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R8598c0226a0301e7",
+            "R088a9bfe4155ad70",
+            "R59267bb843352fee",
+            "R5ac6b767014e67f7",
+            "Rcbc5c1595ef50824"
+          ]
+        },
+        {
+          "query_id": "Q23",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 2,
+          "reciprocal_rank": 0.5,
+          "retrieved_at_5": [
+            "Ra2106d7693381df7",
+            "R88e6aedfa4a0bb86",
+            "R792023c52b4df06f",
+            "Rc81a39072eab07a3",
+            "Rfcdeae654fbda1bb"
+          ]
+        },
+        {
+          "query_id": "Q24",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 3,
+          "reciprocal_rank": 0.333333,
+          "retrieved_at_5": [
+            "R0ae9c169e5e8399c",
+            "Re8f54ce85b58fe7d",
+            "Re2af66b75be57c85",
+            "R9da3d5ea6f15370f",
+            "Ra7f32a51a588cfe0"
+          ]
+        },
+        {
+          "query_id": "Q25",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R9717e3ddec15c8c2",
+            "R01ff428daaa30c34",
+            "R253e57ebad2859cd",
+            "Rf02486bc5dc8f6b0",
+            "Rffee1127ec6c3dcb"
+          ]
+        },
+        {
+          "query_id": "Q26",
+          "recall_at_5": 0.0,
+          "first_relevant_rank": 6,
+          "reciprocal_rank": 0.166667,
+          "retrieved_at_5": [
+            "R732ff0e68f891cf8",
+            "Rf009513d6cee8705",
+            "Rebe7184bbac26f4b",
+            "R45212ed2f2f80fc9",
+            "R5426f19a80f6d9cf"
+          ]
+        },
+        {
+          "query_id": "Q27",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R6c422cf99f8ae9f7",
+            "R39554c1c6021f7e6",
+            "R5a634cb63e917bc0",
+            "R6e8f6e063d9d144a",
+            "R59a9870464fe5f22"
+          ]
+        },
+        {
+          "query_id": "Q28",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rfd8579fcaeff6621",
+            "Rdcde34e40e5b5e9f",
+            "R83a5267670c152a9",
+            "R731a18f778496f95",
+            "Rc3f36f837d202288"
+          ]
+        },
+        {
+          "query_id": "Q29",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rebc66c234240a078",
+            "R94be84319284cab7",
+            "R2644c73cb12b4464",
+            "Re778dc832852181b",
+            "R82ef231af8569366"
+          ]
+        },
+        {
+          "query_id": "Q30",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rd4b0047671eca73e",
+            "R19476bc0a8c630eb",
+            "R3cd2479de3e2c17e",
+            "Re0250a0ba82ca453",
+            "R59183211862242df"
+          ]
+        },
+        {
+          "query_id": "Q31",
+          "recall_at_5": 0.0,
+          "first_relevant_rank": 11,
+          "reciprocal_rank": 0.090909,
+          "retrieved_at_5": [
+            "R17096ac49fc1bf0e",
+            "Ra7705cb46447e10c",
+            "Rebc66c234240a078",
+            "Rbfa7ccb47999d025",
+            "R2c6a4881a011f3f8"
+          ]
+        },
+        {
+          "query_id": "Q32",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R9e8ed3a712c2052e",
+            "R0a55dc7351fa51f5",
+            "R316f9dc46cec58e2",
+            "R7f79bcffa8806cb4",
+            "Rbd0996213000c39d"
+          ]
+        },
+        {
+          "query_id": "Q33",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rf79189dc9276a1c1",
+            "R1ae952339b8e2655",
+            "R28f84085ca729155",
+            "R78b5dc56497aa50d",
+            "Reef19f81f14ba732"
+          ]
+        },
+        {
+          "query_id": "Q34",
+          "recall_at_5": 0.0,
+          "first_relevant_rank": 9,
+          "reciprocal_rank": 0.111111,
+          "retrieved_at_5": [
+            "R8c94bce4b9dbf660",
+            "Rb189ff4fa1c2f82e",
+            "R376d199b1dd5344e",
+            "R9e8da627ea1d374c",
+            "R03d52290434e37aa"
+          ]
+        },
+        {
+          "query_id": "Q35",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R760396e91ea721ba",
+            "R8b543c5a3be0bbc0",
+            "R20102b300d0f9249",
+            "R4d989e5ac99ec063",
+            "R7218f2ef9f35fa9c"
+          ]
+        },
+        {
+          "query_id": "Q36",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 3,
+          "reciprocal_rank": 0.333333,
+          "retrieved_at_5": [
+            "R78b5dc56497aa50d",
+            "R9e8ed3a712c2052e",
+            "R5fea8bf0a9bb7aba",
+            "R56c86f76784e63b1",
+            "Rfe2f5e338e328b87"
+          ]
+        },
+        {
+          "query_id": "Q37",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rb8bc7c13550768dc",
+            "R6b93e8e414de9d94",
+            "Rd02ec385c9eda52d",
+            "R8f63dd7a137c4ff1",
+            "Rb4d247f8e8b64c52"
+          ]
+        },
+        {
+          "query_id": "Q38",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R07bbafe1f799923b",
+            "Rc7c94fc82b256eae",
+            "Rf032f2679aab27b8",
+            "Rc09332ab780080fa",
+            "R56542e0e943b44ba"
+          ]
+        },
+        {
+          "query_id": "Q39",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 4,
+          "reciprocal_rank": 0.25,
+          "retrieved_at_5": [
+            "R7487ba551bc6c3b1",
+            "R0572eac7cb7f7b88",
+            "R89807ebd37920f35",
+            "Rfbc9fe7a0d9d9ddd",
+            "R0420bdfda06afff0"
+          ]
+        },
+        {
+          "query_id": "Q40",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R9beb2b861dee7b45",
+            "Ra784dcabf89370f9",
+            "R41dc77022765c352",
+            "R2bc9218a60ab4a6e",
+            "R251418603622ae2e"
+          ]
+        },
+        {
+          "query_id": "Q41",
+          "recall_at_5": 0.0,
+          "first_relevant_rank": 6,
+          "reciprocal_rank": 0.166667,
+          "retrieved_at_5": [
+            "Rdbe2d4ac79a853f1",
+            "R7cbcff4cd9cb5879",
+            "R9acedf8e76af25f5",
+            "Rdd5194cf996ab4a7",
+            "R4782de9040e10c2a"
+          ]
+        },
+        {
+          "query_id": "Q42",
+          "recall_at_5": 0.0,
+          "first_relevant_rank": 25,
+          "reciprocal_rank": 0.04,
+          "retrieved_at_5": [
+            "Ra7e3066ffa7acd2d",
+            "Rbf18aad613381e94",
+            "R3d57ddd8870733b7",
+            "Raa76fbd13a5a63be",
+            "R2ec28e8e1f116545"
+          ]
+        },
+        {
+          "query_id": "Q43",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R33a621fedc378d50",
+            "R42875be848dff7cc",
+            "R056d22b579e2f57e",
+            "Rd7cdc370258cfbef",
+            "R8d9cc0840508557d"
+          ]
+        },
+        {
+          "query_id": "Q44",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R6de2fca3cbbe4c48",
+            "Re7a283c4f2023d09",
+            "R70d0f40ce5d32312",
+            "R0db7a28f18a07931",
+            "R43a0caad7ea57865"
+          ]
+        },
+        {
+          "query_id": "Q45",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R5cbbd51192236b04",
+            "R47a7c33b18ad8ce0",
+            "R340f232e34ea3f4d",
+            "R17096ac49fc1bf0e",
+            "R9ffbcf4c3dcb3efc"
+          ]
+        }
+      ]
+    },
+    "hybrid": {
+      "query_count": 45,
+      "recall_at_5": 0.9556,
+      "mrr": 0.8283,
+      "records": [
+        {
+          "query_id": "Q01",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R7f54fcb6851a8bfb",
+            "R9f3192a9e464ef82",
+            "Ra34a1f870fa0cded",
+            "Ra9928e4b51716f72",
+            "Rbff42d68384d0937"
+          ]
+        },
+        {
+          "query_id": "Q02",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 2,
+          "reciprocal_rank": 0.5,
+          "retrieved_at_5": [
+            "R68144ab590b27343",
+            "Rf2604ed2a7983f45",
+            "R698e20c907204de1",
+            "R773a60003eeeab99",
+            "R3bc4128b83df5acc"
+          ]
+        },
+        {
+          "query_id": "Q03",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 4,
+          "reciprocal_rank": 0.25,
+          "retrieved_at_5": [
+            "Rff49ba888ab523be",
+            "Rd350ee1bb8d83de7",
+            "R75bb12931882ae52",
+            "Rfc8e3b8b6a0d2d22",
+            "R1c94168ba83fd2a1"
+          ]
+        },
+        {
+          "query_id": "Q04",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R275ff8e91a674401",
+            "R3d13cf0df6e179c0",
+            "R28cc3ccb0d7a759f",
+            "R6e3191eb4835ed4f",
+            "R77b24a2d0a5886b4"
+          ]
+        },
+        {
+          "query_id": "Q05",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R3381c72831765aed",
+            "R9ac5e40ec19ac34b",
+            "Rd8e410d474145c92",
+            "R4ef2c0bb5d7a8c90",
+            "R23ee314da64b5558"
+          ]
+        },
+        {
+          "query_id": "Q06",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R38eb01438e3a1b7c",
+            "R52a2b234655144b2",
+            "R2e53a49ba029bde8",
+            "R2b29c156a8699dae",
+            "Rf89f29eea7a6d2c2"
+          ]
+        },
+        {
+          "query_id": "Q07",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R607e31c34a1f5423",
+            "R6e46eb85108d395c",
+            "R59630345039baf16",
+            "R50849cee9e727c2e",
+            "Rf1203b3a79922d75"
+          ]
+        },
+        {
+          "query_id": "Q08",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rf02486bc5dc8f6b0",
+            "Re235d7efb9293b31",
+            "R84224ef5da932bd3",
+            "R9840b19c568f65e3",
+            "R131d6283343cd296"
+          ]
+        },
+        {
+          "query_id": "Q09",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 2,
+          "reciprocal_rank": 0.5,
+          "retrieved_at_5": [
+            "R01f357ccbd656fc2",
+            "R112740f31455484b",
+            "R64909c47bfdf251b",
+            "Rbd9c9199cf2a16a7",
+            "Ra1b5294c17d01de5"
+          ]
+        },
+        {
+          "query_id": "Q10",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R9840b19c568f65e3",
+            "R6f11b1a6e893f4d8",
+            "Rbb845cfe2e25fd85",
+            "R0fcbd9209935b65b",
+            "R131d6283343cd296"
+          ]
+        },
+        {
+          "query_id": "Q11",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R0420bdfda06afff0",
+            "Rcf6be33299a6f48b",
+            "R41dc77022765c352",
+            "Ra784dcabf89370f9",
+            "R780a29fc4764c1cc"
+          ]
+        },
+        {
+          "query_id": "Q12",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 4,
+          "reciprocal_rank": 0.25,
+          "retrieved_at_5": [
+            "Rabda844fb2dfd832",
+            "R87432bf251ab9907",
+            "R2a64cf95c70c48ff",
+            "R3b7a689807b021ee",
+            "R601ef6eb52dcd1eb"
+          ]
+        },
+        {
+          "query_id": "Q13",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rf84662024c0a32cd",
+            "R8b28c8bb525c027b",
+            "Red85ff6a6ee8387c",
+            "R801032b2eb87fa16",
+            "R8f63dd7a137c4ff1"
+          ]
+        },
+        {
+          "query_id": "Q14",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R0ac8ed880990c857",
+            "R2da48e6672c62900",
+            "R81d850f78de59b2f",
+            "R25bb27bbba1b2fc4",
+            "R6ac9f890741847f3"
+          ]
+        },
+        {
+          "query_id": "Q15",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R0e4d9ee4b8407ef4",
+            "Re99b84f2d591c7fb",
+            "R6e60dacf642fd604",
+            "R09efce7de82eb047",
+            "Rc71052a146d8d2fa"
+          ]
+        },
+        {
+          "query_id": "Q16",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Re99b84f2d591c7fb",
+            "Rde2362b7643a3736",
+            "R2aba8ca3ae1eb8b6",
+            "R137319a5569eda29",
+            "Rc0442aafc450902f"
+          ]
+        },
+        {
+          "query_id": "Q17",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R35252bab8dd50ff2",
+            "R632cb654f4f4e2d2",
+            "R241062450a909608",
+            "Rdaf9f2fb6064c546",
+            "Rcd3c881c447229fd"
+          ]
+        },
+        {
+          "query_id": "Q18",
+          "recall_at_5": 0.0,
+          "first_relevant_rank": 14,
+          "reciprocal_rank": 0.071429,
+          "retrieved_at_5": [
+            "Rdaf9f2fb6064c546",
+            "Rcd3c881c447229fd",
+            "R9db07e3da2fd01c1",
+            "Rcb8b5c2d6442ec6a",
+            "Ra9a83d61c756e23c"
+          ]
+        },
+        {
+          "query_id": "Q19",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rd448efeb4e4b350d",
+            "R08fc668420131306",
+            "R2e82adfbbbf8ee4b",
+            "R4518651b40de92b7",
+            "R8db84ab8c4c39999"
+          ]
+        },
+        {
+          "query_id": "Q20",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 2,
+          "reciprocal_rank": 0.5,
+          "retrieved_at_5": [
+            "R9b7c24766132fd02",
+            "R4d989e5ac99ec063",
+            "R4202b758f471808b",
+            "R5a0478a122ed0ba9",
+            "Re7a3ae8c515dfe9c"
+          ]
+        },
+        {
+          "query_id": "Q21",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R467e3d870a7af1e6",
+            "R6ac9f890741847f3",
+            "R2da48e6672c62900",
+            "Rcf2546cb2174a584",
+            "R25bb27bbba1b2fc4"
+          ]
+        },
+        {
+          "query_id": "Q22",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R8598c0226a0301e7",
+            "R59267bb843352fee",
+            "R088a9bfe4155ad70",
+            "Rb4bd86e64c253484",
+            "R822f0bdc40706ba9"
+          ]
+        },
+        {
+          "query_id": "Q23",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 2,
+          "reciprocal_rank": 0.5,
+          "retrieved_at_5": [
+            "R792023c52b4df06f",
+            "R88e6aedfa4a0bb86",
+            "Rc81a39072eab07a3",
+            "Rfcdeae654fbda1bb",
+            "R9d1e1d3732255ea7"
+          ]
+        },
+        {
+          "query_id": "Q24",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Re2af66b75be57c85",
+            "R0ae9c169e5e8399c",
+            "Re8f54ce85b58fe7d",
+            "R9da3d5ea6f15370f",
+            "Ra7f32a51a588cfe0"
+          ]
+        },
+        {
+          "query_id": "Q25",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R9717e3ddec15c8c2",
+            "R01ff428daaa30c34",
+            "R253e57ebad2859cd",
+            "R0620909bb4399bd9",
+            "Recd8987dbfe28ecf"
+          ]
+        },
+        {
+          "query_id": "Q26",
+          "recall_at_5": 0.0,
+          "first_relevant_rank": 6,
+          "reciprocal_rank": 0.166667,
+          "retrieved_at_5": [
+            "R732ff0e68f891cf8",
+            "R6c176d920357239c",
+            "R45212ed2f2f80fc9",
+            "Rf009513d6cee8705",
+            "R2dd166d58bd81c9c"
+          ]
+        },
+        {
+          "query_id": "Q27",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R6c422cf99f8ae9f7",
+            "R39554c1c6021f7e6",
+            "R5a634cb63e917bc0",
+            "R728556c8ba47015c",
+            "R46f1a507800fd7f5"
+          ]
+        },
+        {
+          "query_id": "Q28",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rfd8579fcaeff6621",
+            "Rc3f36f837d202288",
+            "Rab7dc3aba0b747c4",
+            "R28cc3ccb0d7a759f",
+            "R6e3191eb4835ed4f"
+          ]
+        },
+        {
+          "query_id": "Q29",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rebc66c234240a078",
+            "R2644c73cb12b4464",
+            "Re778dc832852181b",
+            "R1c49b6fddb1c9b49",
+            "R82ef231af8569366"
+          ]
+        },
+        {
+          "query_id": "Q30",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rd4b0047671eca73e",
+            "R3b5f0f87571593ba",
+            "Rdc232d8e89ff6033",
+            "R4d30b12a224f45c8",
+            "R568fb6284804a9ba"
+          ]
+        },
+        {
+          "query_id": "Q31",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 3,
+          "reciprocal_rank": 0.333333,
+          "retrieved_at_5": [
+            "R17096ac49fc1bf0e",
+            "Ra7705cb46447e10c",
+            "R04a47e8479578035",
+            "Re44cea8c40316205",
+            "Rfeb4b8572630a0c2"
+          ]
+        },
+        {
+          "query_id": "Q32",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R9e8ed3a712c2052e",
+            "R0a55dc7351fa51f5",
+            "R316f9dc46cec58e2",
+            "Rcc4d19b6c2d4a4e8",
+            "R4d7cc779a3bc7575"
+          ]
+        },
+        {
+          "query_id": "Q33",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rf79189dc9276a1c1",
+            "R28f84085ca729155",
+            "R1ae952339b8e2655",
+            "R38b2930b43851569",
+            "R174c6571b173819a"
+          ]
+        },
+        {
+          "query_id": "Q34",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rb774c8d66bde17c7",
+            "R9f5b138e51adb91f",
+            "Rd7cdc370258cfbef",
+            "R056d22b579e2f57e",
+            "Rd9c5b5c0a70e117b"
+          ]
+        },
+        {
+          "query_id": "Q35",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R760396e91ea721ba",
+            "R8b543c5a3be0bbc0",
+            "R12e87ba04d018aff",
+            "R2927ee775ef994d5",
+            "Rf109bcab0cf41904"
+          ]
+        },
+        {
+          "query_id": "Q36",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R5fea8bf0a9bb7aba",
+            "R56c86f76784e63b1",
+            "Rfe2f5e338e328b87",
+            "R1b43767ec3ac763f",
+            "Rcf6be33299a6f48b"
+          ]
+        },
+        {
+          "query_id": "Q37",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rb8bc7c13550768dc",
+            "R6b93e8e414de9d94",
+            "Rce70d0bc5e843ed1",
+            "Rd02ec385c9eda52d",
+            "Ra5c58cfafcce2d60"
+          ]
+        },
+        {
+          "query_id": "Q38",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R07bbafe1f799923b",
+            "Ra198d3bdfd66caa8",
+            "Rd4a21094cb8cf77e",
+            "Rddb7feee1cfe4342",
+            "R124e05d2fb3308c0"
+          ]
+        },
+        {
+          "query_id": "Q39",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "Rfbc9fe7a0d9d9ddd",
+            "Rb5ed054d685a26f3",
+            "R3fcf3791876ba856",
+            "Ra23ddf420f4d19f5",
+            "R7487ba551bc6c3b1"
+          ]
+        },
+        {
+          "query_id": "Q40",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R9beb2b861dee7b45",
+            "R76e8ffb45e96b138",
+            "R2bc9218a60ab4a6e",
+            "R63100585d0a4bbe3",
+            "R5a019fbc844fa758"
+          ]
+        },
+        {
+          "query_id": "Q41",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 5,
+          "reciprocal_rank": 0.2,
+          "retrieved_at_5": [
+            "R4782de9040e10c2a",
+            "Rdbe2d4ac79a853f1",
+            "R7cbcff4cd9cb5879",
+            "R9acedf8e76af25f5",
+            "R9fa366d316d5e5e7"
+          ]
+        },
+        {
+          "query_id": "Q42",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 2,
+          "reciprocal_rank": 0.5,
+          "retrieved_at_5": [
+            "Rf24c54ea7017ee2f",
+            "R8f5e1de076d23cfd",
+            "R128215cb2c8c8095",
+            "Rb26278ba1ccd241c",
+            "R01ff428daaa30c34"
+          ]
+        },
+        {
+          "query_id": "Q43",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 2,
+          "reciprocal_rank": 0.5,
+          "retrieved_at_5": [
+            "R42875be848dff7cc",
+            "R33a621fedc378d50",
+            "R58c6216fa72e0b66",
+            "R6e25952f884cde5a",
+            "R45212ed2f2f80fc9"
+          ]
+        },
+        {
+          "query_id": "Q44",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R6de2fca3cbbe4c48",
+            "Rba5245146d72330e",
+            "Rf5b0fba3786d5633",
+            "Rfc4571c9ae789214",
+            "R83181b143fc9a967"
+          ]
+        },
+        {
+          "query_id": "Q45",
+          "recall_at_5": 1.0,
+          "first_relevant_rank": 1,
+          "reciprocal_rank": 1.0,
+          "retrieved_at_5": [
+            "R5cbbd51192236b04",
+            "R47a7c33b18ad8ce0",
+            "R340f232e34ea3f4d",
+            "R366c902664c94a11",
+            "R5fea8bf0a9bb7aba"
+          ]
+        }
+      ]
+    }
+  },
+  "acceptance": {
+    "hybrid_recall_at_5_beats_bm25": true,
+    "hybrid_recall_at_5_beats_vector": true
+  },
+  "limitations": [
+    "Queries and relevance labels were authored by one evaluator from this fixed corpus.",
+    "Metrics assess retrieval relevance, not clinical correctness or safety.",
+    "MNBVC dataset-card licensing does not settle rights or freshness of underlying instruction pages."
+  ]
+}

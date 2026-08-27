@@ -1,0 +1,26 @@
+{"case_id": "H01", "warnings": [{"drug_a": "甲硝唑", "drug_b": "华法林", "severity": "major", "mechanism": "CYP inhibition: CYP2C9", "effect": "增强华法林的作用", "management": null, "source_text": "本品能增强华法林等抗凝药物的作用", "source_url": "https://www.yaozs.com/sms43627/", "confidence": "high", "detection_path": "kegg+rag+llm"}]}
+{"case_id": "H02", "warnings": [{"drug_a": "甲硝唑", "drug_b": "华法林", "severity": "major", "mechanism": "CYP inhibition: CYP2C9", "effect": "增强华法林的作用", "management": null, "source_text": "本品能增强华法林等抗凝药物的作用", "source_url": "https://www.yaozs.com/sms43627/", "confidence": "high", "detection_path": "kegg+rag+llm"}]}
+{"case_id": "H03", "warnings": [{"drug_a": "别嘌醇", "drug_b": "氨苄西林", "severity": "moderate", "mechanism": "unclassified", "effect": "氨苄西林皮疹发生率增加", "management": null, "source_text": "与别嘌醇合用可使氨苄西林皮疹发生率增加", "source_url": "https://www.yaozs.com/sms5034/", "confidence": "high", "detection_path": "kegg+rag+llm"}]}
+{"case_id": "H04", "warnings": [{"drug_a": "别嘌醇", "drug_b": "氨苄西林", "severity": "moderate", "mechanism": "unclassified", "effect": "氨苄西林皮疹发生率增加", "management": null, "source_text": "与别嘌醇合用可使氨苄西林皮疹发生率增加", "source_url": "https://www.yaozs.com/sms5034/", "confidence": "high", "detection_path": "kegg+rag+llm"}]}
+{"case_id": "H05", "warnings": [{"drug_a": "利福平", "drug_b": "华法林", "severity": "moderate", "mechanism": "unclassified", "effect": null, "management": null, "source_text": null, "source_url": "https://rest.kegg.jp/ddi/D00211+D00564", "confidence": "medium", "detection_path": "kegg"}]}
+{"case_id": "H06", "warnings": [{"drug_a": "利福平", "drug_b": "华法林", "severity": "moderate", "mechanism": "unclassified", "effect": null, "management": null, "source_text": null, "source_url": "https://rest.kegg.jp/ddi/D00211+D00564", "confidence": "medium", "detection_path": "kegg"}]}
+{"case_id": "H07", "warnings": [{"drug_a": "红霉素", "drug_b": "华法林", "severity": "major", "mechanism": "unclassified", "effect": "凝血酶原时间延长，增加出血的危险性", "management": "两者必须同时使用时，华法林的剂量宜适当调整，并严密观察凝血酶原时间", "source_text": "长期服用华法林的患者应用本品时可导致凝血酶原时间延长，从而增加出血的危险性", "source_url": "https://www.yaozs.com/sms35681/", "confidence": "high", "detection_path": "kegg+rag+llm"}]}
+{"case_id": "H08", "warnings": [{"drug_a": "红霉素", "drug_b": "华法林", "severity": "major", "mechanism": "unclassified", "effect": "凝血酶原时间延长，增加出血的危险性", "management": "两者必须同时使用时，华法林的剂量宜适当调整，并严密观察凝血酶原时间", "source_text": "长期服用华法林的患者应用本品时可导致凝血酶原时间延长，从而增加出血的危险性", "source_url": "https://www.yaozs.com/sms35681/", "confidence": "high", "detection_path": "kegg+rag+llm"}]}
+{"case_id": "H09", "warnings": [{"drug_a": "克拉霉素", "drug_b": "阿托伐他汀", "severity": "moderate", "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / Transporter inhibition: ABCB1", "effect": null, "management": null, "source_text": null, "source_url": "https://rest.kegg.jp/ddi/D00276+D07474", "confidence": "medium", "detection_path": "kegg"}]}
+{"case_id": "H10", "warnings": [{"drug_a": "克拉霉素", "drug_b": "阿托伐他汀", "severity": "moderate", "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / Transporter inhibition: ABCB1", "effect": null, "management": null, "source_text": null, "source_url": "https://rest.kegg.jp/ddi/D00276+D07474", "confidence": "medium", "detection_path": "kegg"}]}
+{"case_id": "H11", "warnings": [{"drug_a": "伊曲康唑", "drug_b": "阿托伐他汀", "severity": "moderate", "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / Transporter inhibition: ABCB1", "effect": null, "management": null, "source_text": null, "source_url": "https://rest.kegg.jp/ddi/D00350+D07474", "confidence": "medium", "detection_path": "kegg"}]}
+{"case_id": "H12", "warnings": [{"drug_a": "阿托伐他汀", "drug_b": "伏立康唑", "severity": "moderate", "mechanism": "unclassified", "effect": null, "management": null, "source_text": null, "source_url": "https://rest.kegg.jp/ddi/D07474+D00578", "confidence": "medium", "detection_path": "kegg"}]}
+{"case_id": "H13", "warnings": []}
+{"case_id": "H14", "warnings": []}
+{"case_id": "H15", "warnings": [{"drug_a": "环丙沙星", "drug_b": "华法林", "severity": "moderate", "mechanism": "unclassified", "effect": null, "management": null, "source_text": null, "source_url": "https://rest.kegg.jp/ddi/D00186+D00564", "confidence": "medium", "detection_path": "kegg"}]}
+{"case_id": "H16", "warnings": [{"drug_a": "地高辛", "drug_b": "维拉帕米", "severity": "moderate", "mechanism": "Transporter inhibition: ABCB1", "effect": null, "management": null, "source_text": null, "source_url": "https://rest.kegg.jp/ddi/D00298+D00619", "confidence": "medium", "detection_path": "kegg"}]}
+{"case_id": "H17", "warnings": []}
+{"case_id": "H18", "warnings": []}
+{"case_id": "H19", "warnings": []}
+{"case_id": "H20", "warnings": [{"drug_a": "左甲状腺素", "drug_b": "碳酸钙", "severity": "moderate", "mechanism": "unclassified", "effect": null, "management": null, "source_text": null, "source_url": "https://rest.kegg.jp/ddi/D01010+D00932", "confidence": "medium", "detection_path": "kegg"}]}
+{"case_id": "C21", "warnings": []}
+{"case_id": "C22", "warnings": []}
+{"case_id": "C23", "warnings": []}
+{"case_id": "C24", "warnings": []}
+{"case_id": "C25", "warnings": []}
+{"case_id": "C26", "warnings": []}

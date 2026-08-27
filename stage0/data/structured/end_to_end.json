@@ -1,0 +1,264 @@
+{
+  "pairs_tested": 6,
+  "correctly_flagged": 6,
+  "kegg_recorded_matches": 1,
+  "all_extracted_triples_crosschecked_in_kegg": 1,
+  "all_crosschecks": [
+    {
+      "drug_a_en": "Warfarin",
+      "drug_b_en": "Aspirin",
+      "status": "matched",
+      "level": "P",
+      "mechanism": "unclassified",
+      "source_url": "https://www.kegg.jp/kegg-bin/ddi_list?drug=D00564"
+    }
+  ],
+  "results": [
+    {
+      "inputs": [
+        "华法林",
+        "阿司匹林"
+      ],
+      "normalized": [
+        {
+          "input": "华法林",
+          "matched": true,
+          "generic_cn": "华法林",
+          "ingredients": [
+            {
+              "name_cn": "华法林",
+              "name_en": "Warfarin",
+              "kegg": "D00564"
+            }
+          ]
+        },
+        {
+          "input": "阿司匹林",
+          "matched": true,
+          "generic_cn": "阿司匹林",
+          "ingredients": [
+            {
+              "name_cn": "阿司匹林",
+              "name_en": "Aspirin",
+              "kegg": "D00109"
+            }
+          ]
+        }
+      ],
+      "flagged": true,
+      "expected": "出血风险增加；禁忌/慎用",
+      "correct": true,
+      "warning": "华法林与阿司匹林合用会增强抗凝/抗血小板效应，增加出血风险。",
+      "source_text": "干扰血小板功能，促使抗凝作用更明显的药物，如大剂量阿司匹林",
+      "source_url": "https://www.jianke.com/a/20151121/2175732.html",
+      "crosscheck": {
+        "drug_a_en": "Warfarin",
+        "drug_b_en": "Aspirin",
+        "status": "matched",
+        "level": "P",
+        "mechanism": "unclassified",
+        "kegg_ids": [
+          "D00564",
+          "D00109"
+        ],
+        "source_url": "https://www.kegg.jp/kegg-bin/ddi_list?drug=D00564",
+        "checked_on": "2026-08-26"
+      }
+    },
+    {
+      "inputs": [
+        "辛伐他汀",
+        "克拉仙"
+      ],
+      "normalized": [
+        {
+          "input": "辛伐他汀",
+          "matched": true,
+          "generic_cn": "辛伐他汀",
+          "ingredients": [
+            {
+              "name_cn": "辛伐他汀",
+              "name_en": "Simvastatin",
+              "kegg": "D00434"
+            }
+          ]
+        },
+        {
+          "input": "克拉仙",
+          "matched": true,
+          "generic_cn": "克拉霉素",
+          "ingredients": [
+            {
+              "name_cn": "克拉霉素",
+              "name_en": "Clarithromycin",
+              "kegg": "D00276"
+            }
+          ]
+        }
+      ],
+      "flagged": true,
+      "expected": "CYP3A4抑制导致肌病/横纹肌溶解；禁忌",
+      "correct": true,
+      "warning": "克拉霉素抑制CYP3A4并升高辛伐他汀暴露，可能导致肌病或横纹肌溶解；避免合用。",
+      "source_text": "由于这些他汀药物经CYP3A4广泛代谢，导致血浆浓度升高，这将增加肌病的风险，包括横纹肌溶解症",
+      "source_url": "https://www.abbott.com.cn/content/dam/corp/abbott/cn-cn/documents/2021pdf/KELAMEISU_GANHUNXUANJI.pdf",
+      "crosscheck": null
+    },
+    {
+      "inputs": [
+        "格华止",
+        "碘造影剂"
+      ],
+      "normalized": [
+        {
+          "input": "格华止",
+          "matched": true,
+          "generic_cn": "二甲双胍",
+          "ingredients": [
+            {
+              "name_cn": "二甲双胍",
+              "name_en": "Metformin",
+              "kegg": "D00944"
+            }
+          ]
+        },
+        {
+          "input": "碘造影剂",
+          "matched": true,
+          "generic_cn": "碘造影剂",
+          "ingredients": [
+            {
+              "name_cn": "碘造影剂（药物类别）",
+              "name_en": "Iodinated contrast media",
+              "kegg": null
+            }
+          ]
+        }
+      ],
+      "flagged": true,
+      "expected": "乳酸酸中毒/肾风险；检查前后停药并复评肾功能",
+      "correct": true,
+      "warning": "含碘造影剂可能损伤肾功能并使二甲双胍蓄积，增加乳酸酸中毒风险；按说明书窗口停药并复评肾功能。",
+      "source_text": "血管内注射含碘造影剂可能导致造影剂诱导的肾病，继而导致二甲双胍蓄积，增加乳酸酸中毒风险",
+      "source_url": "https://db.yaozh.com/instruct/3720831336938880.html",
+      "crosscheck": null
+    },
+    {
+      "inputs": [
+        "硝酸甘油",
+        "万艾可"
+      ],
+      "normalized": [
+        {
+          "input": "硝酸甘油",
+          "matched": true,
+          "generic_cn": "硝酸甘油",
+          "ingredients": [
+            {
+              "name_cn": "硝酸甘油",
+              "name_en": "Nitroglycerin",
+              "kegg": "D00515"
+            }
+          ]
+        },
+        {
+          "input": "万艾可",
+          "matched": true,
+          "generic_cn": "西地那非",
+          "ingredients": [
+            {
+              "name_cn": "西地那非",
+              "name_en": "Sildenafil",
+              "kegg": "D02229"
+            }
+          ]
+        }
+      ],
+      "flagged": true,
+      "expected": "严重低血压；禁忌",
+      "correct": true,
+      "warning": "硝酸甘油与西地那非会叠加增强降压作用，可导致严重低血压；禁忌合用。",
+      "source_text": "服用西地那非（万艾可）或其他磷酸二酯酶抑制剂",
+      "source_url": "https://drugs.dxy.cn/pc/drug/pB_umdq7OG4QH1WRW026Wmg",
+      "crosscheck": null
+    },
+    {
+      "inputs": [
+        "安体舒通",
+        "氯化钾"
+      ],
+      "normalized": [
+        {
+          "input": "安体舒通",
+          "matched": true,
+          "generic_cn": "螺内酯",
+          "ingredients": [
+            {
+              "name_cn": "螺内酯",
+              "name_en": "Spironolactone",
+              "kegg": "D00443"
+            }
+          ]
+        },
+        {
+          "input": "氯化钾",
+          "matched": true,
+          "generic_cn": "氯化钾",
+          "ingredients": [
+            {
+              "name_cn": "氯化钾",
+              "name_en": "Potassium chloride",
+              "kegg": "D02060"
+            }
+          ]
+        }
+      ],
+      "flagged": true,
+      "expected": "高钾血症风险",
+      "correct": true,
+      "warning": "螺内酯保钾，合用氯化钾会增加高钾血症风险。",
+      "source_text": "与下列药物合用时，发生高钾血症的机会增加，如含钾药物",
+      "source_url": "https://ypk.39.net/503694/manual/",
+      "crosscheck": null
+    },
+    {
+      "inputs": [
+        "地高辛",
+        "可达龙"
+      ],
+      "normalized": [
+        {
+          "input": "地高辛",
+          "matched": true,
+          "generic_cn": "地高辛",
+          "ingredients": [
+            {
+              "name_cn": "地高辛",
+              "name_en": "Digoxin",
+              "kegg": "D00298"
+            }
+          ]
+        },
+        {
+          "input": "可达龙",
+          "matched": true,
+          "generic_cn": "胺碘酮",
+          "ingredients": [
+            {
+              "name_cn": "胺碘酮",
+              "name_en": "Amiodarone",
+              "kegg": "D00636"
+            }
+          ]
+        }
+      ],
+      "flagged": true,
+      "expected": "地高辛浓度和毒性风险增加",
+      "correct": true,
+      "warning": "胺碘酮可降低地高辛清除并升高其血药浓度，增加地高辛毒性及严重心动过缓风险。",
+      "source_text": "与维拉帕米、地尔硫卓或胺碘酮同用，由于降低肾及全身对地高辛的清除率而提高其血药浓度",
+      "source_url": "https://www.haodf.com/zhuanjiaguandian/drhuangzhiliang_7884333021.htm",
+      "crosscheck": null
+    }
+  ]
+}

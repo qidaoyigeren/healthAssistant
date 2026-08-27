@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "pairs": {
+    "华法林 | 甲硝唑": {
+      "status": "matched",
+      "evidence": [
+        {
+          "drug_a": "甲硝唑",
+          "drug_b": "华法林",
+          "severity": "major",
+          "mechanism": null,
+          "effect": "增强华法林的作用",
+          "management": null,
+          "source_text": "本品能增强华法林等抗凝药物的作用",
+          "source_url": "https://www.yaozs.com/sms43627/",
+          "origin": "rag+llm",
+          "curated": false
+        },
+        {
+          "drug_a": "甲硝唑",
+          "drug_b": "华法林",
+          "severity": "major",
+          "mechanism": null,
+          "effect": "增强抗凝药物的作用",
+          "management": null,
+          "source_text": "本品能增强华法林等抗凝药物的作用",
+          "source_url": "https://www.yaozs.com/sms43627/",
+          "origin": "rag+llm",
+          "curated": false
+        },
+        {
+          "drug_a": "甲硝唑",
+          "drug_b": "华法林",
+          "severity": "major",
+          "mechanism": null,
+          "effect": "增强华法林等抗凝药物的作用",
+          "management": null,
+          "source_text": "本品能增强华法林等抗凝药物的作用",
+          "source_url": "https://www.yaozs.com/sms43657/",
+          "origin": "rag+llm",
+          "curated": false
+        }
+      ],
+      "attempted_chunk_ids": [
+        "R10ef610bd236b4e7",
+        "R7df940c23f426e5b"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T09:58:57.742603+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "华法林 | 氨氯地平": {
+      "status": "not_found",
+      "evidence": [],
+      "attempted_chunk_ids": [
+        "R59267bb843352fee",
+        "R088a9bfe4155ad70"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T09:59:25.180652+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "别嘌醇 | 氨苄西林": {
+      "status": "matched",
+      "evidence": [
+        {
+          "drug_a": "氨苄西林",
+          "drug_b": "别嘌醇",
+          "severity": "moderate",
+          "mechanism": null,
+          "effect": "氨苄西林皮疹发生率增加",
+          "management": null,
+          "source_text": "与别嘌醇合用可使氨苄西林皮疹发生率增加",
+          "source_url": "https://www.yaozs.com/sms5034/",
+          "origin": "rag+llm",
+          "curated": false
+        }
+      ],
+      "attempted_chunk_ids": [
+        "R6c422cf99f8ae9f7"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T10:00:28.102338+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "华法林 | 红霉素": {
+      "status": "matched",
+      "evidence": [
+        {
+          "drug_a": "红霉素",
+          "drug_b": "华法林",
+          "severity": "major",
+          "mechanism": null,
+          "effect": "凝血酶原时间延长，增加出血的危险性",
+          "management": "两者必须同时使用时，华法林的剂量宜适当调整，并严密观察凝血酶原时间",
+          "source_text": "长期服用华法林的患者应用本品时可导致凝血酶原时间延长，从而增加出血的危险性",
+          "source_url": "https://www.yaozs.com/sms35681/",
+          "origin": "rag+llm",
+          "curated": false
+        },
+        {
+          "drug_a": "红霉素",
+          "drug_b": "华法林",
+          "severity": "major",
+          "mechanism": null,
+          "effect": "凝血酶原时间延长，增加出血的危险性",
+          "management": "两者必须同时使用时，华法林的剂量宜适当调整，并严密观察凝血酶原时间",
+          "source_text": "长期服用华法林的患者应用本品时可导致凝血酶原时间延长，从而增加出血的危险性",
+          "source_url": "https://www.yaozs.com/sms35673/",
+          "origin": "rag+llm",
+          "curated": false
+        }
+      ],
+      "attempted_chunk_ids": [
+        "Rb056eea96361d93f",
+        "R2b0cd35aa3f6ca6a"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T10:05:58.729293+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "氨氯地平 | 红霉素": {
+      "status": "not_found",
+      "evidence": [],
+      "attempted_chunk_ids": [
+        "R67356ce8256e9946",
+        "R5a9da0a939d89060"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T10:31:29.942999+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "克拉霉素 | 阿托伐他汀": {
+      "status": "not_found",
+      "evidence": [],
+      "attempted_chunk_ids": [
+        "R25374d8a9b958b6f",
+        "R3cc566c828f0aa1d"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T10:32:17.944927+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "伊曲康唑 | 阿托伐他汀": {
+      "status": "not_found",
+      "evidence": [],
+      "attempted_chunk_ids": [
+        "R3cc566c828f0aa1d",
+        "R25374d8a9b958b6f"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T10:33:18.461646+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "环丙沙星 | 茶碱": {
+      "status": "not_found",
+      "evidence": [],
+      "attempted_chunk_ids": [
+        "R541f3e9499652151",
+        "R433b9026d73f906e"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T10:34:09.637002+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "华法林 | 环丙沙星": {
+      "status": "not_found",
+      "evidence": [],
+      "attempted_chunk_ids": [
+        "R541f3e9499652151"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T10:34:37.818016+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "地高辛 | 维拉帕米": {
+      "status": "not_found",
+      "evidence": [],
+      "attempted_chunk_ids": [
+        "Reae8a152a09a3f00",
+        "R56533f3cf9b44d77"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T10:35:36.119219+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "奥美拉唑 | 茶碱": {
+      "status": "not_found",
+      "evidence": [],
+      "attempted_chunk_ids": [
+        "R885ab26ce9e9392b",
+        "Rb2e80d6aa15a9158"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T10:36:35.052802+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "利福平 | 茶碱": {
+      "status": "not_found",
+      "evidence": [],
+      "attempted_chunk_ids": [
+        "Rc2918478062abba5",
+        "R41dc2668d7841f17"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T10:37:34.397907+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "红霉素 | 茶碱": {
+      "status": "not_found",
+      "evidence": [],
+      "attempted_chunk_ids": [
+        "R433b9026d73f906e",
+        "R98372f767b1ffebd"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T10:38:38.248613+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "左甲状腺素 | 碳酸钙": {
+      "status": "not_found",
+      "evidence": [],
+      "attempted_chunk_ids": [
+        "R01f357ccbd656fc2",
+        "R64909c47bfdf251b"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T10:39:23.782317+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "氨氯地平 | 阿托伐他汀": {
+      "status": "not_found",
+      "evidence": [],
+      "attempted_chunk_ids": [
+        "R8598c0226a0301e7",
+        "R59267bb843352fee"
+      ],
+      "errors": [],
+      "cached_at": "2026-08-27T10:40:17.238720+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    }
+  }
+}

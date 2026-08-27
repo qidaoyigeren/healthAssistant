@@ -1,0 +1,1009 @@
+[
+  {
+    "generic_cn": "氨氯地平",
+    "brands": [
+      "络活喜"
+    ],
+    "aliases": [
+      "苯磺酸氨氯地平"
+    ],
+    "ingredients": [
+      {
+        "name_cn": "氨氯地平",
+        "name_en": "Amlodipine",
+        "kegg": "D07450"
+      }
+    ]
+  },
+  {
+    "generic_cn": "硝苯地平",
+    "brands": [
+      "拜新同"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "硝苯地平",
+        "name_en": "Nifedipine",
+        "kegg": "D00437"
+      }
+    ]
+  },
+  {
+    "generic_cn": "缬沙坦",
+    "brands": [
+      "代文"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "缬沙坦",
+        "name_en": "Valsartan",
+        "kegg": "D00400"
+      }
+    ]
+  },
+  {
+    "generic_cn": "厄贝沙坦",
+    "brands": [
+      "安博维"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "厄贝沙坦",
+        "name_en": "Irbesartan",
+        "kegg": "D00523"
+      }
+    ]
+  },
+  {
+    "generic_cn": "美托洛尔",
+    "brands": [
+      "倍他乐克"
+    ],
+    "aliases": [
+      "琥珀酸美托洛尔",
+      "酒石酸美托洛尔"
+    ],
+    "ingredients": [
+      {
+        "name_cn": "美托洛尔",
+        "name_en": "Metoprolol",
+        "kegg": "D02358"
+      }
+    ]
+  },
+  {
+    "generic_cn": "氢氯噻嗪",
+    "brands": [
+      "双氢克尿噻"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "氢氯噻嗪",
+        "name_en": "Hydrochlorothiazide",
+        "kegg": "D00340"
+      }
+    ]
+  },
+  {
+    "generic_cn": "二甲双胍",
+    "brands": [
+      "格华止"
+    ],
+    "aliases": [
+      "盐酸二甲双胍"
+    ],
+    "ingredients": [
+      {
+        "name_cn": "二甲双胍",
+        "name_en": "Metformin",
+        "kegg": "D00944"
+      }
+    ]
+  },
+  {
+    "generic_cn": "格列美脲",
+    "brands": [
+      "亚莫利"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "格列美脲",
+        "name_en": "Glimepiride",
+        "kegg": "D00593"
+      }
+    ]
+  },
+  {
+    "generic_cn": "阿卡波糖",
+    "brands": [
+      "拜唐苹"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "阿卡波糖",
+        "name_en": "Acarbose",
+        "kegg": "D00216"
+      }
+    ]
+  },
+  {
+    "generic_cn": "达格列净",
+    "brands": [
+      "安达唐"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "达格列净",
+        "name_en": "Dapagliflozin",
+        "kegg": "D08897"
+      }
+    ]
+  },
+  {
+    "generic_cn": "阿托伐他汀",
+    "brands": [
+      "立普妥"
+    ],
+    "aliases": [
+      "阿托伐他汀钙"
+    ],
+    "ingredients": [
+      {
+        "name_cn": "阿托伐他汀",
+        "name_en": "Atorvastatin",
+        "kegg": "D07474"
+      }
+    ]
+  },
+  {
+    "generic_cn": "瑞舒伐他汀",
+    "brands": [
+      "可定"
+    ],
+    "aliases": [
+      "瑞舒伐他汀钙"
+    ],
+    "ingredients": [
+      {
+        "name_cn": "瑞舒伐他汀",
+        "name_en": "Rosuvastatin",
+        "kegg": "D01915"
+      }
+    ]
+  },
+  {
+    "generic_cn": "辛伐他汀",
+    "brands": [
+      "舒降之"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "辛伐他汀",
+        "name_en": "Simvastatin",
+        "kegg": "D00434"
+      }
+    ]
+  },
+  {
+    "generic_cn": "非诺贝特",
+    "brands": [
+      "力平之"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "非诺贝特",
+        "name_en": "Fenofibrate",
+        "kegg": "D00565"
+      }
+    ]
+  },
+  {
+    "generic_cn": "阿司匹林",
+    "brands": [
+      "拜阿司匹灵"
+    ],
+    "aliases": [
+      "乙酰水杨酸"
+    ],
+    "ingredients": [
+      {
+        "name_cn": "阿司匹林",
+        "name_en": "Aspirin",
+        "kegg": "D00109"
+      }
+    ]
+  },
+  {
+    "generic_cn": "氯吡格雷",
+    "brands": [
+      "波立维"
+    ],
+    "aliases": [
+      "硫酸氢氯吡格雷"
+    ],
+    "ingredients": [
+      {
+        "name_cn": "氯吡格雷",
+        "name_en": "Clopidogrel",
+        "kegg": "D07729"
+      }
+    ]
+  },
+  {
+    "generic_cn": "华法林",
+    "brands": [
+      "可迈丁"
+    ],
+    "aliases": [
+      "华法林钠"
+    ],
+    "ingredients": [
+      {
+        "name_cn": "华法林",
+        "name_en": "Warfarin",
+        "kegg": "D00564"
+      }
+    ]
+  },
+  {
+    "generic_cn": "利伐沙班",
+    "brands": [
+      "拜瑞妥"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "利伐沙班",
+        "name_en": "Rivaroxaban",
+        "kegg": "D07086"
+      }
+    ]
+  },
+  {
+    "generic_cn": "硝酸甘油",
+    "brands": [
+      "耐绞宁"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "硝酸甘油",
+        "name_en": "Nitroglycerin",
+        "kegg": "D00515"
+      }
+    ]
+  },
+  {
+    "generic_cn": "地高辛",
+    "brands": [
+      "兰尼"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "地高辛",
+        "name_en": "Digoxin",
+        "kegg": "D00298"
+      }
+    ]
+  },
+  {
+    "generic_cn": "胺碘酮",
+    "brands": [
+      "可达龙"
+    ],
+    "aliases": [
+      "盐酸胺碘酮"
+    ],
+    "ingredients": [
+      {
+        "name_cn": "胺碘酮",
+        "name_en": "Amiodarone",
+        "kegg": "D00636"
+      }
+    ]
+  },
+  {
+    "generic_cn": "奥美拉唑",
+    "brands": [
+      "洛赛克"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "奥美拉唑",
+        "name_en": "Omeprazole",
+        "kegg": "D00455"
+      }
+    ]
+  },
+  {
+    "generic_cn": "左甲状腺素",
+    "brands": [
+      "优甲乐"
+    ],
+    "aliases": [
+      "左甲状腺素钠"
+    ],
+    "ingredients": [
+      {
+        "name_cn": "左甲状腺素",
+        "name_en": "Levothyroxine",
+        "kegg": "D01010"
+      }
+    ]
+  },
+  {
+    "generic_cn": "阿仑膦酸钠",
+    "brands": [
+      "福善美"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "阿仑膦酸",
+        "name_en": "Alendronate",
+        "kegg": "D00939"
+      }
+    ]
+  },
+  {
+    "generic_cn": "布洛芬",
+    "brands": [
+      "芬必得"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "布洛芬",
+        "name_en": "Ibuprofen",
+        "kegg": "D00126"
+      }
+    ]
+  },
+  {
+    "generic_cn": "塞来昔布",
+    "brands": [
+      "西乐葆"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "塞来昔布",
+        "name_en": "Celecoxib",
+        "kegg": "D00567"
+      }
+    ]
+  },
+  {
+    "generic_cn": "克拉霉素",
+    "brands": [
+      "克拉仙"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "克拉霉素",
+        "name_en": "Clarithromycin",
+        "kegg": "D00276"
+      }
+    ]
+  },
+  {
+    "generic_cn": "碘造影剂",
+    "brands": [],
+    "aliases": [
+      "含碘造影剂",
+      "碘对比剂"
+    ],
+    "ingredients": [
+      {
+        "name_cn": "碘造影剂（药物类别）",
+        "name_en": "Iodinated contrast media",
+        "kegg": null
+      }
+    ]
+  },
+  {
+    "generic_cn": "西地那非",
+    "brands": [
+      "万艾可"
+    ],
+    "aliases": [
+      "枸橼酸西地那非"
+    ],
+    "ingredients": [
+      {
+        "name_cn": "西地那非",
+        "name_en": "Sildenafil",
+        "kegg": "D02229"
+      }
+    ]
+  },
+  {
+    "generic_cn": "螺内酯",
+    "brands": [
+      "安体舒通"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "螺内酯",
+        "name_en": "Spironolactone",
+        "kegg": "D00443"
+      }
+    ]
+  },
+  {
+    "generic_cn": "氯化钾",
+    "brands": [
+      "补达秀"
+    ],
+    "aliases": [
+      "氯化钾缓释"
+    ],
+    "ingredients": [
+      {
+        "name_cn": "氯化钾",
+        "name_en": "Potassium chloride",
+        "kegg": "D02060"
+      }
+    ]
+  },
+  {
+    "generic_cn": "复方利血平氨苯蝶啶",
+    "brands": [
+      "北京降压0号"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "利血平",
+        "name_en": "Reserpine",
+        "kegg": "D00197"
+      },
+      {
+        "name_cn": "氢氯噻嗪",
+        "name_en": "Hydrochlorothiazide",
+        "kegg": "D00340"
+      },
+      {
+        "name_cn": "氨苯蝶啶",
+        "name_en": "Triamterene",
+        "kegg": "D00386"
+      },
+      {
+        "name_cn": "硫酸双肼屈嗪",
+        "name_en": "Dihydralazine sulfate",
+        "kegg": "D01326"
+      }
+    ]
+  },
+  {
+    "generic_cn": "沙库巴曲缬沙坦",
+    "brands": [
+      "诺欣妥"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "沙库巴曲",
+        "name_en": "Sacubitril",
+        "kegg": "D10225"
+      },
+      {
+        "name_cn": "缬沙坦",
+        "name_en": "Valsartan",
+        "kegg": "D00400"
+      }
+    ]
+  },
+  {
+    "generic_cn": "替米沙坦氨氯地平",
+    "brands": [
+      "乐相宜"
+    ],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "替米沙坦",
+        "name_en": "Telmisartan",
+        "kegg": "D00627"
+      },
+      {
+        "name_cn": "氨氯地平",
+        "name_en": "Amlodipine",
+        "kegg": "D07450"
+      }
+    ]
+  },
+  {
+    "generic_cn": "洋地黄毒苷",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "洋地黄毒苷",
+        "name_en": "Digitoxin",
+        "kegg": "D00297"
+      }
+    ]
+  },
+  {
+    "generic_cn": "萘普生",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "萘普生",
+        "name_en": "Naproxen",
+        "kegg": "D00118"
+      }
+    ]
+  },
+  {
+    "generic_cn": "吲哚美辛",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "吲哚美辛",
+        "name_en": "Indomethacin",
+        "kegg": "D00141"
+      }
+    ]
+  },
+  {
+    "generic_cn": "双氯芬酸钾",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "双氯芬酸钾",
+        "name_en": "Diclofenac potassium",
+        "kegg": "D00903"
+      }
+    ]
+  },
+  {
+    "generic_cn": "肝素钠",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "肝素钠",
+        "name_en": "Heparin sodium",
+        "kegg": "D02112"
+      }
+    ]
+  },
+  {
+    "generic_cn": "阿替普酶",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "阿替普酶",
+        "name_en": "Alteplase",
+        "kegg": "D02837"
+      }
+    ]
+  },
+  {
+    "generic_cn": "地塞米松",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "地塞米松",
+        "name_en": "Dexamethasone",
+        "kegg": "D00292"
+      }
+    ]
+  },
+  {
+    "generic_cn": "甲泼尼龙",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "甲泼尼龙",
+        "name_en": "Methylprednisolone",
+        "kegg": "D00407"
+      }
+    ]
+  },
+  {
+    "generic_cn": "氢化可的松",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "氢化可的松",
+        "name_en": "Hydrocortisone",
+        "kegg": "D00088"
+      }
+    ]
+  },
+  {
+    "generic_cn": "酮康唑",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "酮康唑",
+        "name_en": "Ketoconazole",
+        "kegg": "D00351"
+      }
+    ]
+  },
+  {
+    "generic_cn": "伊曲康唑",
+    "brands": [],
+    "aliases": ["依曲康唑"],
+    "ingredients": [
+      {
+        "name_cn": "伊曲康唑",
+        "name_en": "Itraconazole",
+        "kegg": "D00350"
+      }
+    ]
+  },
+  {
+    "generic_cn": "利托那韦",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "利托那韦",
+        "name_en": "Ritonavir",
+        "kegg": "D00427"
+      }
+    ]
+  },
+  {
+    "generic_cn": "氟康唑",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "氟康唑",
+        "name_en": "Fluconazole",
+        "kegg": "D00322"
+      }
+    ]
+  },
+  {
+    "generic_cn": "保泰松",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "保泰松",
+        "name_en": "Phenylbutazone",
+        "kegg": "D00510"
+      }
+    ]
+  },
+  {
+    "generic_cn": "复方磺胺甲噁唑",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "复方磺胺甲噁唑",
+        "name_en": "Sulfamethoxazole and trimethoprim",
+        "kegg": "D00285"
+      }
+    ]
+  },
+  {
+    "generic_cn": "碳酸钙",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "碳酸钙",
+        "name_en": "Calcium carbonate",
+        "kegg": "D00932"
+      }
+    ]
+  },
+  {
+    "generic_cn": "氢氧化镁",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "氢氧化镁",
+        "name_en": "Magnesium hydroxide",
+        "kegg": "D00731"
+      }
+    ]
+  },
+  {
+    "generic_cn": "依那普利",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "依那普利",
+        "name_en": "Enalapril",
+        "kegg": "D00621"
+      }
+    ]
+  },
+  {
+    "generic_cn": "环孢素",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "环孢素",
+        "name_en": "Cyclosporine",
+        "kegg": "D00184"
+      }
+    ]
+  },
+  {
+    "generic_cn": "阿米洛利",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "阿米洛利",
+        "name_en": "Amiloride hydrochloride",
+        "kegg": "D00649"
+      }
+    ]
+  },
+  {
+    "generic_cn": "格列吡嗪",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "格列吡嗪",
+        "name_en": "Glipizide",
+        "kegg": "D00335"
+      }
+    ]
+  },
+  {
+    "generic_cn": "格列齐特",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "格列齐特",
+        "name_en": "Gliclazide",
+        "kegg": "D01599"
+      }
+    ]
+  },
+  {
+    "generic_cn": "格列本脲",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "格列本脲",
+        "name_en": "Glibenclamide",
+        "kegg": "D00336"
+      }
+    ]
+  },
+  {
+    "generic_cn": "人胰岛素",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "人胰岛素",
+        "name_en": "Insulin human",
+        "kegg": "D03230"
+      }
+    ]
+  },
+  {
+    "generic_cn": "甲氨蝶呤",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "甲氨蝶呤",
+        "name_en": "Methotrexate",
+        "kegg": "D00142"
+      }
+    ]
+  },
+  {
+    "generic_cn": "培美曲塞",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "培美曲塞",
+        "name_en": "Pemetrexed disodium",
+        "kegg": "D03828"
+      }
+    ]
+  },
+  {
+    "generic_cn": "奎尼丁葡萄糖酸盐",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "奎尼丁葡萄糖酸盐",
+        "name_en": "Quinidine gluconate",
+        "kegg": "D00642"
+      }
+    ]
+  },
+  {
+    "generic_cn": "帕罗西汀",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "帕罗西汀",
+        "name_en": "Paroxetine",
+        "kegg": "D02260"
+      }
+    ]
+  },
+  {
+    "generic_cn": "氟西汀",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "氟西汀",
+        "name_en": "Fluoxetine",
+        "kegg": "D00326"
+      }
+    ]
+  },
+  {
+    "generic_cn": "苯丙香豆素",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "苯丙香豆素",
+        "name_en": "Phenprocoumon",
+        "kegg": "D05457"
+      }
+    ]
+  },
+  {
+    "generic_cn": "甲硝唑",
+    "brands": [],
+    "aliases": ["甲硝唑片"],
+    "ingredients": [
+      {
+        "name_cn": "甲硝唑",
+        "name_en": "Metronidazole",
+        "kegg": "D00409"
+      }
+    ]
+  },
+  {
+    "generic_cn": "别嘌醇",
+    "brands": [],
+    "aliases": ["别嘌呤醇"],
+    "ingredients": [
+      {
+        "name_cn": "别嘌醇",
+        "name_en": "Allopurinol",
+        "kegg": "D00224"
+      }
+    ]
+  },
+  {
+    "generic_cn": "氨苄西林",
+    "brands": [],
+    "aliases": ["氨苄青霉素"],
+    "ingredients": [
+      {
+        "name_cn": "氨苄西林",
+        "name_en": "Ampicillin",
+        "kegg": "D00204"
+      }
+    ]
+  },
+  {
+    "generic_cn": "利福平",
+    "brands": [],
+    "aliases": ["利福平片"],
+    "ingredients": [
+      {
+        "name_cn": "利福平",
+        "name_en": "Rifampicin",
+        "kegg": "D00211"
+      }
+    ]
+  },
+  {
+    "generic_cn": "伏立康唑",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "伏立康唑",
+        "name_en": "Voriconazole",
+        "kegg": "D00578"
+      }
+    ]
+  },
+  {
+    "generic_cn": "茶碱",
+    "brands": [],
+    "aliases": ["氨茶碱"],
+    "ingredients": [
+      {
+        "name_cn": "茶碱",
+        "name_en": "Theophylline",
+        "kegg": "D00227"
+      }
+    ]
+  },
+  {
+    "generic_cn": "环丙沙星",
+    "brands": [],
+    "aliases": ["乳酸环丙沙星"],
+    "ingredients": [
+      {
+        "name_cn": "环丙沙星",
+        "name_en": "Ciprofloxacin",
+        "kegg": "D00186"
+      }
+    ]
+  },
+  {
+    "generic_cn": "硫酸亚铁",
+    "brands": [],
+    "aliases": ["亚铁"],
+    "ingredients": [
+      {
+        "name_cn": "硫酸亚铁",
+        "name_en": "Ferrous sulfate",
+        "kegg": "D01725"
+      }
+    ]
+  },
+  {
+    "generic_cn": "维拉帕米",
+    "brands": [],
+    "aliases": [],
+    "ingredients": [
+      {
+        "name_cn": "维拉帕米",
+        "name_en": "Verapamil",
+        "kegg": "D00619"
+      }
+    ]
+  },
+  {
+    "generic_cn": "红霉素",
+    "brands": [],
+    "aliases": ["红霉素片"],
+    "ingredients": [
+      {
+        "name_cn": "红霉素",
+        "name_en": "Erythromycin",
+        "kegg": "D00140"
+      }
+    ]
+  }
+]

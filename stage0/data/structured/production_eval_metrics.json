@@ -1,0 +1,60 @@
+{
+  "mode": "deepseek_free_text_production_path_evaluation",
+  "model": "deepseek-chat",
+  "sample_count": 30,
+  "sample_design": "30 manually labeled positive source sentences; single annotator",
+  "successful_api_outputs": 30,
+  "accuracy": {
+    "drug_a": {
+      "correct": 30,
+      "total": 30,
+      "value": 1.0
+    },
+    "drug_b": {
+      "correct": 30,
+      "total": 30,
+      "value": 1.0
+    },
+    "entity_pair": {
+      "correct": 30,
+      "total": 30,
+      "value": 1.0
+    },
+    "severity": {
+      "correct": 23,
+      "total": 30,
+      "value": 0.7667
+    },
+    "mechanism_type": {
+      "correct": 26,
+      "total": 30,
+      "value": 0.8667
+    },
+    "effect_tag": {
+      "correct": 25,
+      "total": 30,
+      "value": 0.8333
+    },
+    "source_span": {
+      "correct": 30,
+      "total": 30,
+      "value": 1.0
+    },
+    "all_core": {
+      "correct": 16,
+      "total": 30,
+      "value": 0.5333
+    }
+  },
+  "limitations": [
+    "Positive-only, sentence-selected evaluation; detection recall is measured separately with automatic tool choice.",
+    "Gold labels were created by one annotator and severity is an operational data-layer rubric, not a clinical standard.",
+    "Entity scoring is bilingual concept matching after deterministic source-self canonicalization.",
+    "Partner scoring accepts any explicit member of a multi-drug/class source; it does not measure complete list recall."
+  ],
+  "predictions_path": "data\\structured\\production_eval_predictions_30.jsonl",
+  "alignment": {
+    "self_reference_resolution": "drug_a deterministically canonicalized to the supplied source generic name",
+    "controlled_type_field": "type is the evaluation mechanism_type enum; mechanism_type is emitted as an alias for direct scoring"
+  }
+}

@@ -1,0 +1,1539 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-27T08:47:10.371218+00:00",
+  "source": "data/kegg_ddi_cache.json via crosscheck_eval.kegg_ddi",
+  "universe_size": 75,
+  "universe": [
+    {
+      "name_cn": "氢化可的松",
+      "name_en": "Hydrocortisone",
+      "kegg": "D00088"
+    },
+    {
+      "name_cn": "阿司匹林",
+      "name_en": "Aspirin",
+      "kegg": "D00109"
+    },
+    {
+      "name_cn": "萘普生",
+      "name_en": "Naproxen",
+      "kegg": "D00118"
+    },
+    {
+      "name_cn": "布洛芬",
+      "name_en": "Ibuprofen",
+      "kegg": "D00126"
+    },
+    {
+      "name_cn": "红霉素",
+      "name_en": "Erythromycin",
+      "kegg": "D00140"
+    },
+    {
+      "name_cn": "吲哚美辛",
+      "name_en": "Indomethacin",
+      "kegg": "D00141"
+    },
+    {
+      "name_cn": "甲氨蝶呤",
+      "name_en": "Methotrexate",
+      "kegg": "D00142"
+    },
+    {
+      "name_cn": "环孢素",
+      "name_en": "Cyclosporine",
+      "kegg": "D00184"
+    },
+    {
+      "name_cn": "环丙沙星",
+      "name_en": "Ciprofloxacin",
+      "kegg": "D00186"
+    },
+    {
+      "name_cn": "利血平",
+      "name_en": "Reserpine",
+      "kegg": "D00197"
+    },
+    {
+      "name_cn": "氨苄西林",
+      "name_en": "Ampicillin",
+      "kegg": "D00204"
+    },
+    {
+      "name_cn": "利福平",
+      "name_en": "Rifampicin",
+      "kegg": "D00211"
+    },
+    {
+      "name_cn": "阿卡波糖",
+      "name_en": "Acarbose",
+      "kegg": "D00216"
+    },
+    {
+      "name_cn": "别嘌醇",
+      "name_en": "Allopurinol",
+      "kegg": "D00224"
+    },
+    {
+      "name_cn": "茶碱",
+      "name_en": "Theophylline",
+      "kegg": "D00227"
+    },
+    {
+      "name_cn": "克拉霉素",
+      "name_en": "Clarithromycin",
+      "kegg": "D00276"
+    },
+    {
+      "name_cn": "复方磺胺甲噁唑",
+      "name_en": "Sulfamethoxazole and trimethoprim",
+      "kegg": "D00285"
+    },
+    {
+      "name_cn": "地塞米松",
+      "name_en": "Dexamethasone",
+      "kegg": "D00292"
+    },
+    {
+      "name_cn": "洋地黄毒苷",
+      "name_en": "Digitoxin",
+      "kegg": "D00297"
+    },
+    {
+      "name_cn": "地高辛",
+      "name_en": "Digoxin",
+      "kegg": "D00298"
+    },
+    {
+      "name_cn": "氟康唑",
+      "name_en": "Fluconazole",
+      "kegg": "D00322"
+    },
+    {
+      "name_cn": "氟西汀",
+      "name_en": "Fluoxetine",
+      "kegg": "D00326"
+    },
+    {
+      "name_cn": "格列吡嗪",
+      "name_en": "Glipizide",
+      "kegg": "D00335"
+    },
+    {
+      "name_cn": "格列本脲",
+      "name_en": "Glibenclamide",
+      "kegg": "D00336"
+    },
+    {
+      "name_cn": "氢氯噻嗪",
+      "name_en": "Hydrochlorothiazide",
+      "kegg": "D00340"
+    },
+    {
+      "name_cn": "伊曲康唑",
+      "name_en": "Itraconazole",
+      "kegg": "D00350"
+    },
+    {
+      "name_cn": "酮康唑",
+      "name_en": "Ketoconazole",
+      "kegg": "D00351"
+    },
+    {
+      "name_cn": "氨苯蝶啶",
+      "name_en": "Triamterene",
+      "kegg": "D00386"
+    },
+    {
+      "name_cn": "缬沙坦",
+      "name_en": "Valsartan",
+      "kegg": "D00400"
+    },
+    {
+      "name_cn": "甲泼尼龙",
+      "name_en": "Methylprednisolone",
+      "kegg": "D00407"
+    },
+    {
+      "name_cn": "甲硝唑",
+      "name_en": "Metronidazole",
+      "kegg": "D00409"
+    },
+    {
+      "name_cn": "利托那韦",
+      "name_en": "Ritonavir",
+      "kegg": "D00427"
+    },
+    {
+      "name_cn": "辛伐他汀",
+      "name_en": "Simvastatin",
+      "kegg": "D00434"
+    },
+    {
+      "name_cn": "硝苯地平",
+      "name_en": "Nifedipine",
+      "kegg": "D00437"
+    },
+    {
+      "name_cn": "螺内酯",
+      "name_en": "Spironolactone",
+      "kegg": "D00443"
+    },
+    {
+      "name_cn": "奥美拉唑",
+      "name_en": "Omeprazole",
+      "kegg": "D00455"
+    },
+    {
+      "name_cn": "保泰松",
+      "name_en": "Phenylbutazone",
+      "kegg": "D00510"
+    },
+    {
+      "name_cn": "硝酸甘油",
+      "name_en": "Nitroglycerin",
+      "kegg": "D00515"
+    },
+    {
+      "name_cn": "厄贝沙坦",
+      "name_en": "Irbesartan",
+      "kegg": "D00523"
+    },
+    {
+      "name_cn": "华法林",
+      "name_en": "Warfarin",
+      "kegg": "D00564"
+    },
+    {
+      "name_cn": "非诺贝特",
+      "name_en": "Fenofibrate",
+      "kegg": "D00565"
+    },
+    {
+      "name_cn": "塞来昔布",
+      "name_en": "Celecoxib",
+      "kegg": "D00567"
+    },
+    {
+      "name_cn": "伏立康唑",
+      "name_en": "Voriconazole",
+      "kegg": "D00578"
+    },
+    {
+      "name_cn": "格列美脲",
+      "name_en": "Glimepiride",
+      "kegg": "D00593"
+    },
+    {
+      "name_cn": "维拉帕米",
+      "name_en": "Verapamil",
+      "kegg": "D00619"
+    },
+    {
+      "name_cn": "依那普利",
+      "name_en": "Enalapril",
+      "kegg": "D00621"
+    },
+    {
+      "name_cn": "替米沙坦",
+      "name_en": "Telmisartan",
+      "kegg": "D00627"
+    },
+    {
+      "name_cn": "胺碘酮",
+      "name_en": "Amiodarone",
+      "kegg": "D00636"
+    },
+    {
+      "name_cn": "奎尼丁葡萄糖酸盐",
+      "name_en": "Quinidine gluconate",
+      "kegg": "D00642"
+    },
+    {
+      "name_cn": "阿米洛利",
+      "name_en": "Amiloride hydrochloride",
+      "kegg": "D00649"
+    },
+    {
+      "name_cn": "氢氧化镁",
+      "name_en": "Magnesium hydroxide",
+      "kegg": "D00731"
+    },
+    {
+      "name_cn": "双氯芬酸钾",
+      "name_en": "Diclofenac potassium",
+      "kegg": "D00903"
+    },
+    {
+      "name_cn": "碳酸钙",
+      "name_en": "Calcium carbonate",
+      "kegg": "D00932"
+    },
+    {
+      "name_cn": "阿仑膦酸",
+      "name_en": "Alendronate",
+      "kegg": "D00939"
+    },
+    {
+      "name_cn": "二甲双胍",
+      "name_en": "Metformin",
+      "kegg": "D00944"
+    },
+    {
+      "name_cn": "左甲状腺素",
+      "name_en": "Levothyroxine",
+      "kegg": "D01010"
+    },
+    {
+      "name_cn": "硫酸双肼屈嗪",
+      "name_en": "Dihydralazine sulfate",
+      "kegg": "D01326"
+    },
+    {
+      "name_cn": "格列齐特",
+      "name_en": "Gliclazide",
+      "kegg": "D01599"
+    },
+    {
+      "name_cn": "硫酸亚铁",
+      "name_en": "Ferrous sulfate",
+      "kegg": "D01725"
+    },
+    {
+      "name_cn": "瑞舒伐他汀",
+      "name_en": "Rosuvastatin",
+      "kegg": "D01915"
+    },
+    {
+      "name_cn": "氯化钾",
+      "name_en": "Potassium chloride",
+      "kegg": "D02060"
+    },
+    {
+      "name_cn": "肝素钠",
+      "name_en": "Heparin sodium",
+      "kegg": "D02112"
+    },
+    {
+      "name_cn": "西地那非",
+      "name_en": "Sildenafil",
+      "kegg": "D02229"
+    },
+    {
+      "name_cn": "帕罗西汀",
+      "name_en": "Paroxetine",
+      "kegg": "D02260"
+    },
+    {
+      "name_cn": "美托洛尔",
+      "name_en": "Metoprolol",
+      "kegg": "D02358"
+    },
+    {
+      "name_cn": "阿替普酶",
+      "name_en": "Alteplase",
+      "kegg": "D02837"
+    },
+    {
+      "name_cn": "人胰岛素",
+      "name_en": "Insulin human",
+      "kegg": "D03230"
+    },
+    {
+      "name_cn": "培美曲塞",
+      "name_en": "Pemetrexed disodium",
+      "kegg": "D03828"
+    },
+    {
+      "name_cn": "苯丙香豆素",
+      "name_en": "Phenprocoumon",
+      "kegg": "D05457"
+    },
+    {
+      "name_cn": "利伐沙班",
+      "name_en": "Rivaroxaban",
+      "kegg": "D07086"
+    },
+    {
+      "name_cn": "氨氯地平",
+      "name_en": "Amlodipine",
+      "kegg": "D07450"
+    },
+    {
+      "name_cn": "阿托伐他汀",
+      "name_en": "Atorvastatin",
+      "kegg": "D07474"
+    },
+    {
+      "name_cn": "氯吡格雷",
+      "name_en": "Clopidogrel",
+      "kegg": "D07729"
+    },
+    {
+      "name_cn": "达格列净",
+      "name_en": "Dapagliflozin",
+      "kegg": "D08897"
+    },
+    {
+      "name_cn": "沙库巴曲",
+      "name_en": "Sacubitril",
+      "kegg": "D10225"
+    }
+  ],
+  "cached_pair_count": 73,
+  "matched_pair_count": 60,
+  "checked_not_found_count": 13,
+  "entries": {
+    "D00088 D00109": {
+      "drug_a": {
+        "name_cn": "氢化可的松",
+        "name_en": "Hydrocortisone",
+        "kegg": "D00088"
+      },
+      "drug_b": {
+        "name_cn": "阿司匹林",
+        "name_en": "Aspirin",
+        "kegg": "D00109"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00109+D00088"
+    },
+    "D00109 D00292": {
+      "drug_a": {
+        "name_cn": "阿司匹林",
+        "name_en": "Aspirin",
+        "kegg": "D00109"
+      },
+      "drug_b": {
+        "name_cn": "地塞米松",
+        "name_en": "Dexamethasone",
+        "kegg": "D00292"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00109+D00292"
+    },
+    "D00109 D00407": {
+      "drug_a": {
+        "name_cn": "阿司匹林",
+        "name_en": "Aspirin",
+        "kegg": "D00109"
+      },
+      "drug_b": {
+        "name_cn": "甲泼尼龙",
+        "name_en": "Methylprednisolone",
+        "kegg": "D00407"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00109+D00407"
+    },
+    "D00109 D00564": {
+      "drug_a": {
+        "name_cn": "阿司匹林",
+        "name_en": "Aspirin",
+        "kegg": "D00109"
+      },
+      "drug_b": {
+        "name_cn": "华法林",
+        "name_en": "Warfarin",
+        "kegg": "D00564"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00109+D00564"
+    },
+    "D00109 D00593": {
+      "drug_a": {
+        "name_cn": "阿司匹林",
+        "name_en": "Aspirin",
+        "kegg": "D00109"
+      },
+      "drug_b": {
+        "name_cn": "格列美脲",
+        "name_en": "Glimepiride",
+        "kegg": "D00593"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00593+D00109"
+    },
+    "D00109 D02112": {
+      "drug_a": {
+        "name_cn": "阿司匹林",
+        "name_en": "Aspirin",
+        "kegg": "D00109"
+      },
+      "drug_b": {
+        "name_cn": "肝素钠",
+        "name_en": "Heparin sodium",
+        "kegg": "D02112"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00109+D02112"
+    },
+    "D00109 D02837": {
+      "drug_a": {
+        "name_cn": "阿司匹林",
+        "name_en": "Aspirin",
+        "kegg": "D00109"
+      },
+      "drug_b": {
+        "name_cn": "阿替普酶",
+        "name_en": "Alteplase",
+        "kegg": "D02837"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00109+D02837"
+    },
+    "D00109 D07729": {
+      "drug_a": {
+        "name_cn": "阿司匹林",
+        "name_en": "Aspirin",
+        "kegg": "D00109"
+      },
+      "drug_b": {
+        "name_cn": "氯吡格雷",
+        "name_en": "Clopidogrel",
+        "kegg": "D07729"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D07729+D00109"
+    },
+    "D00118 D00340": {
+      "drug_a": {
+        "name_cn": "萘普生",
+        "name_en": "Naproxen",
+        "kegg": "D00118"
+      },
+      "drug_b": {
+        "name_cn": "氢氯噻嗪",
+        "name_en": "Hydrochlorothiazide",
+        "kegg": "D00340"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00340+D00118"
+    },
+    "D00118 D00443": {
+      "drug_a": {
+        "name_cn": "萘普生",
+        "name_en": "Naproxen",
+        "kegg": "D00118"
+      },
+      "drug_b": {
+        "name_cn": "螺内酯",
+        "name_en": "Spironolactone",
+        "kegg": "D00443"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00443+D00118"
+    },
+    "D00118 D07729": {
+      "drug_a": {
+        "name_cn": "萘普生",
+        "name_en": "Naproxen",
+        "kegg": "D00118"
+      },
+      "drug_b": {
+        "name_cn": "氯吡格雷",
+        "name_en": "Clopidogrel",
+        "kegg": "D07729"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D07729+D00118"
+    },
+    "D00126 D00142": {
+      "drug_a": {
+        "name_cn": "布洛芬",
+        "name_en": "Ibuprofen",
+        "kegg": "D00126"
+      },
+      "drug_b": {
+        "name_cn": "甲氨蝶呤",
+        "name_en": "Methotrexate",
+        "kegg": "D00142"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00126+D00142"
+    },
+    "D00126 D00335": {
+      "drug_a": {
+        "name_cn": "布洛芬",
+        "name_en": "Ibuprofen",
+        "kegg": "D00126"
+      },
+      "drug_b": {
+        "name_cn": "格列吡嗪",
+        "name_en": "Glipizide",
+        "kegg": "D00335"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00126+D00335"
+    },
+    "D00126 D00340": {
+      "drug_a": {
+        "name_cn": "布洛芬",
+        "name_en": "Ibuprofen",
+        "kegg": "D00126"
+      },
+      "drug_b": {
+        "name_cn": "氢氯噻嗪",
+        "name_en": "Hydrochlorothiazide",
+        "kegg": "D00340"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00340+D00126"
+    },
+    "D00126 D00443": {
+      "drug_a": {
+        "name_cn": "布洛芬",
+        "name_en": "Ibuprofen",
+        "kegg": "D00126"
+      },
+      "drug_b": {
+        "name_cn": "螺内酯",
+        "name_en": "Spironolactone",
+        "kegg": "D00443"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00443+D00126"
+    },
+    "D00126 D00564": {
+      "drug_a": {
+        "name_cn": "布洛芬",
+        "name_en": "Ibuprofen",
+        "kegg": "D00126"
+      },
+      "drug_b": {
+        "name_cn": "华法林",
+        "name_en": "Warfarin",
+        "kegg": "D00564"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "Enzyme: CYP2C9"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00126+D00564"
+    },
+    "D00126 D00593": {
+      "drug_a": {
+        "name_cn": "布洛芬",
+        "name_en": "Ibuprofen",
+        "kegg": "D00126"
+      },
+      "drug_b": {
+        "name_cn": "格列美脲",
+        "name_en": "Glimepiride",
+        "kegg": "D00593"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "Enzyme: CYP2C9"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00126+D00593"
+    },
+    "D00126 D02112": {
+      "drug_a": {
+        "name_cn": "布洛芬",
+        "name_en": "Ibuprofen",
+        "kegg": "D00126"
+      },
+      "drug_b": {
+        "name_cn": "肝素钠",
+        "name_en": "Heparin sodium",
+        "kegg": "D02112"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00126+D02112"
+    },
+    "D00126 D02837": {
+      "drug_a": {
+        "name_cn": "布洛芬",
+        "name_en": "Ibuprofen",
+        "kegg": "D00126"
+      },
+      "drug_b": {
+        "name_cn": "阿替普酶",
+        "name_en": "Alteplase",
+        "kegg": "D02837"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00126+D02837"
+    },
+    "D00126 D03828": {
+      "drug_a": {
+        "name_cn": "布洛芬",
+        "name_en": "Ibuprofen",
+        "kegg": "D00126"
+      },
+      "drug_b": {
+        "name_cn": "培美曲塞",
+        "name_en": "Pemetrexed disodium",
+        "kegg": "D03828"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00126+D03828"
+    },
+    "D00141 D00340": {
+      "drug_a": {
+        "name_cn": "吲哚美辛",
+        "name_en": "Indomethacin",
+        "kegg": "D00141"
+      },
+      "drug_b": {
+        "name_cn": "氢氯噻嗪",
+        "name_en": "Hydrochlorothiazide",
+        "kegg": "D00340"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00340+D00141"
+    },
+    "D00141 D00443": {
+      "drug_a": {
+        "name_cn": "吲哚美辛",
+        "name_en": "Indomethacin",
+        "kegg": "D00141"
+      },
+      "drug_b": {
+        "name_cn": "螺内酯",
+        "name_en": "Spironolactone",
+        "kegg": "D00443"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00443+D00141"
+    },
+    "D00184 D00400": {
+      "drug_a": {
+        "name_cn": "环孢素",
+        "name_en": "Cyclosporine",
+        "kegg": "D00184"
+      },
+      "drug_b": {
+        "name_cn": "缬沙坦",
+        "name_en": "Valsartan",
+        "kegg": "D00400"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00400+D00184"
+    },
+    "D00184 D00434": {
+      "drug_a": {
+        "name_cn": "环孢素",
+        "name_en": "Cyclosporine",
+        "kegg": "D00184"
+      },
+      "drug_b": {
+        "name_cn": "辛伐他汀",
+        "name_en": "Simvastatin",
+        "kegg": "D00434"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "Enzyme: CYP3A4 / CYP inhibition: CYP3A4"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00434+D00184"
+    },
+    "D00184 D00443": {
+      "drug_a": {
+        "name_cn": "环孢素",
+        "name_en": "Cyclosporine",
+        "kegg": "D00184"
+      },
+      "drug_b": {
+        "name_cn": "螺内酯",
+        "name_en": "Spironolactone",
+        "kegg": "D00443"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00443+D00184"
+    },
+    "D00184 D02060": {
+      "drug_a": {
+        "name_cn": "环孢素",
+        "name_en": "Cyclosporine",
+        "kegg": "D00184"
+      },
+      "drug_b": {
+        "name_cn": "氯化钾",
+        "name_en": "Potassium chloride",
+        "kegg": "D02060"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D02060+D00184"
+    },
+    "D00216 D00593": {
+      "drug_a": {
+        "name_cn": "阿卡波糖",
+        "name_en": "Acarbose",
+        "kegg": "D00216"
+      },
+      "drug_b": {
+        "name_cn": "格列美脲",
+        "name_en": "Glimepiride",
+        "kegg": "D00593"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00216+D00593"
+    },
+    "D00216 D00944": {
+      "drug_a": {
+        "name_cn": "阿卡波糖",
+        "name_en": "Acarbose",
+        "kegg": "D00216"
+      },
+      "drug_b": {
+        "name_cn": "二甲双胍",
+        "name_en": "Metformin",
+        "kegg": "D00944"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00216+D00944"
+    },
+    "D00216 D03230": {
+      "drug_a": {
+        "name_cn": "阿卡波糖",
+        "name_en": "Acarbose",
+        "kegg": "D00216"
+      },
+      "drug_b": {
+        "name_cn": "人胰岛素",
+        "name_en": "Insulin human",
+        "kegg": "D03230"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00216+D03230"
+    },
+    "D00252 D00276": {
+      "drug_a": {
+        "kegg": "D00252"
+      },
+      "drug_b": {
+        "name_cn": "克拉霉素",
+        "name_en": "Clarithromycin",
+        "kegg": "D00276"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / CYP induction: CYP3A4"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00276+D00252"
+    },
+    "D00276 D00298": {
+      "drug_a": {
+        "name_cn": "克拉霉素",
+        "name_en": "Clarithromycin",
+        "kegg": "D00276"
+      },
+      "drug_b": {
+        "name_cn": "地高辛",
+        "name_en": "Digoxin",
+        "kegg": "D00298"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "Transporter inhibition: ABCB1"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00276+D00298"
+    },
+    "D00276 D00434": {
+      "drug_a": {
+        "name_cn": "克拉霉素",
+        "name_en": "Clarithromycin",
+        "kegg": "D00276"
+      },
+      "drug_b": {
+        "name_cn": "辛伐他汀",
+        "name_en": "Simvastatin",
+        "kegg": "D00434"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "Enzyme: CYP3A4 / CYP inhibition: CYP3A4"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00276+D00434"
+    },
+    "D00285 D00593": {
+      "drug_a": {
+        "name_cn": "复方磺胺甲噁唑",
+        "name_en": "Sulfamethoxazole and trimethoprim",
+        "kegg": "D00285"
+      },
+      "drug_b": {
+        "name_cn": "格列美脲",
+        "name_en": "Glimepiride",
+        "kegg": "D00593"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "CYP inhibition: CYP2C9"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00593+D00285"
+    },
+    "D00297 D00340": {
+      "drug_a": {
+        "name_cn": "洋地黄毒苷",
+        "name_en": "Digitoxin",
+        "kegg": "D00297"
+      },
+      "drug_b": {
+        "name_cn": "氢氯噻嗪",
+        "name_en": "Hydrochlorothiazide",
+        "kegg": "D00340"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00340+D00297"
+    },
+    "D00298 D00340": {
+      "drug_a": {
+        "name_cn": "地高辛",
+        "name_en": "Digoxin",
+        "kegg": "D00298"
+      },
+      "drug_b": {
+        "name_cn": "氢氯噻嗪",
+        "name_en": "Hydrochlorothiazide",
+        "kegg": "D00340"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00340+D00298"
+    },
+    "D00298 D00437": {
+      "drug_a": {
+        "name_cn": "地高辛",
+        "name_en": "Digoxin",
+        "kegg": "D00298"
+      },
+      "drug_b": {
+        "name_cn": "硝苯地平",
+        "name_en": "Nifedipine",
+        "kegg": "D00437"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00437+D00298"
+    },
+    "D00298 D00443": {
+      "drug_a": {
+        "name_cn": "地高辛",
+        "name_en": "Digoxin",
+        "kegg": "D00298"
+      },
+      "drug_b": {
+        "name_cn": "螺内酯",
+        "name_en": "Spironolactone",
+        "kegg": "D00443"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00443+D00298"
+    },
+    "D00298 D00636": {
+      "drug_a": {
+        "name_cn": "地高辛",
+        "name_en": "Digoxin",
+        "kegg": "D00298"
+      },
+      "drug_b": {
+        "name_cn": "胺碘酮",
+        "name_en": "Amiodarone",
+        "kegg": "D00636"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00298+D00636"
+    },
+    "D00340 D00801": {
+      "drug_a": {
+        "name_cn": "氢氯噻嗪",
+        "name_en": "Hydrochlorothiazide",
+        "kegg": "D00340"
+      },
+      "drug_b": {
+        "kegg": "D00801"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00340+D00801"
+    },
+    "D00340 D00903": {
+      "drug_a": {
+        "name_cn": "氢氯噻嗪",
+        "name_en": "Hydrochlorothiazide",
+        "kegg": "D00340"
+      },
+      "drug_b": {
+        "name_cn": "双氯芬酸钾",
+        "name_en": "Diclofenac potassium",
+        "kegg": "D00903"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00340+D00903"
+    },
+    "D00350 D00455": {
+      "drug_a": {
+        "name_cn": "伊曲康唑",
+        "name_en": "Itraconazole",
+        "kegg": "D00350"
+      },
+      "drug_b": {
+        "name_cn": "奥美拉唑",
+        "name_en": "Omeprazole",
+        "kegg": "D00455"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00455+D00350"
+    },
+    "D00351 D07086": {
+      "drug_a": {
+        "name_cn": "酮康唑",
+        "name_en": "Ketoconazole",
+        "kegg": "D00351"
+      },
+      "drug_b": {
+        "name_cn": "利伐沙班",
+        "name_en": "Rivaroxaban",
+        "kegg": "D07086"
+      },
+      "levels": [
+        "CI"
+      ],
+      "mechanisms": [
+        "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / Transporter inhibition: ABCB1"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D07086+D00351"
+    },
+    "D00386 D00400": {
+      "drug_a": {
+        "name_cn": "氨苯蝶啶",
+        "name_en": "Triamterene",
+        "kegg": "D00386"
+      },
+      "drug_b": {
+        "name_cn": "缬沙坦",
+        "name_en": "Valsartan",
+        "kegg": "D00400"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00400+D00386"
+    },
+    "D00386 D02060": {
+      "drug_a": {
+        "name_cn": "氨苯蝶啶",
+        "name_en": "Triamterene",
+        "kegg": "D00386"
+      },
+      "drug_b": {
+        "name_cn": "氯化钾",
+        "name_en": "Potassium chloride",
+        "kegg": "D02060"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D02060+D00386"
+    },
+    "D00400 D00443": {
+      "drug_a": {
+        "name_cn": "缬沙坦",
+        "name_en": "Valsartan",
+        "kegg": "D00400"
+      },
+      "drug_b": {
+        "name_cn": "螺内酯",
+        "name_en": "Spironolactone",
+        "kegg": "D00443"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00443+D00400"
+    },
+    "D00400 D00621": {
+      "drug_a": {
+        "name_cn": "缬沙坦",
+        "name_en": "Valsartan",
+        "kegg": "D00400"
+      },
+      "drug_b": {
+        "name_cn": "依那普利",
+        "name_en": "Enalapril",
+        "kegg": "D00621"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00400+D00621"
+    },
+    "D00400 D00649": {
+      "drug_a": {
+        "name_cn": "缬沙坦",
+        "name_en": "Valsartan",
+        "kegg": "D00400"
+      },
+      "drug_b": {
+        "name_cn": "阿米洛利",
+        "name_en": "Amiloride hydrochloride",
+        "kegg": "D00649"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00400+D00649"
+    },
+    "D00400 D02060": {
+      "drug_a": {
+        "name_cn": "缬沙坦",
+        "name_en": "Valsartan",
+        "kegg": "D00400"
+      },
+      "drug_b": {
+        "name_cn": "氯化钾",
+        "name_en": "Potassium chloride",
+        "kegg": "D02060"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D02060+D00400"
+    },
+    "D00443 D00621": {
+      "drug_a": {
+        "name_cn": "螺内酯",
+        "name_en": "Spironolactone",
+        "kegg": "D00443"
+      },
+      "drug_b": {
+        "name_cn": "依那普利",
+        "name_en": "Enalapril",
+        "kegg": "D00621"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00443+D00621"
+    },
+    "D00443 D00903": {
+      "drug_a": {
+        "name_cn": "螺内酯",
+        "name_en": "Spironolactone",
+        "kegg": "D00443"
+      },
+      "drug_b": {
+        "name_cn": "双氯芬酸钾",
+        "name_en": "Diclofenac potassium",
+        "kegg": "D00903"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00443+D00903"
+    },
+    "D00443 D02060": {
+      "drug_a": {
+        "name_cn": "螺内酯",
+        "name_en": "Spironolactone",
+        "kegg": "D00443"
+      },
+      "drug_b": {
+        "name_cn": "氯化钾",
+        "name_en": "Potassium chloride",
+        "kegg": "D02060"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00443+D02060"
+    },
+    "D00515 D02229": {
+      "drug_a": {
+        "name_cn": "硝酸甘油",
+        "name_en": "Nitroglycerin",
+        "kegg": "D00515"
+      },
+      "drug_b": {
+        "name_cn": "西地那非",
+        "name_en": "Sildenafil",
+        "kegg": "D02229"
+      },
+      "levels": [
+        "CI"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00515+D02229"
+    },
+    "D00564 D00636": {
+      "drug_a": {
+        "name_cn": "华法林",
+        "name_en": "Warfarin",
+        "kegg": "D00564"
+      },
+      "drug_b": {
+        "name_cn": "胺碘酮",
+        "name_en": "Amiodarone",
+        "kegg": "D00636"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00636+D00564"
+    },
+    "D00564 D01010": {
+      "drug_a": {
+        "name_cn": "华法林",
+        "name_en": "Warfarin",
+        "kegg": "D00564"
+      },
+      "drug_b": {
+        "name_cn": "左甲状腺素",
+        "name_en": "Levothyroxine",
+        "kegg": "D01010"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D01010+D00564"
+    },
+    "D00621 D02060": {
+      "drug_a": {
+        "name_cn": "依那普利",
+        "name_en": "Enalapril",
+        "kegg": "D00621"
+      },
+      "drug_b": {
+        "name_cn": "氯化钾",
+        "name_en": "Potassium chloride",
+        "kegg": "D02060"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D02060+D00621"
+    },
+    "D00649 D02060": {
+      "drug_a": {
+        "name_cn": "阿米洛利",
+        "name_en": "Amiloride hydrochloride",
+        "kegg": "D00649"
+      },
+      "drug_b": {
+        "name_cn": "氯化钾",
+        "name_en": "Potassium chloride",
+        "kegg": "D02060"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D02060+D00649"
+    },
+    "D00731 D00939": {
+      "drug_a": {
+        "name_cn": "氢氧化镁",
+        "name_en": "Magnesium hydroxide",
+        "kegg": "D00731"
+      },
+      "drug_b": {
+        "name_cn": "阿仑膦酸",
+        "name_en": "Alendronate",
+        "kegg": "D00939"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00939+D00731"
+    },
+    "D00932 D00939": {
+      "drug_a": {
+        "name_cn": "碳酸钙",
+        "name_en": "Calcium carbonate",
+        "kegg": "D00932"
+      },
+      "drug_b": {
+        "name_cn": "阿仑膦酸",
+        "name_en": "Alendronate",
+        "kegg": "D00939"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D00939+D00932"
+    },
+    "D01010 D05457": {
+      "drug_a": {
+        "name_cn": "左甲状腺素",
+        "name_en": "Levothyroxine",
+        "kegg": "D01010"
+      },
+      "drug_b": {
+        "name_cn": "苯丙香豆素",
+        "name_en": "Phenprocoumon",
+        "kegg": "D05457"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "unclassified"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D01010+D05457"
+    },
+    "D02260 D02358": {
+      "drug_a": {
+        "name_cn": "帕罗西汀",
+        "name_en": "Paroxetine",
+        "kegg": "D02260"
+      },
+      "drug_b": {
+        "name_cn": "美托洛尔",
+        "name_en": "Metoprolol",
+        "kegg": "D02358"
+      },
+      "levels": [
+        "P"
+      ],
+      "mechanisms": [
+        "Enzyme: CYP2D6 / CYP inhibition: CYP2D6"
+      ],
+      "source_url": "https://rest.kegg.jp/ddi/D02358+D02260"
+    }
+  },
+  "checked_not_found": [
+    "D00126 D00297",
+    "D00126 D00298",
+    "D00126 D00944",
+    "D00274 D00276",
+    "D00322 D00455",
+    "D00326 D02358",
+    "D00351 D00455",
+    "D00400 D00400",
+    "D00437 D00944",
+    "D00510 D00593",
+    "D00567 D02358",
+    "D00642 D02358",
+    "D02060 D02060"
+  ]
+}

@@ -1,0 +1,8 @@
+# Stage 1 local RAG and evaluation dependencies (Python 3.11+)
+jieba==0.42.1
+rank-bm25==0.2.2
+sentence-transformers==6.0.0
+faiss-cpu==1.15.0
+openai>=1.0,<3
+# Stage 4 interactive local UI
+streamlit>=1.40,<2

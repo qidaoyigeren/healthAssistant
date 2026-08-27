@@ -1,0 +1,18 @@
+{
+  "model": "BAAI/bge-small-zh-v1.5",
+  "embedding_dimension": 512,
+  "normalized_embeddings": true,
+  "faiss_index": "IndexFlatIP",
+  "labels": 1200,
+  "chunks": 4158,
+  "sections": [
+    "药物相互作用",
+    "禁忌",
+    "注意事项"
+  ],
+  "chunking": {
+    "max_chars": 480,
+    "overlap_chars": 80
+  },
+  "query_prefix": "为这个句子生成表示以用于检索相关文章："
+}

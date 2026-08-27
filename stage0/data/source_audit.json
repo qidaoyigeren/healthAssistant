@@ -1,0 +1,52 @@
+{
+  "checked_on": "2026-08-27",
+  "sources": [
+    {
+      "name": "MNBVC medical/20250624",
+      "priority": "open mirror",
+      "accessible": true,
+      "records_verified": 114367,
+      "unique_approval_numbers": 107672,
+      "unique_records_with_禁忌_注意事项_药物相互作用": 104134,
+      "sample_persisted": 100,
+      "content": "structured Chinese drug instructions with approval number, manufacturer, section fields, and originating page URL",
+      "license": "MIT on dataset card; underlying page rights and production provenance require review",
+      "url": "https://huggingface.co/datasets/noeatme/MNBVC/tree/main/medical/20250624",
+      "sha256": "b4928f883728ad9981dcfc371f4c332f63d22d7b45fc8f13eed2a8c012d81b2b",
+      "decision": "passes the Stage-0 accessibility/count gate; not accepted as a production clinical authority"
+    },
+    {
+      "name": "drug-instructions-sample-20",
+      "priority": "open mirror",
+      "accessible": true,
+      "count_verified_by_manifest": 20,
+      "content": "PDF labels + JSONL metadata",
+      "license": "Apache-2.0",
+      "url": "https://github.com/lengfeng650-star/drug-instructions-sample-20",
+      "decision": "retained as a small PDF-parser source; PDF download failed TLS in the first run"
+    },
+    {
+      "name": "NMPA official query",
+      "priority": "official",
+      "accessible_as_bulk_download": false,
+      "count_verified": 0,
+      "content": "no stable anonymous bulk instruction-text download located during spike",
+      "url": "https://www.nmpa.gov.cn/",
+      "decision": "record; do not scrape dynamic query"
+    },
+    {
+      "name": "Manufacturer/NHSA and third-party public pages",
+      "priority": "individual public sources",
+      "accessible": true,
+      "target_instruction_excerpts_saved": 9,
+      "decision": "use selected excerpts with provenance; no bulk crawl"
+    }
+  ],
+  "mnbvc_compressed_bytes": 73218878,
+  "full_instruction_records_audited": 114367,
+  "unique_approval_numbers": 107672,
+  "full_instruction_samples_saved": 100,
+  "target_names_found": 29,
+  "target_names_requested": 30,
+  "threshold_50_met": true
+}

@@ -1,0 +1,5 @@
+{"input": "倍他乐克", "matched": true, "generic_cn": "美托洛尔", "ingredients": [{"name_cn": "美托洛尔", "name_en": "Metoprolol", "kegg": "D02358"}]}
+{"input": "拜阿司匹灵", "matched": true, "generic_cn": "阿司匹林", "ingredients": [{"name_cn": "阿司匹林", "name_en": "Aspirin", "kegg": "D00109"}]}
+{"input": "复方利血平氨苯蝶啶胶囊", "matched": true, "generic_cn": "复方利血平氨苯蝶啶", "ingredients": [{"name_cn": "利血平", "name_en": "Reserpine", "kegg": "D00197"}, {"name_cn": "氢氯噻嗪", "name_en": "Hydrochlorothiazide", "kegg": "D00340"}, {"name_cn": "氨苯蝶啶", "name_en": "Triamterene", "kegg": "D00386"}, {"name_cn": "硫酸双肼屈嗪", "name_en": "Dihydralazine sulfate", "kegg": "D01326"}]}
+{"input": "硝酸甘油", "matched": true, "generic_cn": "硝酸甘油", "ingredients": [{"name_cn": "硝酸甘油", "name_en": "Nitroglycerin", "kegg": "D00515"}]}
+{"input": "万艾可", "matched": true, "generic_cn": "西地那非", "ingredients": [{"name_cn": "西地那非", "name_en": "Sildenafil", "kegg": "D02229"}]}

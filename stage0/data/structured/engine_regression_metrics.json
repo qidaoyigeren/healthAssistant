@@ -1,0 +1,278 @@
+{
+  "generated_at": "2026-08-27T11:09:02.204599+00:00",
+  "evaluation_kind": "regression_replay",
+  "generalization_claim": false,
+  "evaluation_design": "scenario-level regression over normalized ingredient pairs; gold authored from Stage 0/1 grounded label evidence",
+  "case_count": 26,
+  "medications_per_case": {
+    "min": 3,
+    "max": 4
+  },
+  "gold_positive_pair_occurrences": 41,
+  "warning_occurrences": 41,
+  "pair_detection": {
+    "true_positive": 41,
+    "false_positive": 0,
+    "false_negative": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+  },
+  "severity_accuracy_on_flagged_gold_pairs": {
+    "correct": 41,
+    "total": 41,
+    "value": 1.0
+  },
+  "citation_coverage": {
+    "definition": "warning has a Chinese source_text span and a source_url",
+    "covered": 41,
+    "total": 41,
+    "value": 1.0
+  },
+  "path_usage": {
+    "warning_occurrences_by_detection_path": {
+      "fallback_cache": 9,
+      "kegg+fallback_cache": 32
+    },
+    "fast_path_warning_occurrences": 32,
+    "fallback_path_warning_occurrences": 41,
+    "unique_fast_path_pairs": 22,
+    "unique_fallback_path_pairs": 31,
+    "fast_path_pair_count": 22,
+    "fallback_path_pair_count": 31
+  },
+  "clean_lists": {
+    "total": 6,
+    "returned_no_warning": 6
+  },
+  "required_severe_pair_coverage": {
+    "covered": 6,
+    "total": 6,
+    "all_flagged": true,
+    "missing": []
+  },
+  "acceptance": {
+    "scope": "regression_only; do not interpret as held-out detection accuracy",
+    "pair_precision_gte_0_85": true,
+    "pair_recall_gte_0_90": true,
+    "severity_accuracy_gte_0_80": true,
+    "citation_coverage_gte_0_90": true,
+    "all_required_severe_pairs_flagged": true
+  },
+  "per_case": [
+    {
+      "case_id": "S01",
+      "gold_pairs": 2,
+      "predicted_pairs": 2,
+      "true_positive_pairs": 2,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S02",
+      "gold_pairs": 3,
+      "predicted_pairs": 3,
+      "true_positive_pairs": 3,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S03",
+      "gold_pairs": 2,
+      "predicted_pairs": 2,
+      "true_positive_pairs": 2,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S04",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S05",
+      "gold_pairs": 3,
+      "predicted_pairs": 3,
+      "true_positive_pairs": 3,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S06",
+      "gold_pairs": 2,
+      "predicted_pairs": 2,
+      "true_positive_pairs": 2,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S07",
+      "gold_pairs": 2,
+      "predicted_pairs": 2,
+      "true_positive_pairs": 2,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S08",
+      "gold_pairs": 2,
+      "predicted_pairs": 2,
+      "true_positive_pairs": 2,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S09",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S10",
+      "gold_pairs": 3,
+      "predicted_pairs": 3,
+      "true_positive_pairs": 3,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S11",
+      "gold_pairs": 2,
+      "predicted_pairs": 2,
+      "true_positive_pairs": 2,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S12",
+      "gold_pairs": 2,
+      "predicted_pairs": 2,
+      "true_positive_pairs": 2,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S13",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S14",
+      "gold_pairs": 2,
+      "predicted_pairs": 2,
+      "true_positive_pairs": 2,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S15",
+      "gold_pairs": 2,
+      "predicted_pairs": 2,
+      "true_positive_pairs": 2,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S16",
+      "gold_pairs": 3,
+      "predicted_pairs": 3,
+      "true_positive_pairs": 3,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S17",
+      "gold_pairs": 1,
+      "predicted_pairs": 1,
+      "true_positive_pairs": 1,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S18",
+      "gold_pairs": 2,
+      "predicted_pairs": 2,
+      "true_positive_pairs": 2,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S19",
+      "gold_pairs": 2,
+      "predicted_pairs": 2,
+      "true_positive_pairs": 2,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "S20",
+      "gold_pairs": 3,
+      "predicted_pairs": 3,
+      "true_positive_pairs": 3,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "C21",
+      "gold_pairs": 0,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "C22",
+      "gold_pairs": 0,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "C23",
+      "gold_pairs": 0,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "C24",
+      "gold_pairs": 0,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "C25",
+      "gold_pairs": 0,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    },
+    {
+      "case_id": "C26",
+      "gold_pairs": 0,
+      "predicted_pairs": 0,
+      "true_positive_pairs": 0,
+      "false_positive_pairs": 0,
+      "missed_pairs": []
+    }
+  ],
+  "limitations": [
+    "This is detector regression testing, not clinical validation or evidence of patient-outcome safety.",
+    "Cases reuse the Stage 0/1 scoped label-evidence universe and are not an independent external benchmark.",
+    "A single annotator assigned the operational severities; class expansion uses the small ontology, not exhaustive pharmacology.",
+    "Evaluation disables new network and model calls, measuring the reproducible persisted-index and warm-cache path."
+  ]
+}

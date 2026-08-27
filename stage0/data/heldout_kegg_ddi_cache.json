@@ -1,0 +1,362 @@
+{
+  "D00409 D00564": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00409",
+        "b": "dr:D00564",
+        "level": "P",
+        "mechanism": "CYP inhibition: CYP2C9"
+      },
+      {
+        "a": "dr:D00564",
+        "b": "dr:D00409",
+        "level": "P",
+        "mechanism": "CYP inhibition: CYP2C9"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00409+D00564"
+  },
+  "D00409 D07450": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00409+D07450"
+  },
+  "D00564 D07450": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00564+D07450"
+  },
+  "D00204 D00224": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00204",
+        "b": "dr:D00224",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00224",
+        "b": "dr:D00204",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00224+D00204"
+  },
+  "D00224 D01915": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00224+D01915"
+  },
+  "D00204 D01915": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00204+D01915"
+  },
+  "D00224 D08897": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00224+D08897"
+  },
+  "D00204 D08897": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00204+D08897"
+  },
+  "D00211 D00564": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00211",
+        "b": "dr:D00564",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00564",
+        "b": "dr:D00211",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00211+D00564"
+  },
+  "D00140 D00564": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00140",
+        "b": "dr:D00564",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00564",
+        "b": "dr:D00140",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00140+D00564"
+  },
+  "D00140 D07450": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00140+D07450"
+  },
+  "D00276 D07474": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00276",
+        "b": "dr:D07474",
+        "level": "P",
+        "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / Transporter inhibition: ABCB1"
+      },
+      {
+        "a": "dr:D07474",
+        "b": "dr:D00276",
+        "level": "P",
+        "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / Transporter inhibition: ABCB1"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00276+D07474"
+  },
+  "D00204 D00276": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00276+D00204"
+  },
+  "D00204 D07474": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D07474+D00204"
+  },
+  "D00350 D07474": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00350",
+        "b": "dr:D07474",
+        "level": "P",
+        "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / Transporter inhibition: ABCB1"
+      },
+      {
+        "a": "dr:D07474",
+        "b": "dr:D00350",
+        "level": "P",
+        "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / Transporter inhibition: ABCB1"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00350+D07474"
+  },
+  "D00204 D00350": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00350+D00204"
+  },
+  "D00578 D07474": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00578",
+        "b": "dr:D07474",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D07474",
+        "b": "dr:D00578",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D07474+D00578"
+  },
+  "D00204 D00578": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00578+D00204"
+  },
+  "D00186 D00227": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00186+D00227"
+  },
+  "D00186 D00204": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00186+D00204"
+  },
+  "D00204 D00227": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00227+D00204"
+  },
+  "D00186 D00564": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00186",
+        "b": "dr:D00564",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D00564",
+        "b": "dr:D00186",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00186+D00564"
+  },
+  "D00298 D00619": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00298",
+        "b": "dr:D00619",
+        "level": "P",
+        "mechanism": "Transporter inhibition: ABCB1"
+      },
+      {
+        "a": "dr:D00619",
+        "b": "dr:D00298",
+        "level": "P",
+        "mechanism": "Transporter inhibition: ABCB1"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D00298+D00619"
+  },
+  "D00204 D00298": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00298+D00204"
+  },
+  "D00204 D00619": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00619+D00204"
+  },
+  "D00227 D00455": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00455+D00227"
+  },
+  "D00204 D00455": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00455+D00204"
+  },
+  "D00211 D00227": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00211+D00227"
+  },
+  "D00204 D00211": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00211+D00204"
+  },
+  "D00140 D00227": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00140+D00227"
+  },
+  "D00932 D01010": {
+    "status": "matched",
+    "rows": [
+      {
+        "a": "dr:D00932",
+        "b": "dr:D01010",
+        "level": "P",
+        "mechanism": "unclassified"
+      },
+      {
+        "a": "dr:D01010",
+        "b": "dr:D00932",
+        "level": "P",
+        "mechanism": "unclassified"
+      }
+    ],
+    "url": "https://rest.kegg.jp/ddi/D01010+D00932"
+  },
+  "D00204 D01010": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D01010+D00204"
+  },
+  "D00204 D00932": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00932+D00204"
+  },
+  "D00409 D01915": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00409+D01915"
+  },
+  "D00224 D07450": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00224+D07450"
+  },
+  "D07450 D08897": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D07450+D08897"
+  },
+  "D01725 D07474": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D01725+D07474"
+  },
+  "D01725 D07450": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D01725+D07450"
+  },
+  "D07450 D07474": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D07474+D07450"
+  },
+  "D00186 D01915": {
+    "status": "not_found",
+    "rows": [],
+    "error": "HTTP 404",
+    "url": "https://rest.kegg.jp/ddi/D00186+D01915"
+  }
+}

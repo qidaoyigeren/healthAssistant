@@ -1,0 +1,38 @@
+[
+  {
+    "drug_a": "����ù��",
+    "drug_b": "������͡",
+    "severity": "contraindicated",
+    "mechanism": "����ù������CYP3A4��ʹ������͡Ѫ��Ũ������",
+    "effect": "����/���Ƽ��ܽ��������",
+    "management": "���ɺ��ã�����ʹ�ÿ���ù��ʱ��ͣ������͡",
+    "source_text": "������Щ��͡ҩ�ﾭCYP3A4�㷺��л������Ѫ��Ũ�����ߣ��⽫���Ӽ����ķ��գ��������Ƽ��ܽ�֢",
+    "source_url": "https://www.abbott.com.cn/content/dam/corp/abbott/cn-cn/documents/2021pdf/KELAMEISU_GANHUNXUANJI.pdf",
+    "confidence": "high",
+    "detection_path": "kegg+fallback_cache"
+  },
+  {
+    "drug_a": "������",
+    "drug_b": "��˾ƥ��",
+    "severity": "major",
+    "mechanism": "����������ѪС�幦�����Ƶ���",
+    "effect": "��Ѫ��������",
+    "management": "���ò���ǿ��Ѫ/��Ѫ���",
+    "source_text": "����ѪС�幦�ܣ���ʹ�������ø����Ե�ҩ���������˾ƥ��",
+    "source_url": "https://www.jianke.com/a/20151121/2175732.html",
+    "confidence": "high",
+    "detection_path": "kegg+fallback_cache"
+  },
+  {
+    "drug_a": "����˫��",
+    "drug_b": "����Ӱ����ҩ�����",
+    "severity": "major",
+    "mechanism": "��Ӱ���յ������ɵ��¶���˫�����",
+    "effect": "�������ж���������",
+    "management": "���ǰ�������м�������48Сʱͣ�ã������������ȶ���ָ�",
+    "source_text": "Ѫ����ע�京����Ӱ�����ܵ�����Ӱ���յ����������̶����¶���˫������������������ж�����",
+    "source_url": "https://db.yaozh.com/instruct/3720831336938880.html",
+    "confidence": "medium",
+    "detection_path": "fallback_cache"
+  }
+]

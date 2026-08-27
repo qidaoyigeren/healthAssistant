@@ -1,0 +1,13 @@
+# Secrets
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Local demo state (created by stage0/app.py and stage0/demo.py)
+stage0/memory.db*
+
+# Local browser smoke-test snapshots
+.playwright-cli/

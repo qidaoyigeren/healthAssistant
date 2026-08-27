@@ -1,0 +1,8 @@
+[
+  {"drug_a_en":"Warfarin","drug_b_en":"Aspirin","status":"matched","level":"P","mechanism":"unclassified","kegg_ids":["D00564","D00109"],"source_url":"https://www.kegg.jp/kegg-bin/ddi_list?drug=D00564","checked_on":"2026-08-26"},
+  {"drug_a_en":"Warfarin","drug_b_en":"Clarithromycin","status":"matched","level":"P","mechanism":"unclassified","kegg_ids":["D00564","D00276"],"source_url":"https://www.kegg.jp/kegg-bin/ddi_list?drug=D00564","checked_on":"2026-08-26"},
+  {"drug_a_en":"Warfarin","drug_b_en":"Simvastatin","status":"matched","level":"P","mechanism":"unclassified","kegg_ids":["D00564","D00434"],"source_url":"https://www.kegg.jp/kegg-bin/ddi_list?drug=D00564","checked_on":"2026-08-26"},
+  {"drug_a_en":"Warfarin","drug_b_en":"Amiodarone","status":"matched","level":"P","mechanism":"unclassified","kegg_ids":["D00564","D00636"],"source_url":"https://www.kegg.jp/kegg-bin/ddi_list?drug=D00564","checked_on":"2026-08-26"},
+  {"drug_a_en":"Warfarin","drug_b_en":"Ibuprofen","status":"matched","level":"P","mechanism":"Enzyme: CYP2C9","kegg_ids":["D00564","D00126"],"source_url":"https://www.kegg.jp/kegg-bin/ddi_list?drug=D00564","checked_on":"2026-08-26"},
+  {"drug_a_en":"Warfarin","drug_b_en":"Celecoxib","status":"matched","level":"P","mechanism":"Enzyme: CYP2C9","kegg_ids":["D00564","D00567"],"source_url":"https://www.kegg.jp/kegg-bin/ddi_list?drug=D00564","checked_on":"2026-08-26"}
+]

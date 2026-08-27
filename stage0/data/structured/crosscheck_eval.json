@@ -1,0 +1,2827 @@
+{
+  "mode": "kegg_live_ontology_expansion",
+  "total_cases": 30,
+  "single_drug_cases": 14,
+  "class_partner_cases": 16,
+  "ontology": {
+    "valid": true,
+    "class_count": 16,
+    "unique_member_drugs": 42,
+    "covered_eval_class_cases": 16,
+    "errors": []
+  },
+  "resolved_and_checked": 30,
+  "coverage": 1.0,
+  "kegg_matched": 28,
+  "corroboration_rate": 0.9333,
+  "single_drug_results": {
+    "checked": 14,
+    "corroborated": 12
+  },
+  "class_partner_results": {
+    "checked": 16,
+    "corroborated": 16
+  },
+  "case_corroboration_rule": "any representative ontology member pair returned by KEGG DDI",
+  "limitations": [
+    "Ontology members are representative (2-5 per class), not exhaustive class definitions.",
+    "KEGG DDI is standardized primarily from Japanese labels; absence is not evidence of no interaction.",
+    "KEGG REST terms restrict use to academic users; uncached calls are limited to one request per second."
+  ],
+  "rows": [
+    {
+      "case_id": "E01",
+      "label_drug": "厄贝沙坦氢氯噻嗪片",
+      "drug_a": "Hydrochlorothiazide",
+      "drug_b": "Lithium",
+      "kegg_a": "D00340",
+      "partner_resolution_type": "single_drug",
+      "ontology_class_ids": [],
+      "partner_resolved": "Lithium",
+      "kegg_b": "D00801",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00340",
+            "b": "dr:D00801",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00801",
+            "b": "dr:D00340",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00340+D00801"
+      },
+      "member_pairs_attempted": 1,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": null,
+            "name_en": "Lithium",
+            "kegg": "D00801",
+            "class_id": null
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00340",
+                "b": "dr:D00801",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00801",
+                "b": "dr:D00340",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00340+D00801"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E02",
+      "label_drug": "厄贝沙坦氢氯噻嗪片",
+      "drug_a": "Hydrochlorothiazide",
+      "drug_b": "Digoxin class",
+      "kegg_a": "D00340",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "cardiac_glycosides"
+      ],
+      "partner_resolved": "Digoxin",
+      "kegg_b": "D00298",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00298",
+            "b": "dr:D00340",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00340",
+            "b": "dr:D00298",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00340+D00298"
+      },
+      "member_pairs_attempted": 2,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "地高辛",
+            "name_en": "Digoxin",
+            "kegg": "D00298",
+            "class_id": "cardiac_glycosides"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00298",
+                "b": "dr:D00340",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00340",
+                "b": "dr:D00298",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00340+D00298"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "洋地黄毒苷",
+            "name_en": "Digitoxin",
+            "kegg": "D00297",
+            "class_id": "cardiac_glycosides"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00297",
+                "b": "dr:D00340",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00340",
+                "b": "dr:D00297",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00340+D00297"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E03",
+      "label_drug": "厄贝沙坦氢氯噻嗪片",
+      "drug_a": "Hydrochlorothiazide",
+      "drug_b": "NSAIDs",
+      "kegg_a": "D00340",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "nsaids"
+      ],
+      "partner_resolved": "Ibuprofen",
+      "kegg_b": "D00126",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00126",
+            "b": "dr:D00340",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00340",
+            "b": "dr:D00126",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00340+D00126"
+      },
+      "member_pairs_attempted": 4,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "布洛芬",
+            "name_en": "Ibuprofen",
+            "kegg": "D00126",
+            "class_id": "nsaids"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00126",
+                "b": "dr:D00340",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00340",
+                "b": "dr:D00126",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00340+D00126"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "萘普生",
+            "name_en": "Naproxen",
+            "kegg": "D00118",
+            "class_id": "nsaids"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00118",
+                "b": "dr:D00340",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00340",
+                "b": "dr:D00118",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00340+D00118"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "吲哚美辛",
+            "name_en": "Indomethacin",
+            "kegg": "D00141",
+            "class_id": "nsaids"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00141",
+                "b": "dr:D00340",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00340",
+                "b": "dr:D00141",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00340+D00141"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "双氯芬酸钾",
+            "name_en": "Diclofenac potassium",
+            "kegg": "D00903",
+            "class_id": "nsaids"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00340",
+                "b": "dr:D00903",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00903",
+                "b": "dr:D00340",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00340+D00903"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E04",
+      "label_drug": "阿司匹林肠溶片",
+      "drug_a": "Aspirin",
+      "drug_b": "Anticoagulants or thrombolytics",
+      "kegg_a": "D00109",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "anticoagulants_thrombolytics"
+      ],
+      "partner_resolved": "Warfarin",
+      "kegg_b": "D00564",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00109",
+            "b": "dr:D00564",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00564",
+            "b": "dr:D00109",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00109+D00564"
+      },
+      "member_pairs_attempted": 3,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "华法林",
+            "name_en": "Warfarin",
+            "kegg": "D00564",
+            "class_id": "anticoagulants_thrombolytics"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00109",
+                "b": "dr:D00564",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00564",
+                "b": "dr:D00109",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00109+D00564"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "肝素钠",
+            "name_en": "Heparin sodium",
+            "kegg": "D02112",
+            "class_id": "anticoagulants_thrombolytics"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00109",
+                "b": "dr:D02112",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D02112",
+                "b": "dr:D00109",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00109+D02112"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "阿替普酶",
+            "name_en": "Alteplase",
+            "kegg": "D02837",
+            "class_id": "anticoagulants_thrombolytics"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00109",
+                "b": "dr:D02837",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D02837",
+                "b": "dr:D00109",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00109+D02837"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E05",
+      "label_drug": "阿司匹林肠溶片",
+      "drug_a": "Aspirin",
+      "drug_b": "Corticosteroids",
+      "kegg_a": "D00109",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "corticosteroids"
+      ],
+      "partner_resolved": "Dexamethasone",
+      "kegg_b": "D00292",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00109",
+            "b": "dr:D00292",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00292",
+            "b": "dr:D00109",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00109+D00292"
+      },
+      "member_pairs_attempted": 3,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "地塞米松",
+            "name_en": "Dexamethasone",
+            "kegg": "D00292",
+            "class_id": "corticosteroids"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00109",
+                "b": "dr:D00292",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00292",
+                "b": "dr:D00109",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00109+D00292"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "甲泼尼龙",
+            "name_en": "Methylprednisolone",
+            "kegg": "D00407",
+            "class_id": "corticosteroids"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00109",
+                "b": "dr:D00407",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00407",
+                "b": "dr:D00109",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00109+D00407"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "氢化可的松",
+            "name_en": "Hydrocortisone",
+            "kegg": "D00088",
+            "class_id": "corticosteroids"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00088",
+                "b": "dr:D00109",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00109",
+                "b": "dr:D00088",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00109+D00088"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E06",
+      "label_drug": "克拉霉素分散片",
+      "drug_a": "Clarithromycin",
+      "drug_b": "Carbamazepine",
+      "kegg_a": "D00276",
+      "partner_resolution_type": "single_drug",
+      "ontology_class_ids": [],
+      "partner_resolved": "Carbamazepine",
+      "kegg_b": "D00252",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00252",
+            "b": "dr:D00276",
+            "level": "P",
+            "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / CYP induction: CYP3A4"
+          },
+          {
+            "a": "dr:D00276",
+            "b": "dr:D00252",
+            "level": "P",
+            "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / CYP induction: CYP3A4"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00276+D00252"
+      },
+      "member_pairs_attempted": 1,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": null,
+            "name_en": "Carbamazepine",
+            "kegg": "D00252",
+            "class_id": null
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00252",
+                "b": "dr:D00276",
+                "level": "P",
+                "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / CYP induction: CYP3A4"
+              },
+              {
+                "a": "dr:D00276",
+                "b": "dr:D00252",
+                "level": "P",
+                "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / CYP induction: CYP3A4"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00276+D00252"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E07",
+      "label_drug": "克拉霉素分散片",
+      "drug_a": "Clarithromycin",
+      "drug_b": "Simvastatin or lovastatin",
+      "kegg_a": "D00276",
+      "partner_resolution_type": "single_drug",
+      "ontology_class_ids": [],
+      "partner_resolved": "Simvastatin",
+      "kegg_b": "D00434",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00276",
+            "b": "dr:D00434",
+            "level": "P",
+            "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4"
+          },
+          {
+            "a": "dr:D00434",
+            "b": "dr:D00276",
+            "level": "P",
+            "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00276+D00434"
+      },
+      "member_pairs_attempted": 1,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": null,
+            "name_en": "Simvastatin",
+            "kegg": "D00434",
+            "class_id": null
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00276",
+                "b": "dr:D00434",
+                "level": "P",
+                "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4"
+              },
+              {
+                "a": "dr:D00434",
+                "b": "dr:D00276",
+                "level": "P",
+                "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00276+D00434"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E08",
+      "label_drug": "克拉霉素分散片",
+      "drug_a": "Clarithromycin",
+      "drug_b": "Cisapride or pimozide",
+      "kegg_a": "D00276",
+      "partner_resolution_type": "single_drug",
+      "ontology_class_ids": [],
+      "partner_resolved": "Cisapride",
+      "kegg_b": "D00274",
+      "crosscheck": {
+        "status": "not_found",
+        "rows": [],
+        "error": "HTTP 404"
+      },
+      "member_pairs_attempted": 1,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": null,
+            "name_en": "Cisapride",
+            "kegg": "D00274",
+            "class_id": null
+          },
+          "crosscheck": {
+            "status": "not_found",
+            "rows": [],
+            "error": "HTTP 404"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": false
+    },
+    {
+      "case_id": "E09",
+      "label_drug": "克拉霉素分散片",
+      "drug_a": "Clarithromycin",
+      "drug_b": "Digoxin",
+      "kegg_a": "D00276",
+      "partner_resolution_type": "single_drug",
+      "ontology_class_ids": [],
+      "partner_resolved": "Digoxin",
+      "kegg_b": "D00298",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00276",
+            "b": "dr:D00298",
+            "level": "P",
+            "mechanism": "Transporter inhibition: ABCB1"
+          },
+          {
+            "a": "dr:D00298",
+            "b": "dr:D00276",
+            "level": "P",
+            "mechanism": "Transporter inhibition: ABCB1"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00276+D00298"
+      },
+      "member_pairs_attempted": 1,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": null,
+            "name_en": "Digoxin",
+            "kegg": "D00298",
+            "class_id": null
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00276",
+                "b": "dr:D00298",
+                "level": "P",
+                "mechanism": "Transporter inhibition: ABCB1"
+              },
+              {
+                "a": "dr:D00298",
+                "b": "dr:D00276",
+                "level": "P",
+                "mechanism": "Transporter inhibition: ABCB1"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00276+D00298"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E10",
+      "label_drug": "奥美拉唑肠溶胶囊",
+      "drug_a": "Omeprazole",
+      "drug_b": "Oral azole antifungals",
+      "kegg_a": "D00455",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "oral_azole_antifungals"
+      ],
+      "partner_resolved": "Ketoconazole",
+      "kegg_b": "D00351",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00350",
+            "b": "dr:D00455",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00455",
+            "b": "dr:D00350",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00455+D00350"
+      },
+      "member_pairs_attempted": 3,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "酮康唑",
+            "name_en": "Ketoconazole",
+            "kegg": "D00351",
+            "class_id": "oral_azole_antifungals"
+          },
+          "crosscheck": {
+            "status": "not_found",
+            "rows": [],
+            "error": "HTTP 404",
+            "url": "https://rest.kegg.jp/ddi/D00455+D00351"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "伊曲康唑",
+            "name_en": "Itraconazole",
+            "kegg": "D00350",
+            "class_id": "oral_azole_antifungals"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00350",
+                "b": "dr:D00455",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00455",
+                "b": "dr:D00350",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00455+D00350"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "氟康唑",
+            "name_en": "Fluconazole",
+            "kegg": "D00322",
+            "class_id": "oral_azole_antifungals"
+          },
+          "crosscheck": {
+            "status": "not_found",
+            "rows": [],
+            "error": "HTTP 404",
+            "url": "https://rest.kegg.jp/ddi/D00455+D00322"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E11",
+      "label_drug": "二甲双胍格列本脲片",
+      "drug_a": "Metformin",
+      "drug_b": "Nifedipine",
+      "kegg_a": "D00944",
+      "partner_resolution_type": "single_drug",
+      "ontology_class_ids": [],
+      "partner_resolved": "Nifedipine",
+      "kegg_b": "D00437",
+      "crosscheck": {
+        "status": "not_found",
+        "rows": [],
+        "error": "HTTP 404"
+      },
+      "member_pairs_attempted": 1,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": null,
+            "name_en": "Nifedipine",
+            "kegg": "D00437",
+            "class_id": null
+          },
+          "crosscheck": {
+            "status": "not_found",
+            "rows": [],
+            "error": "HTTP 404"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": false
+    },
+    {
+      "case_id": "E12",
+      "label_drug": "格列美脲片",
+      "drug_a": "Glimepiride",
+      "drug_b": "Listed interacting drug classes",
+      "kegg_a": "D00593",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "hypoglycemia_potentiating_drugs"
+      ],
+      "partner_resolved": "Aspirin",
+      "kegg_b": "D00109",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00109",
+            "b": "dr:D00593",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00593",
+            "b": "dr:D00109",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00593+D00109"
+      },
+      "member_pairs_attempted": 3,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "阿司匹林",
+            "name_en": "Aspirin",
+            "kegg": "D00109",
+            "class_id": "hypoglycemia_potentiating_drugs"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00109",
+                "b": "dr:D00593",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00593",
+                "b": "dr:D00109",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00593+D00109"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "保泰松",
+            "name_en": "Phenylbutazone",
+            "kegg": "D00510",
+            "class_id": "hypoglycemia_potentiating_drugs"
+          },
+          "crosscheck": {
+            "status": "not_found",
+            "rows": [],
+            "error": "HTTP 404",
+            "url": "https://rest.kegg.jp/ddi/D00593+D00510"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "复方磺胺甲噁唑",
+            "name_en": "Sulfamethoxazole and trimethoprim",
+            "kegg": "D00285",
+            "class_id": "hypoglycemia_potentiating_drugs"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00285",
+                "b": "dr:D00593",
+                "level": "P",
+                "mechanism": "CYP inhibition: CYP2C9"
+              },
+              {
+                "a": "dr:D00593",
+                "b": "dr:D00285",
+                "level": "P",
+                "mechanism": "CYP inhibition: CYP2C9"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00593+D00285"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E13",
+      "label_drug": "阿仑膦酸钠片",
+      "drug_a": "Alendronate",
+      "drug_b": "Antacids or mineral-containing laxatives",
+      "kegg_a": "D00939",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "antacids_mineral_laxatives"
+      ],
+      "partner_resolved": "Calcium carbonate",
+      "kegg_b": "D00932",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00932",
+            "b": "dr:D00939",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00939",
+            "b": "dr:D00932",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00939+D00932"
+      },
+      "member_pairs_attempted": 2,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "碳酸钙",
+            "name_en": "Calcium carbonate",
+            "kegg": "D00932",
+            "class_id": "antacids_mineral_laxatives"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00932",
+                "b": "dr:D00939",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00939",
+                "b": "dr:D00932",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00939+D00932"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "氢氧化镁",
+            "name_en": "Magnesium hydroxide",
+            "kegg": "D00731",
+            "class_id": "antacids_mineral_laxatives"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00731",
+                "b": "dr:D00939",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00939",
+                "b": "dr:D00731",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00939+D00731"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E14",
+      "label_drug": "螺内酯片",
+      "drug_a": "Spironolactone",
+      "drug_b": "NSAIDs",
+      "kegg_a": "D00443",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "nsaids"
+      ],
+      "partner_resolved": "Ibuprofen",
+      "kegg_b": "D00126",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00126",
+            "b": "dr:D00443",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00443",
+            "b": "dr:D00126",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00443+D00126"
+      },
+      "member_pairs_attempted": 4,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "布洛芬",
+            "name_en": "Ibuprofen",
+            "kegg": "D00126",
+            "class_id": "nsaids"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00126",
+                "b": "dr:D00443",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00443",
+                "b": "dr:D00126",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00443+D00126"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "萘普生",
+            "name_en": "Naproxen",
+            "kegg": "D00118",
+            "class_id": "nsaids"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00118",
+                "b": "dr:D00443",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00443",
+                "b": "dr:D00118",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00443+D00118"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "吲哚美辛",
+            "name_en": "Indomethacin",
+            "kegg": "D00141",
+            "class_id": "nsaids"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00141",
+                "b": "dr:D00443",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00443",
+                "b": "dr:D00141",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00443+D00141"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "双氯芬酸钾",
+            "name_en": "Diclofenac potassium",
+            "kegg": "D00903",
+            "class_id": "nsaids"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00443",
+                "b": "dr:D00903",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00903",
+                "b": "dr:D00443",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00443+D00903"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E15",
+      "label_drug": "螺内酯片",
+      "drug_a": "Spironolactone",
+      "drug_b": "Potassium-raising drugs",
+      "kegg_a": "D00443",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "potassium_raising_drugs"
+      ],
+      "partner_resolved": "Potassium chloride",
+      "kegg_b": "D02060",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00443",
+            "b": "dr:D02060",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D02060",
+            "b": "dr:D00443",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00443+D02060"
+      },
+      "member_pairs_attempted": 4,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "氯化钾",
+            "name_en": "Potassium chloride",
+            "kegg": "D02060",
+            "class_id": "potassium_raising_drugs"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00443",
+                "b": "dr:D02060",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D02060",
+                "b": "dr:D00443",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00443+D02060"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "依那普利",
+            "name_en": "Enalapril",
+            "kegg": "D00621",
+            "class_id": "potassium_raising_drugs"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00443",
+                "b": "dr:D00621",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00621",
+                "b": "dr:D00443",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00443+D00621"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "缬沙坦",
+            "name_en": "Valsartan",
+            "kegg": "D00400",
+            "class_id": "potassium_raising_drugs"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00400",
+                "b": "dr:D00443",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00443",
+                "b": "dr:D00400",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00443+D00400"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "环孢素",
+            "name_en": "Cyclosporine",
+            "kegg": "D00184",
+            "class_id": "potassium_raising_drugs"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00184",
+                "b": "dr:D00443",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00443",
+                "b": "dr:D00184",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00443+D00184"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E16",
+      "label_drug": "螺内酯片",
+      "drug_a": "Spironolactone",
+      "drug_b": "Digoxin",
+      "kegg_a": "D00443",
+      "partner_resolution_type": "single_drug",
+      "ontology_class_ids": [],
+      "partner_resolved": "Digoxin",
+      "kegg_b": "D00298",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00298",
+            "b": "dr:D00443",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00443",
+            "b": "dr:D00298",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00443+D00298"
+      },
+      "member_pairs_attempted": 1,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": null,
+            "name_en": "Digoxin",
+            "kegg": "D00298",
+            "class_id": null
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00298",
+                "b": "dr:D00443",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00443",
+                "b": "dr:D00298",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00443+D00298"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E17",
+      "label_drug": "布洛芬颗粒",
+      "drug_a": "Ibuprofen",
+      "drug_b": "Anticoagulants",
+      "kegg_a": "D00126",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "anticoagulants_thrombolytics"
+      ],
+      "partner_resolved": "Warfarin",
+      "kegg_b": "D00564",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00126",
+            "b": "dr:D00564",
+            "level": "P",
+            "mechanism": "Enzyme: CYP2C9"
+          },
+          {
+            "a": "dr:D00564",
+            "b": "dr:D00126",
+            "level": "P",
+            "mechanism": "Enzyme: CYP2C9"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00126+D00564"
+      },
+      "member_pairs_attempted": 3,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "华法林",
+            "name_en": "Warfarin",
+            "kegg": "D00564",
+            "class_id": "anticoagulants_thrombolytics"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00126",
+                "b": "dr:D00564",
+                "level": "P",
+                "mechanism": "Enzyme: CYP2C9"
+              },
+              {
+                "a": "dr:D00564",
+                "b": "dr:D00126",
+                "level": "P",
+                "mechanism": "Enzyme: CYP2C9"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00126+D00564"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "肝素钠",
+            "name_en": "Heparin sodium",
+            "kegg": "D02112",
+            "class_id": "anticoagulants_thrombolytics"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00126",
+                "b": "dr:D02112",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D02112",
+                "b": "dr:D00126",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00126+D02112"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "阿替普酶",
+            "name_en": "Alteplase",
+            "kegg": "D02837",
+            "class_id": "anticoagulants_thrombolytics"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00126",
+                "b": "dr:D02837",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D02837",
+                "b": "dr:D00126",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00126+D02837"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E18",
+      "label_drug": "布洛芬颗粒",
+      "drug_a": "Ibuprofen",
+      "drug_b": "Digoxin, methotrexate, or oral antidiabetics",
+      "kegg_a": "D00126",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "cardiac_glycosides",
+        "folate_antagonists",
+        "oral_antidiabetics"
+      ],
+      "partner_resolved": "Digoxin",
+      "kegg_b": "D00298",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00126",
+            "b": "dr:D00142",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00142",
+            "b": "dr:D00126",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00126+D00142"
+      },
+      "member_pairs_attempted": 7,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "地高辛",
+            "name_en": "Digoxin",
+            "kegg": "D00298",
+            "class_id": "cardiac_glycosides"
+          },
+          "crosscheck": {
+            "status": "not_found",
+            "rows": [],
+            "error": "HTTP 404",
+            "url": "https://rest.kegg.jp/ddi/D00126+D00298"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "洋地黄毒苷",
+            "name_en": "Digitoxin",
+            "kegg": "D00297",
+            "class_id": "cardiac_glycosides"
+          },
+          "crosscheck": {
+            "status": "not_found",
+            "rows": [],
+            "error": "HTTP 404",
+            "url": "https://rest.kegg.jp/ddi/D00126+D00297"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "甲氨蝶呤",
+            "name_en": "Methotrexate",
+            "kegg": "D00142",
+            "class_id": "folate_antagonists"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00126",
+                "b": "dr:D00142",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00142",
+                "b": "dr:D00126",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00126+D00142"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "培美曲塞",
+            "name_en": "Pemetrexed disodium",
+            "kegg": "D03828",
+            "class_id": "folate_antagonists"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00126",
+                "b": "dr:D03828",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D03828",
+                "b": "dr:D00126",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00126+D03828"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "二甲双胍",
+            "name_en": "Metformin",
+            "kegg": "D00944",
+            "class_id": "oral_antidiabetics"
+          },
+          "crosscheck": {
+            "status": "not_found",
+            "rows": [],
+            "error": "HTTP 404",
+            "url": "https://rest.kegg.jp/ddi/D00126+D00944"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "格列美脲",
+            "name_en": "Glimepiride",
+            "kegg": "D00593",
+            "class_id": "oral_antidiabetics"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00126",
+                "b": "dr:D00593",
+                "level": "P",
+                "mechanism": "Enzyme: CYP2C9"
+              },
+              {
+                "a": "dr:D00593",
+                "b": "dr:D00126",
+                "level": "P",
+                "mechanism": "Enzyme: CYP2C9"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00126+D00593"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "格列吡嗪",
+            "name_en": "Glipizide",
+            "kegg": "D00335",
+            "class_id": "oral_antidiabetics"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00126",
+                "b": "dr:D00335",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00335",
+                "b": "dr:D00126",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00126+D00335"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E19",
+      "label_drug": "硝苯地平控释片",
+      "drug_a": "Nifedipine",
+      "drug_b": "Digoxin",
+      "kegg_a": "D00437",
+      "partner_resolution_type": "single_drug",
+      "ontology_class_ids": [],
+      "partner_resolved": "Digoxin",
+      "kegg_b": "D00298",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00298",
+            "b": "dr:D00437",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00437",
+            "b": "dr:D00298",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00437+D00298"
+      },
+      "member_pairs_attempted": 1,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": null,
+            "name_en": "Digoxin",
+            "kegg": "D00298",
+            "class_id": null
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00298",
+                "b": "dr:D00437",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00437",
+                "b": "dr:D00298",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00437+D00298"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E20",
+      "label_drug": "酒石酸美托洛尔片",
+      "drug_a": "Metoprolol",
+      "drug_b": "CYP2D6 inhibitors including celecoxib",
+      "kegg_a": "D02358",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "cyp2d6_inhibitors"
+      ],
+      "partner_resolved": "Quinidine gluconate",
+      "kegg_b": "D00642",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D02260",
+            "b": "dr:D02358",
+            "level": "P",
+            "mechanism": "Enzyme: CYP2D6 / CYP inhibition: CYP2D6"
+          },
+          {
+            "a": "dr:D02358",
+            "b": "dr:D02260",
+            "level": "P",
+            "mechanism": "Enzyme: CYP2D6 / CYP inhibition: CYP2D6"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D02358+D02260"
+      },
+      "member_pairs_attempted": 4,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "奎尼丁葡萄糖酸盐",
+            "name_en": "Quinidine gluconate",
+            "kegg": "D00642",
+            "class_id": "cyp2d6_inhibitors"
+          },
+          "crosscheck": {
+            "status": "not_found",
+            "rows": [],
+            "error": "HTTP 404",
+            "url": "https://rest.kegg.jp/ddi/D02358+D00642"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "帕罗西汀",
+            "name_en": "Paroxetine",
+            "kegg": "D02260",
+            "class_id": "cyp2d6_inhibitors"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D02260",
+                "b": "dr:D02358",
+                "level": "P",
+                "mechanism": "Enzyme: CYP2D6 / CYP inhibition: CYP2D6"
+              },
+              {
+                "a": "dr:D02358",
+                "b": "dr:D02260",
+                "level": "P",
+                "mechanism": "Enzyme: CYP2D6 / CYP inhibition: CYP2D6"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D02358+D02260"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "氟西汀",
+            "name_en": "Fluoxetine",
+            "kegg": "D00326",
+            "class_id": "cyp2d6_inhibitors"
+          },
+          "crosscheck": {
+            "status": "not_found",
+            "rows": [],
+            "error": "HTTP 404",
+            "url": "https://rest.kegg.jp/ddi/D02358+D00326"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "塞来昔布",
+            "name_en": "Celecoxib",
+            "kegg": "D00567",
+            "class_id": "cyp2d6_inhibitors"
+          },
+          "crosscheck": {
+            "status": "not_found",
+            "rows": [],
+            "error": "HTTP 404",
+            "url": "https://rest.kegg.jp/ddi/D02358+D00567"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E21",
+      "label_drug": "硫酸氢氯吡格雷片",
+      "drug_a": "Clopidogrel",
+      "drug_b": "Aspirin",
+      "kegg_a": "D07729",
+      "partner_resolution_type": "single_drug",
+      "ontology_class_ids": [],
+      "partner_resolved": "Aspirin",
+      "kegg_b": "D00109",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00109",
+            "b": "dr:D07729",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D07729",
+            "b": "dr:D00109",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D07729+D00109"
+      },
+      "member_pairs_attempted": 1,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": null,
+            "name_en": "Aspirin",
+            "kegg": "D00109",
+            "class_id": null
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00109",
+                "b": "dr:D07729",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D07729",
+                "b": "dr:D00109",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D07729+D00109"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E22",
+      "label_drug": "硫酸氢氯吡格雷片",
+      "drug_a": "Clopidogrel",
+      "drug_b": "Naproxen or NSAIDs",
+      "kegg_a": "D07729",
+      "partner_resolution_type": "single_drug",
+      "ontology_class_ids": [],
+      "partner_resolved": "Naproxen",
+      "kegg_b": "D00118",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00118",
+            "b": "dr:D07729",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D07729",
+            "b": "dr:D00118",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D07729+D00118"
+      },
+      "member_pairs_attempted": 1,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": null,
+            "name_en": "Naproxen",
+            "kegg": "D00118",
+            "class_id": null
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00118",
+                "b": "dr:D07729",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D07729",
+                "b": "dr:D00118",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D07729+D00118"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E23",
+      "label_drug": "辛伐他汀胶囊",
+      "drug_a": "Simvastatin",
+      "drug_b": "Cyclosporine, erythromycin, gemfibrozil, or niacin",
+      "kegg_a": "D00434",
+      "partner_resolution_type": "single_drug",
+      "ontology_class_ids": [],
+      "partner_resolved": "Cyclosporine",
+      "kegg_b": "D00184",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00184",
+            "b": "dr:D00434",
+            "level": "P",
+            "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4"
+          },
+          {
+            "a": "dr:D00434",
+            "b": "dr:D00184",
+            "level": "P",
+            "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00434+D00184"
+      },
+      "member_pairs_attempted": 1,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": null,
+            "name_en": "Cyclosporine",
+            "kegg": "D00184",
+            "class_id": null
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00184",
+                "b": "dr:D00434",
+                "level": "P",
+                "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4"
+              },
+              {
+                "a": "dr:D00434",
+                "b": "dr:D00184",
+                "level": "P",
+                "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00434+D00184"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E24",
+      "label_drug": "氯化钾缓释片",
+      "drug_a": "Potassium chloride",
+      "drug_b": "Potassium-containing drugs or potassium-sparing diuretics",
+      "kegg_a": "D02060",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "potassium_raising_drugs",
+        "potassium_sparing_diuretics"
+      ],
+      "partner_resolved": "Enalapril",
+      "kegg_b": "D00621",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00621",
+            "b": "dr:D02060",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D02060",
+            "b": "dr:D00621",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D02060+D00621"
+      },
+      "member_pairs_attempted": 6,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "依那普利",
+            "name_en": "Enalapril",
+            "kegg": "D00621",
+            "class_id": "potassium_raising_drugs"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00621",
+                "b": "dr:D02060",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D02060",
+                "b": "dr:D00621",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D02060+D00621"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "缬沙坦",
+            "name_en": "Valsartan",
+            "kegg": "D00400",
+            "class_id": "potassium_raising_drugs"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00400",
+                "b": "dr:D02060",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D02060",
+                "b": "dr:D00400",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D02060+D00400"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "环孢素",
+            "name_en": "Cyclosporine",
+            "kegg": "D00184",
+            "class_id": "potassium_raising_drugs"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00184",
+                "b": "dr:D02060",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D02060",
+                "b": "dr:D00184",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D02060+D00184"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "螺内酯",
+            "name_en": "Spironolactone",
+            "kegg": "D00443",
+            "class_id": "potassium_sparing_diuretics"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00443",
+                "b": "dr:D02060",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D02060",
+                "b": "dr:D00443",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00443+D02060"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "氨苯蝶啶",
+            "name_en": "Triamterene",
+            "kegg": "D00386",
+            "class_id": "potassium_sparing_diuretics"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00386",
+                "b": "dr:D02060",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D02060",
+                "b": "dr:D00386",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D02060+D00386"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "阿米洛利",
+            "name_en": "Amiloride hydrochloride",
+            "kegg": "D00649",
+            "class_id": "potassium_sparing_diuretics"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00649",
+                "b": "dr:D02060",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D02060",
+                "b": "dr:D00649",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D02060+D00649"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E25",
+      "label_drug": "阿卡波糖片",
+      "drug_a": "Acarbose",
+      "drug_b": "Sulfonylureas, metformin, or insulin",
+      "kegg_a": "D00216",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "glucose_lowering_drugs"
+      ],
+      "partner_resolved": "Glimepiride",
+      "kegg_b": "D00593",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00216",
+            "b": "dr:D00593",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00593",
+            "b": "dr:D00216",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00216+D00593"
+      },
+      "member_pairs_attempted": 3,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "格列美脲",
+            "name_en": "Glimepiride",
+            "kegg": "D00593",
+            "class_id": "glucose_lowering_drugs"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00216",
+                "b": "dr:D00593",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00593",
+                "b": "dr:D00216",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00216+D00593"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "二甲双胍",
+            "name_en": "Metformin",
+            "kegg": "D00944",
+            "class_id": "glucose_lowering_drugs"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00216",
+                "b": "dr:D00944",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00944",
+                "b": "dr:D00216",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00216+D00944"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "人胰岛素",
+            "name_en": "Insulin human",
+            "kegg": "D03230",
+            "class_id": "glucose_lowering_drugs"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00216",
+                "b": "dr:D03230",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D03230",
+                "b": "dr:D00216",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00216+D03230"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E26",
+      "label_drug": "利伐沙班片",
+      "drug_a": "Rivaroxaban",
+      "drug_b": "Ketoconazole or ritonavir",
+      "kegg_a": "D07086",
+      "partner_resolution_type": "single_drug",
+      "ontology_class_ids": [],
+      "partner_resolved": "Ketoconazole",
+      "kegg_b": "D00351",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00351",
+            "b": "dr:D07086",
+            "level": "CI",
+            "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / Transporter inhibition: ABCB1"
+          },
+          {
+            "a": "dr:D07086",
+            "b": "dr:D00351",
+            "level": "CI",
+            "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / Transporter inhibition: ABCB1"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D07086+D00351"
+      },
+      "member_pairs_attempted": 1,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": null,
+            "name_en": "Ketoconazole",
+            "kegg": "D00351",
+            "class_id": null
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00351",
+                "b": "dr:D07086",
+                "level": "CI",
+                "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / Transporter inhibition: ABCB1"
+              },
+              {
+                "a": "dr:D07086",
+                "b": "dr:D00351",
+                "level": "CI",
+                "mechanism": "Enzyme: CYP3A4 / CYP inhibition: CYP3A4 / Transporter inhibition: ABCB1"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D07086+D00351"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E27",
+      "label_drug": "缬沙坦氨氯地平片",
+      "drug_a": "Valsartan",
+      "drug_b": "Potassium-sparing diuretics or potassium products",
+      "kegg_a": "D00400",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "potassium_sparing_diuretics",
+        "potassium_raising_drugs"
+      ],
+      "partner_resolved": "Spironolactone",
+      "kegg_b": "D00443",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00400",
+            "b": "dr:D00443",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00443",
+            "b": "dr:D00400",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00443+D00400"
+      },
+      "member_pairs_attempted": 6,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "螺内酯",
+            "name_en": "Spironolactone",
+            "kegg": "D00443",
+            "class_id": "potassium_sparing_diuretics"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00400",
+                "b": "dr:D00443",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00443",
+                "b": "dr:D00400",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00443+D00400"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "氨苯蝶啶",
+            "name_en": "Triamterene",
+            "kegg": "D00386",
+            "class_id": "potassium_sparing_diuretics"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00386",
+                "b": "dr:D00400",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00400",
+                "b": "dr:D00386",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00400+D00386"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "阿米洛利",
+            "name_en": "Amiloride hydrochloride",
+            "kegg": "D00649",
+            "class_id": "potassium_sparing_diuretics"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00400",
+                "b": "dr:D00649",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00649",
+                "b": "dr:D00400",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00400+D00649"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "氯化钾",
+            "name_en": "Potassium chloride",
+            "kegg": "D02060",
+            "class_id": "potassium_raising_drugs"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00400",
+                "b": "dr:D02060",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D02060",
+                "b": "dr:D00400",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D02060+D00400"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "依那普利",
+            "name_en": "Enalapril",
+            "kegg": "D00621",
+            "class_id": "potassium_raising_drugs"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00400",
+                "b": "dr:D00621",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00621",
+                "b": "dr:D00400",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00400+D00621"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "环孢素",
+            "name_en": "Cyclosporine",
+            "kegg": "D00184",
+            "class_id": "potassium_raising_drugs"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00184",
+                "b": "dr:D00400",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00400",
+                "b": "dr:D00184",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00400+D00184"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E28",
+      "label_drug": "地高辛片",
+      "drug_a": "Digoxin",
+      "drug_b": "Amiodarone, verapamil, or diltiazem",
+      "kegg_a": "D00298",
+      "partner_resolution_type": "single_drug",
+      "ontology_class_ids": [],
+      "partner_resolved": "Amiodarone",
+      "kegg_b": "D00636",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00298",
+            "b": "dr:D00636",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00636",
+            "b": "dr:D00298",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00298+D00636"
+      },
+      "member_pairs_attempted": 1,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": null,
+            "name_en": "Amiodarone",
+            "kegg": "D00636",
+            "class_id": null
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00298",
+                "b": "dr:D00636",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00636",
+                "b": "dr:D00298",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00298+D00636"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E29",
+      "label_drug": "盐酸胺碘酮胶囊",
+      "drug_a": "Amiodarone",
+      "drug_b": "Warfarin",
+      "kegg_a": "D00636",
+      "partner_resolution_type": "single_drug",
+      "ontology_class_ids": [],
+      "partner_resolved": "Warfarin",
+      "kegg_b": "D00564",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00564",
+            "b": "dr:D00636",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D00636",
+            "b": "dr:D00564",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D00636+D00564"
+      },
+      "member_pairs_attempted": 1,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": null,
+            "name_en": "Warfarin",
+            "kegg": "D00564",
+            "class_id": null
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00564",
+                "b": "dr:D00636",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D00636",
+                "b": "dr:D00564",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D00636+D00564"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    },
+    {
+      "case_id": "E30",
+      "label_drug": "左甲状腺素钠片",
+      "drug_a": "Levothyroxine",
+      "drug_b": "Coumarin anticoagulants",
+      "kegg_a": "D01010",
+      "partner_resolution_type": "ontology_class",
+      "ontology_class_ids": [
+        "coumarin_anticoagulants"
+      ],
+      "partner_resolved": "Warfarin",
+      "kegg_b": "D00564",
+      "crosscheck": {
+        "status": "matched",
+        "rows": [
+          {
+            "a": "dr:D00564",
+            "b": "dr:D01010",
+            "level": "P",
+            "mechanism": "unclassified"
+          },
+          {
+            "a": "dr:D01010",
+            "b": "dr:D00564",
+            "level": "P",
+            "mechanism": "unclassified"
+          }
+        ],
+        "url": "https://rest.kegg.jp/ddi/D01010+D00564"
+      },
+      "member_pairs_attempted": 2,
+      "member_crosschecks": [
+        {
+          "member": {
+            "generic_cn": "华法林",
+            "name_en": "Warfarin",
+            "kegg": "D00564",
+            "class_id": "coumarin_anticoagulants"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D00564",
+                "b": "dr:D01010",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D01010",
+                "b": "dr:D00564",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D01010+D00564"
+          }
+        },
+        {
+          "member": {
+            "generic_cn": "苯丙香豆素",
+            "name_en": "Phenprocoumon",
+            "kegg": "D05457",
+            "class_id": "coumarin_anticoagulants"
+          },
+          "crosscheck": {
+            "status": "matched",
+            "rows": [
+              {
+                "a": "dr:D01010",
+                "b": "dr:D05457",
+                "level": "P",
+                "mechanism": "unclassified"
+              },
+              {
+                "a": "dr:D05457",
+                "b": "dr:D01010",
+                "level": "P",
+                "mechanism": "unclassified"
+              }
+            ],
+            "url": "https://rest.kegg.jp/ddi/D01010+D05457"
+          }
+        }
+      ],
+      "checked": true,
+      "corroborated": true
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{"case_id":"S01","medications":["可迈丁","拜阿司匹灵","优甲乐"],"ground_truth":[{"drug_a":"华法林","drug_b":"阿司匹林","severity":"major"},{"drug_a":"华法林","drug_b":"左甲状腺素","severity":"major"}],"notes":"品牌输入；抗凝叠加与甲状腺激素-抗凝相互作用。"}
+{"case_id":"S02","medications":["克拉仙","舒降之","络活喜"],"ground_truth":[{"drug_a":"克拉霉素","drug_b":"辛伐他汀","severity":"contraindicated"},{"drug_a":"克拉霉素","drug_b":"氨氯地平","severity":"moderate"},{"drug_a":"辛伐他汀","drug_b":"氨氯地平","severity":"moderate"}],"notes":"品牌输入；CYP3A4抑制与说明书中的他汀/氨氯地平相互作用。"}
+{"case_id":"S03","medications":["格华止","碘造影剂","拜唐苹"],"ground_truth":[{"drug_a":"二甲双胍","drug_b":"碘造影剂（药物类别）","severity":"major"},{"drug_a":"二甲双胍","drug_b":"阿卡波糖","severity":"major"}],"notes":"二甲双胍与含碘造影剂；低血糖水平的联合降糖风险按安全优先级标为major。"}
+{"case_id":"S04","medications":["耐绞宁","万艾可","倍他乐克"],"ground_truth":[{"drug_a":"硝酸甘油","drug_b":"西地那非","severity":"contraindicated"}],"notes":"品牌输入；硝酸酯与PDE5抑制剂。"}
+{"case_id":"S05","medications":["安体舒通","补达秀","代文"],"ground_truth":[{"drug_a":"螺内酯","drug_b":"氯化钾","severity":"major"},{"drug_a":"缬沙坦","drug_b":"氯化钾","severity":"major"},{"drug_a":"螺内酯","drug_b":"缬沙坦","severity":"major"}],"notes":"保钾利尿剂、补钾与ARB的联合升钾风险。"}
+{"case_id":"S06","medications":["兰尼","可达龙","双氢克尿噻"],"ground_truth":[{"drug_a":"地高辛","drug_b":"胺碘酮","severity":"major"},{"drug_a":"地高辛","drug_b":"氢氯噻嗪","severity":"major"}],"notes":"品牌输入；地高辛清除率/毒性与低钾诱发洋地黄毒性。"}
+{"case_id":"S07","medications":["波立维","萘普生","代文"],"ground_truth":[{"drug_a":"氯吡格雷","drug_b":"萘普生","severity":"major"},{"drug_a":"缬沙坦","drug_b":"萘普生","severity":"moderate"}],"notes":"抗血小板药与NSAID的出血/胃肠风险，并包含ARB-NSAID相互作用。"}
+{"case_id":"S08","medications":["拜唐苹","亚莫利","格华止"],"ground_truth":[{"drug_a":"阿卡波糖","drug_b":"格列美脲","severity":"major"},{"drug_a":"阿卡波糖","drug_b":"二甲双胍","severity":"major"}],"notes":"多药降糖方案；说明书明确可降至低血糖水平并要求减量，按安全优先级标为major。"}
+{"case_id":"S09","medications":["福善美","补达秀","碳酸钙"],"ground_truth":[{"drug_a":"阿仑膦酸","drug_b":"碳酸钙","severity":"moderate"}],"notes":"品牌输入；金属离子影响阿仑膦酸吸收。"}
+{"case_id":"S10","medications":["双氢克尿噻","芬必得","兰尼"],"ground_truth":[{"drug_a":"氢氯噻嗪","drug_b":"布洛芬","severity":"moderate"},{"drug_a":"氢氯噻嗪","drug_b":"地高辛","severity":"major"},{"drug_a":"布洛芬","drug_b":"地高辛","severity":"major"}],"notes":"利尿剂、NSAID与地高辛的三药场景。"}
+{"case_id":"S11","medications":["倍他乐克","帕罗西汀","西乐葆"],"ground_truth":[{"drug_a":"美托洛尔","drug_b":"帕罗西汀","severity":"moderate"},{"drug_a":"美托洛尔","drug_b":"塞来昔布","severity":"moderate"}],"notes":"品牌输入；CYP2D6抑制剂影响美托洛尔血浆浓度。"}
+{"case_id":"S12","medications":["舒降之","环孢素","克拉仙"],"ground_truth":[{"drug_a":"辛伐他汀","drug_b":"环孢素","severity":"major"},{"drug_a":"辛伐他汀","drug_b":"克拉霉素","severity":"contraindicated"}],"notes":"他汀与免疫抑制剂/CYP3A4抑制剂。"}
+{"case_id":"S13","medications":["拜瑞妥","酮康唑","华法林"],"ground_truth":[{"drug_a":"利伐沙班","drug_b":"酮康唑","severity":"contraindicated"}],"notes":"品牌输入；KEGG CI作为禁忌锚点，中文说明书提供出血证据。"}
+{"case_id":"S14","medications":["代文","芬必得","补达秀"],"ground_truth":[{"drug_a":"缬沙坦","drug_b":"布洛芬","severity":"moderate"},{"drug_a":"缬沙坦","drug_b":"氯化钾","severity":"major"}],"notes":"ARB、NSAID与补钾。"}
+{"case_id":"S15","medications":["北京降压0号","补达秀","兰尼"],"ground_truth":[{"drug_a":"氢氯噻嗪","drug_b":"地高辛","severity":"major"},{"drug_a":"氨苯蝶啶","drug_b":"氯化钾","severity":"major"}],"notes":"复方制剂展开为利血平、氢氯噻嗪、氨苯蝶啶和双肼屈嗪后枚举。"}
+{"case_id":"S16","medications":["诺欣妥","安体舒通","补达秀"],"ground_truth":[{"drug_a":"缬沙坦","drug_b":"螺内酯","severity":"major"},{"drug_a":"缬沙坦","drug_b":"氯化钾","severity":"major"},{"drug_a":"螺内酯","drug_b":"氯化钾","severity":"major"}],"notes":"复方沙库巴曲缬沙坦展开；检查复方与外加保钾/补钾药物。"}
+{"case_id":"S17","medications":["洛赛克","酮康唑","福善美"],"ground_truth":[{"drug_a":"奥美拉唑","drug_b":"酮康唑","severity":"major"}],"notes":"品牌输入；奥美拉唑与口服唑类抗真菌药避免同用。"}
+{"case_id":"S18","medications":["阿司匹林","地塞米松","可迈丁"],"ground_truth":[{"drug_a":"阿司匹林","drug_b":"地塞米松","severity":"moderate"},{"drug_a":"阿司匹林","drug_b":"华法林","severity":"major"}],"notes":"抗血小板、糖皮质激素与抗凝药。"}
+{"case_id":"S19","medications":["芬必得","华法林","可达龙","舒降之"],"ground_truth":[{"drug_a":"布洛芬","drug_b":"华法林","severity":"major"},{"drug_a":"华法林","drug_b":"胺碘酮","severity":"major"}],"notes":"四药场景；保留两个有中文证据的高风险对。"}
+{"case_id":"S20","medications":["代文","吲哚美辛","螺内酯"],"ground_truth":[{"drug_a":"缬沙坦","drug_b":"吲哚美辛","severity":"moderate"},{"drug_a":"螺内酯","drug_b":"缬沙坦","severity":"major"},{"drug_a":"螺内酯","drug_b":"吲哚美辛","severity":"major"}],"notes":"ARB、保钾利尿剂与吲哚美辛的肾脏/电解质风险。"}
+{"case_id":"C21","medications":["络活喜","代文","优甲乐"],"ground_truth":[],"notes":"干净对照：未命中本阶段持久化的已知相互作用证据。"}
+{"case_id":"C22","medications":["格华止","安达唐","可定"],"ground_truth":[],"notes":"干净对照：三种慢病药物的组合。"}
+{"case_id":"C23","medications":["倍他乐克","硝苯地平","安博维"],"ground_truth":[],"notes":"干净对照：常见心血管药组合。"}
+{"case_id":"C24","medications":["奥美拉唑","氨氯地平","瑞舒伐他汀"],"ground_truth":[],"notes":"干净对照：未命中本阶段已知对。"}
+{"case_id":"C25","medications":["诺欣妥","优甲乐","福善美"],"ground_truth":[],"notes":"干净对照：包含复方药但其展开成分未命中已知对。"}
+{"case_id":"C26","medications":["可定","力平之","安达唐"],"ground_truth":[],"notes":"干净对照：调脂药与SGLT2抑制剂组合。"}
