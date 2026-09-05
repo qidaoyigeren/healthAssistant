@@ -1,14 +1,15 @@
 """Readable two-session Stage 3 caregiver demonstration.
 
 By default the demo reuses ``stage0/memory.db``.  Pass ``--reset`` for the
-canonical scripted transcript, and ``--llm`` to use DeepSeek structured memory
-extraction in addition to the explicit event payloads.
+canonical scripted transcript, ``--llm`` for structured memory extraction, or
+``--llm-planner`` for the separately opt-in hybrid planner.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import sys
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -55,7 +56,14 @@ def reset_database(path: Path) -> None:
             target.unlink()
 
 
-def run_demo(db_path: Path, *, reset: bool, llm: bool, verbose_tools: bool) -> None:
+def run_demo(
+    db_path: Path,
+    *,
+    reset: bool,
+    llm: bool,
+    verbose_tools: bool,
+    llm_planner: bool = False,
+) -> None:
     if reset:
         reset_database(db_path.resolve())
 
@@ -68,7 +76,7 @@ def run_demo(db_path: Path, *, reset: bool, llm: bool, verbose_tools: bool) -> N
     banner("SESSION 1 / 主动管理")
     first_warning: dict[str, Any] | None = None
     with MemoryStore(db_path, llm_enabled=llm) as memory:
-        agent = MedicationCoordinatorAgent(memory)
+        agent = MedicationCoordinatorAgent(memory, llm_planner_enabled=llm_planner)
         session_id = "caregiver-session-1"
 
         profile_text = "登记我母亲：72岁，女，高血压和糖尿病，磺胺过敏，肾功能轻度受损，平时有些抗拒西药。"
@@ -157,7 +165,7 @@ def run_demo(db_path: Path, *, reset: bool, llm: bool, verbose_tools: bool) -> N
     # session 2 reads SQLite state, not Python objects from session 1.
     banner("SESSION 2 / 重新打开数据库")
     with MemoryStore(db_path, llm_enabled=llm) as memory:
-        second_agent = MedicationCoordinatorAgent(memory)
+        second_agent = MedicationCoordinatorAgent(memory, llm_planner_enabled=llm_planner)
         text = "我妈现在吃什么药？"
         response = second_agent.handle(
             CareEvent("query_current_medications", text),
@@ -183,13 +191,22 @@ def run_demo(db_path: Path, *, reset: bool, llm: bool, verbose_tools: bool) -> N
 
 
 def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="Run the Stage 3 medication coordinator demo")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--reset", action="store_true", help="remove only the selected SQLite DB and its sidecars before the demo")
     parser.add_argument("--llm", action="store_true", help="enable DeepSeek structured fact extraction")
+    parser.add_argument("--llm-planner", action="store_true", help="opt in to the Stage 6 agentic loop: the LLM decides every cycle and composes responses; deterministic code enforces safety only")
     parser.add_argument("--verbose-tools", action="store_true")
     args = parser.parse_args()
-    run_demo(args.db, reset=args.reset, llm=args.llm, verbose_tools=args.verbose_tools)
+    run_demo(
+        args.db,
+        reset=args.reset,
+        llm=args.llm,
+        verbose_tools=args.verbose_tools,
+        llm_planner=args.llm_planner,
+    )
 
 
 if __name__ == "__main__":

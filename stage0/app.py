@@ -9,6 +9,10 @@ structured-memory extractor::
 
     streamlit run stage0/app.py -- --llm
 
+The LLM planner is a separate, explicit opt-in::
+
+    streamlit run stage0/app.py -- --llm-planner
+
 This is a single-caregiver, single-patient engineering demo.  It is not a
 medical device and does not diagnose, prescribe, or replace a clinician.
 """
@@ -36,10 +40,11 @@ except ImportError:  # Support ``streamlit run stage0/app.py``.
 ROOT = Path(__file__).resolve().parent
 DB_PATH = DEFAULT_DB.resolve()
 LLM_ENABLED = "--llm" in sys.argv[1:]
+LLM_PLANNER_ENABLED = "--llm-planner" in sys.argv[1:]
 
-# Keep the normal demo reproducible and network-free.  ``--llm`` only enables
-# the same optional structured fact extraction exposed by ``demo.py --llm``;
-# pair detection still uses persisted Stage 1/2 evidence by default.
+# Keep the normal demo reproducible and network-free.  ``--llm`` enables only
+# structured fact extraction, while ``--llm-planner`` separately opts into
+# hybrid planning; pair detection still uses persisted evidence by default.
 os.environ.setdefault("DDI_ENGINE_ENABLE_LLM", "0")
 os.environ.setdefault("DDI_ENGINE_ENABLE_RAG", "0")
 
@@ -299,15 +304,16 @@ def _split_list(value: str) -> list[str]:
 
 
 def _runtime() -> tuple[MemoryStore, MedicationCoordinatorAgent]:
-    current_mode = st.session_state.get("runtime_llm")
-    if "memory_store" not in st.session_state or current_mode != LLM_ENABLED:
+    requested_mode = (LLM_ENABLED, LLM_PLANNER_ENABLED)
+    current_mode = st.session_state.get("runtime_mode")
+    if "memory_store" not in st.session_state or current_mode != requested_mode:
         old_memory = st.session_state.get("memory_store")
         if old_memory is not None:
             old_memory.close()
         memory = MemoryStore(DB_PATH, llm_enabled=LLM_ENABLED)
         st.session_state.memory_store = memory
-        st.session_state.agent = MedicationCoordinatorAgent(memory)
-        st.session_state.runtime_llm = LLM_ENABLED
+        st.session_state.agent = MedicationCoordinatorAgent(memory, llm_planner_enabled=LLM_PLANNER_ENABLED)
+        st.session_state.runtime_mode = requested_mode
     if "session_id" not in st.session_state:
         st.session_state.session_id = f"caregiver-ui-{uuid.uuid4().hex[:10]}"
         st.session_state.session_number = 1
@@ -318,7 +324,7 @@ def _reopen_session(*, clear_database: bool = False) -> None:
     memory = st.session_state.get("memory_store")
     if memory is not None:
         memory.close()
-    for key in ("memory_store", "agent", "runtime_llm", "last_response", "last_event", "runtime_error"):
+    for key in ("memory_store", "agent", "runtime_llm", "runtime_mode", "last_response", "last_event", "runtime_error"):
         st.session_state.pop(key, None)
 
     if clear_database:
@@ -513,9 +519,16 @@ def _render_sidebar() -> None:
         st.markdown("## 用药协管员")
         st.caption("单照护者 · 单患者 · 本地演示")
         st.divider()
-        mode_label = "LLM 结构化抽取" if LLM_ENABLED else "确定性离线路径"
+        if LLM_PLANNER_ENABLED:
+            mode_label = "LLM 规划 + 安全门禁/故障兜底"
+        elif LLM_ENABLED:
+            mode_label = "LLM 结构化抽取"
+        else:
+            mode_label = "确定性离线路径"
         st.markdown(f"<span class='status-dot'></span> **{mode_label}**", unsafe_allow_html=True)
         st.caption("DDI 检查默认只使用已持久化的本地证据，不发起网络请求。")
+        if LLM_PLANNER_ENABLED:
+            st.caption("LLM 规划为显式第三方数据 opt-in；提案失败或被拒绝时同周期确定性兜底。")
         st.code(f"session {st.session_state.get('session_number', 1)}\n{st.session_state.session_id}", language=None)
         if st.button("开启新会话（保留记忆）", use_container_width=True):
             _reopen_session(clear_database=False)
@@ -545,7 +558,12 @@ medication_events = [
 st.markdown(STYLES, unsafe_allow_html=True)
 _render_sidebar()
 
-mode_copy = "LLM 结构化抽取已启用" if LLM_ENABLED else "默认离线、确定性运行"
+if LLM_PLANNER_ENABLED:
+    mode_copy = "LLM 规划已启用（确定性安全门禁/故障兜底）"
+elif LLM_ENABLED:
+    mode_copy = "LLM 结构化抽取已启用"
+else:
+    mode_copy = "默认离线、确定性运行"
 st.markdown(
     f"""
     <section class="care-hero">
@@ -764,7 +782,7 @@ with profile_view_tab:
         st.markdown("### 结构化患者事实")
         if snapshot.get("semantic"):
             for item in snapshot["semantic"]:
-                st.markdown(f"**{item.get('namespace')} · {item.get('key')}**")
+                st.markdown(f"**{item.get('namespace')} · {item.get('fact_key')}**")
                 st.write(item.get("value"))
                 st.code(item.get("ref"), language=None)
         else:
@@ -776,3 +794,70 @@ with profile_view_tab:
             "不会建议自行开始/停止药物或改变剂量。严重、低置信度和冲突结果会升级给医生/药师。"
         )
         st.caption(f"SQLite：{DB_PATH}")
+
+# --------------------------- P1 记忆可信度面板 ---------------------------
+with st.expander("记忆可信度面板：待核实 / 待重查 / 冲突处理", expanded=False):
+    pending_reports = [
+        item for item in memory.retrieve_episodic(event_types=["caregiver_message"], limit=50)
+        if item.get("needs_verification")
+    ]
+    stale_conclusions = memory.stale_conclusions()
+    recheck_tasks = memory.pending_rechecks()
+    trust_cols = st.columns(4)
+    trust_cols[0].metric("待核实报告", len(pending_reports), help="保留原文的未核实报告，不升级为已核实事实")
+    trust_cols[1].metric("未决冲突", len(snapshot.get("open_conflicts", [])))
+    trust_cols[2].metric("待重查旧结论", len(stale_conclusions), help="事实或药单变化后，重查完成前不作为当前结论")
+    trust_cols[3].metric("重查任务", len(recheck_tasks))
+    if pending_reports:
+        st.markdown("**待核实报告**")
+        for item in pending_reports[:10]:
+            st.caption(
+                f"{item['occurred_at']} · {item['payload'].get('mode', '?')} · {item['payload'].get('mention', '?')}"
+            )
+            st.write(item["payload"].get("reported_text"))
+    else:
+        st.caption("没有待核实的报告。")
+    if stale_conclusions:
+        st.markdown("**待重查旧结论**")
+        for conclusion in stale_conclusions:
+            chain = memory.conclusion_chain(conclusion["id"])
+            with st.expander(f"#{conclusion['id']} {str(conclusion['text'])[:40]}…"):
+                st.caption(f"失效原因：{conclusion.get('stale_reason')}")
+                st.write(conclusion["text"])
+                st.markdown("**版本链（旧 → 新）**")
+                for version in chain["versions"]:
+                    st.caption(f"#{version['id']} · {version['created_at']} · {version['status']}")
+    if recheck_tasks:
+        if st.button("立即执行待重查（按当前药单与事实重新检测）", use_container_width=True):
+            receipt = _agent.run_pending_rechecks()
+            st.json(receipt)
+            st.rerun()
+    else:
+        st.caption("没有待执行的重查任务；重查失败或无证据时不会显示\"风险已解除\"。")
+    st.divider()
+    st.markdown("**处理未决冲突**（记录核实由照护者完成，不代表系统进行临床裁决）")
+    open_conflicts = snapshot.get("open_conflicts", [])
+    if open_conflicts:
+        conflict_labels = {
+            f"#{c['id']} {c.get('subject_key', '')}": c["ref"] for c in open_conflicts
+        }
+        ui_revision = st.session_state.get("ui_revision", 0)
+        chosen_label = st.selectbox("选择冲突", list(conflict_labels), key=f"conflict_pick_{ui_revision}")
+        action_label = st.selectbox(
+            "处理方式",
+            ["resolved（记录核实结果）", "dismissed（重复转述/非矛盾）", "reopened（重新打开）", "undo（撤销上一步）"],
+            key=f"conflict_action_{ui_revision}",
+        )
+        basis = st.text_input("处理依据（必填）", key=f"conflict_basis_{ui_revision}")
+        if st.button("提交处理", disabled=not basis, use_container_width=True):
+            action_key = action_label.split("（")[0]
+            try:
+                memory.resolve_conflict(
+                    conflict_labels[chosen_label], action=action_key, basis=basis, actor="caregiver"
+                )
+                st.success("已记录处理动作、依据与操作者，可在审计链中追溯。")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"处理失败：{type(exc).__name__}: {exc}")
+    else:
+        st.caption("暂无未决冲突。")
