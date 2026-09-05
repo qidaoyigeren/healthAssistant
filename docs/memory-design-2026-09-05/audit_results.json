@@ -1,0 +1,112 @@
+{
+  "generated_at": "2026-09-05T03:04:43.814599+00:00",
+  "python": "3.14.3",
+  "sqlite": "3.50.4",
+  "memory_py_sha256": "275e9e9d15c866ffabc74d4eaf68bcd48a2a96a9cabfbd38a13dcb13432aa1c1",
+  "synthetic_only": true,
+  "opened_user_database": false,
+  "findings": [
+    {
+      "probe": "assertion_semantics",
+      "input": "妈妈没有糖尿病",
+      "disease_candidates": [
+        {
+          "namespace": "chronic_disease",
+          "key": "糖尿病",
+          "value": {
+            "present": true,
+            "name": "糖尿病"
+          },
+          "salience": 0.85,
+          "conflict_policy": "conflict"
+        }
+      ],
+      "defect_observed": true
+    },
+    {
+      "probe": "assertion_semantics",
+      "input": "邻居有糖尿病",
+      "disease_candidates": [
+        {
+          "namespace": "chronic_disease",
+          "key": "糖尿病",
+          "value": {
+            "present": true,
+            "name": "糖尿病"
+          },
+          "salience": 0.85,
+          "conflict_policy": "conflict"
+        }
+      ],
+      "defect_observed": true
+    },
+    {
+      "probe": "assertion_semantics",
+      "input": "如果妈妈有糖尿病",
+      "disease_candidates": [
+        {
+          "namespace": "chronic_disease",
+          "key": "糖尿病",
+          "value": {
+            "present": true,
+            "name": "糖尿病"
+          },
+          "salience": 0.85,
+          "conflict_policy": "conflict"
+        }
+      ],
+      "defect_observed": true
+    },
+    {
+      "probe": "critical_update_bypass",
+      "outcome": "update",
+      "open_conflicts": 0,
+      "defect_observed": true
+    },
+    {
+      "probe": "invalid_ref_version",
+      "requested": 999,
+      "returned": 1,
+      "defect_observed": true
+    },
+    {
+      "probe": "mutable_ref_status",
+      "before": "active",
+      "after": "superseded",
+      "defect_observed": true
+    },
+    {
+      "probe": "event_partial_commit",
+      "error": "salience must be within [0, 1]",
+      "facts_remaining": 1,
+      "defect_observed": true
+    },
+    {
+      "probe": "as_of_future_event",
+      "as_of": "2026-09-03T00:00:00Z",
+      "returned": [
+        "2026-09-05T00:00:00+00:00"
+      ],
+      "defect_observed": true
+    },
+    {
+      "probe": "same_input_retry_different_clock",
+      "rows": 2,
+      "defect_observed": true
+    },
+    {
+      "probe": "distinct_events_same_text_time",
+      "refs": [
+        "memory:episodic:1@v1",
+        "memory:episodic:1@v1"
+      ],
+      "defect_observed": true
+    },
+    {
+      "probe": "out_of_order_stop_start",
+      "current_count": 1,
+      "defect_observed": true
+    }
+  ],
+  "note": "Defect witnesses for existing v3 only. No v4 correctness or medical safety claim."
+}

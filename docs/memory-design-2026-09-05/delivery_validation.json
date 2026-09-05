@@ -1,0 +1,22 @@
+{
+  "kind": "design_delivery_validation",
+  "design_date": "2026-09-05",
+  "baseline_tests": {
+    "command": "python -m unittest stage0.test_stage3 stage0.test_stage5 -v",
+    "run_this_session": true,
+    "tests": 21,
+    "result": "OK",
+    "reported_seconds": 0.196,
+    "note": "Existing offline regression, not v4 implementation or performance evaluation."
+  },
+  "doc_checks": {
+    "all_local_links_exist": true,
+    "json_example_blocks_valid": true,
+    "code_fences_balanced": true,
+    "sql_queries_parsed": 4
+  },
+  "memory_py_sha256": "275e9e9d15c866ffabc74d4eaf68bcd48a2a96a9cabfbd38a13dcb13432aa1c1",
+  "user_database_opened": false,
+  "business_code_modified": false,
+  "scope": "Design and synthetic probes only. No P0/P1/P2 business implementation."
+}

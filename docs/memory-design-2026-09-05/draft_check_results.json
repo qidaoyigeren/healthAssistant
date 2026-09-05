@@ -1,0 +1,34 @@
+{
+  "schema_table_count": 19,
+  "ddl_executed": true,
+  "foreign_key_check": "passed",
+  "integrity_check": "ok",
+  "cross_subject_dependency_rejected": true,
+  "time_matrix": [
+    {
+      "valid": 903,
+      "known": 903,
+      "expected_slice": "s1",
+      "passed": true
+    },
+    {
+      "valid": 903,
+      "known": 905,
+      "expected_slice": "s3",
+      "passed": true
+    },
+    {
+      "valid": 825,
+      "known": 905,
+      "expected_slice": "s2",
+      "passed": true
+    },
+    {
+      "valid": 819,
+      "known": 905,
+      "expected_slice": null,
+      "passed": true
+    }
+  ],
+  "limitation": "Fixture integers encode dates for illustration, not production timestamps. Checks validate DDL and temporal predicates only; no migration, policy guard, projection builder, task runner or v4 application implemented."
+}
