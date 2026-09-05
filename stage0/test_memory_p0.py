@@ -266,7 +266,9 @@ class SchemaMigrationTests(unittest.TestCase):
                 version = reopened.connection.execute(
                     "SELECT value FROM schema_meta WHERE key='schema_version'"
                 ).fetchone()["value"]
-                self.assertEqual(version, "4-p1")
+                # Stage 7 (production upgrade) bumped the additive migration
+                # target from 4-p1 to 4-p2; data survival is the real intent.
+                self.assertEqual(version, "4-p2")
                 current = reopened.current_semantic(["allergy"])
                 self.assertEqual(len(current), 1)
                 self.assertEqual(current[0]["verification_status"], "recorded_as_reported")

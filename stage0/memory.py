@@ -364,6 +364,106 @@ def _ensure_p1_schema(connection: sqlite3.Connection) -> bool:
     return altered
 
 
+P2_SCHEMA_VERSION = "4-p2"
+
+P2_TABLES = """
+-- Stage 7 (production upgrade): conclusion dependency index.  Rows are
+-- derived deterministically from each conclusion's kind, text and
+-- memory_refs at record time (and once at migration for pre-existing rows);
+-- they are an index over existing beliefs, never new beliefs.
+CREATE TABLE IF NOT EXISTS conclusion_dependencies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conclusion_id INTEGER NOT NULL REFERENCES conclusions(id),
+    dep_kind TEXT NOT NULL CHECK(dep_kind IN
+        ('semantic_fact','medication','medication_pair','medication_set','conclusion')),
+    dep_key TEXT NOT NULL,
+    dep_version INTEGER,
+    recorded_hash TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(conclusion_id, dep_kind, dep_key)
+);
+CREATE INDEX IF NOT EXISTS idx_conclusion_deps_target
+    ON conclusion_dependencies(dep_kind, dep_key);
+CREATE INDEX IF NOT EXISTS idx_conclusion_deps_conclusion
+    ON conclusion_dependencies(conclusion_id);
+
+-- Stage 7: report ledger backing the promotion state machine.  One row per
+-- (event, fact) projection; a replayed event key never adds a second row.
+CREATE TABLE IF NOT EXISTS fact_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    namespace TEXT NOT NULL,
+    fact_key TEXT NOT NULL,
+    value_fingerprint TEXT NOT NULL,
+    event_key TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(event_key, namespace, fact_key, value_fingerprint)
+);
+CREATE INDEX IF NOT EXISTS idx_fact_reports_key
+    ON fact_reports(namespace, fact_key, value_fingerprint);
+
+-- Stage 8 design reservation (design doc A5): per-cycle agent checkpoints.
+-- No write path yet; created now so later stages migrate nothing.
+CREATE TABLE IF NOT EXISTS agent_checkpoints (
+    session_id TEXT NOT NULL,
+    turn_id TEXT NOT NULL,
+    cycle INTEGER NOT NULL,
+    state_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(session_id, turn_id, cycle)
+);
+"""
+
+
+def _ensure_p2_schema(connection: sqlite3.Connection) -> bool:
+    """Create Stage 7 dependency/promotion structures. Additive only."""
+    altered = False
+    task_columns = {
+        row[1] for row in connection.execute("PRAGMA table_info(dependency_tasks)")
+    }
+    if "lease_expires_at" not in task_columns:
+        # A2: lease expiry so a crashed worker's 'running' task is recoverable.
+        connection.execute("ALTER TABLE dependency_tasks ADD COLUMN lease_expires_at TEXT")
+        altered = True
+    connection.executescript(P2_TABLES)
+    return altered
+
+
+# Patient-condition warnings are recorded with kind='warning' but their pair
+# text carries this pseudo-member (agent._warning_text); it is how the
+# dependency derivation and the recheck dispatcher tell them apart from
+# whole-list DDI pair warnings without inventing a new conclusion kind.
+_CONDITION_PAIR_MARKER = "患者个体风险"
+
+_FORMULATION_SUFFIX = re.compile(r"(片|胶囊|缓释片|控释片|肠溶片|注射液|颗粒|钠片|钙片)$")
+
+
+def _drug_dep_key(name: str) -> str:
+    """Canonical dependency key for one drug name.
+
+    Prefers the ingredient-level identity used by the DDI engine so a brand
+    display name and the ingredient name inside a warning text map to the
+    same key; falls back to a compact form for unknown names (test drugs
+    included).  Both the dependency writer and the invalidation trigger go
+    through this one function, so any fallback stays consistent.
+    """
+    value = re.sub(r"[\s®™·]", "", str(name)).lower()
+    value = _FORMULATION_SUFFIX.sub("", value)
+    if not value:
+        return value
+    try:
+        try:
+            from . import ddi_engine
+        except ImportError:  # Support ``python stage0/memory.py``.
+            import ddi_engine  # type: ignore
+        for item in ddi_engine.normalize_medications([str(name)]):
+            ingredient = re.sub(r"[\s®™·]", "", str(item.get("name_cn") or "")).lower()
+            if ingredient:
+                return _FORMULATION_SUFFIX.sub("", ingredient)
+    except Exception:
+        pass
+    return value
+
+
 SAFETY_CRITICAL_NAMESPACES = {
     "allergy", "renal_function", "hepatic_function", "chronic_disease", "sex"
 }
@@ -617,15 +717,29 @@ class MemoryStore:
         self.connection.executescript(SCHEMA)
         migrated = _ensure_p0_columns(self.connection)
         migrated = _ensure_p1_schema(self.connection) or migrated
+        migrated = _ensure_p2_schema(self.connection) or migrated
         if migrated:
             self.connection.execute(
                 "INSERT OR REPLACE INTO schema_meta(key,value) VALUES('schema_version',?)",
-                (P1_SCHEMA_VERSION,),
+                (P2_SCHEMA_VERSION,),
             )
         else:
             self.connection.execute(
                 "INSERT OR IGNORE INTO schema_meta(key,value) VALUES('schema_version','3')"
             )
+        # One-time deterministic backfill of the dependency index for
+        # conclusions recorded before Stage 7 (A1.5).  INSERT OR IGNORE keeps
+        # it idempotent; set-scoped rows are backfilled with a NULL hash
+        # (always-mismatch: the conservative behaviour the pre-P2 revision
+        # compare would have produced for them).
+        if self.connection.execute(
+            "SELECT value FROM schema_meta WHERE key='deps_backfilled'"
+        ).fetchone() is None:
+            backfill_report = self._backfill_conclusion_dependencies_tx()
+            self.connection.execute(
+                "INSERT OR REPLACE INTO schema_meta(key,value) VALUES('deps_backfilled','1')"
+            )
+            self._audit("dependency_backfill", "conclusion", None, backfill_report, "memory_migration")
         self.connection.commit()
         self.extractor = StructuredFactExtractor(enabled=llm_enabled, model=llm_model)
 
@@ -794,12 +908,253 @@ class MemoryStore:
         ).fetchone()
         return int(row["revision"]) if row else 0
 
+    # ---- Stage 7: conclusion dependency index --------------------------
+
+    def medication_set_hash(self) -> str:
+        """Stable hash of the current medication set (normalized ingredient keys)."""
+        with self._lock:
+            return self._medication_set_hash_tx()
+
+    def _medication_set_hash_tx(self) -> str:
+        names = [
+            row["display_name"]
+            for row in self.connection.execute(
+                "SELECT display_name FROM medications WHERE status='active'"
+            )
+        ]
+        keys = sorted(_drug_dep_key(name) for name in names)
+        return hashlib.sha256("\x1f".join(keys).encode("utf-8")).hexdigest()[:16]
+
+    def _derive_conclusion_deps_tx(
+        self,
+        kind: str,
+        text: str,
+        memory_refs: Sequence[str],
+        *,
+        backfill: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Deterministically derive dependency rows for one conclusion.
+
+        Signature (design doc A1): every conclusion records the facts and
+        medications its refs actually cite.  On top of that, a kind='warning'
+        conclusion records the pair parsed from its text plus — unless the
+        pair marks a patient-condition finding (患者个体风险) — the
+        medication-set hash: a whole-list pair scan produced it, so any later
+        list change must re-verify it (the S14 scope semantics).  A
+        patient-condition finding depends only on its drug and the cited
+        facts.  Parse failures degrade to the set-scoped dependency, never to
+        nothing — over-invalidation is the safe direction.
+        """
+        deps: dict[tuple[str, str], dict[str, Any]] = {}
+
+        def add(dep_kind: str, dep_key: str, dep_version: int | None = None,
+                recorded_hash: str | None = None) -> None:
+            deps.setdefault(
+                (dep_kind, dep_key),
+                {"dep_kind": dep_kind, "dep_key": dep_key,
+                 "dep_version": dep_version, "recorded_hash": recorded_hash},
+            )
+
+        for ref in memory_refs:
+            if not isinstance(ref, str):
+                continue
+            match = re.fullmatch(r"memory:([a-z_]+):(\d+)(?:@v(\d+))?", ref)
+            if not match:
+                continue
+            layer, item_id, version = match.group(1), int(match.group(2)), match.group(3)
+            if layer == "semantic":
+                row = self.connection.execute(
+                    "SELECT namespace, fact_key FROM semantic_memory WHERE id=?", (item_id,)
+                ).fetchone()
+                if row is not None:
+                    add("semantic_fact", f"{row['namespace']}:{row['fact_key']}",
+                        int(version) if version else None)
+            elif layer == "medication":
+                row = self.connection.execute(
+                    "SELECT display_name FROM medications WHERE id=?", (item_id,)
+                ).fetchone()
+                if row is not None:
+                    add("medication", _drug_dep_key(row["display_name"]))
+            elif layer == "conclusion":
+                add("conclusion", f"conclusion:{item_id}")
+
+        condition_finding = _CONDITION_PAIR_MARKER in (text or "")
+        if kind == "condition_warning" or (kind == "warning" and condition_finding):
+            # Patient-condition finding: drug + cited facts only.
+            pass
+        elif kind == "warning":
+            pair_part = (text or "").split("：", 1)[0]
+            if "×" in pair_part:
+                left, _, right = pair_part.partition("×")
+                left_key, right_key = _drug_dep_key(left), _drug_dep_key(right)
+                if left_key and right_key:
+                    add("medication_pair", "|".join(sorted((left_key, right_key))))
+            # Backfilled conclusions were formed against a list we can no
+            # longer reconstruct; a NULL hash means "always re-verify".
+            add("medication_set", "current",
+                recorded_hash=None if backfill else self._medication_set_hash_tx())
+        else:
+            add("medication_set", "current",
+                recorded_hash=None if backfill else self._medication_set_hash_tx())
+        return list(deps.values())
+
+    def _write_conclusion_dependencies_tx(
+        self,
+        conclusion_id: int,
+        kind: str,
+        text: str,
+        memory_refs: Sequence[str],
+        *,
+        predecessor_id: int | None = None,
+        backfill: bool = False,
+    ) -> None:
+        """Record dependency rows for one conclusion inside the caller's tx.
+
+        A new conclusion version inherits its predecessor's rows (a recheck
+        successor keeps the pair/fact dependencies), except that
+        medication-set rows are re-hashed to the list the recheck just
+        verified against.
+        """
+        now = utc_now()
+        rows = self._derive_conclusion_deps_tx(kind, text, memory_refs, backfill=backfill)
+        if predecessor_id is not None:
+            for row in self.connection.execute(
+                "SELECT dep_kind, dep_key, dep_version FROM conclusion_dependencies WHERE conclusion_id=?",
+                (predecessor_id,),
+            ).fetchall():
+                inherited = {
+                    "dep_kind": row["dep_kind"], "dep_key": row["dep_key"],
+                    "dep_version": row["dep_version"],
+                    "recorded_hash": self._medication_set_hash_tx()
+                    if row["dep_kind"] == "medication_set" else None,
+                }
+                rows.append(inherited)
+        for dep in rows:
+            self.connection.execute(
+                """INSERT OR IGNORE INTO conclusion_dependencies
+                   (conclusion_id, dep_kind, dep_key, dep_version, recorded_hash, created_at)
+                   VALUES(?,?,?,?,?,?)""",
+                (conclusion_id, dep["dep_kind"], dep["dep_key"],
+                 dep["dep_version"], dep["recorded_hash"], now),
+            )
+
+    def _backfill_conclusion_dependencies_tx(self) -> dict[str, Any]:
+        """Derive dependency rows for pre-existing current conclusions (once).
+
+        Deterministic derivation from refs/text only — no fabricated data.
+        Conclusions whose pair cannot be parsed degrade to the set-scoped
+        dependency and are counted in the report.
+        """
+        report: dict[str, Any] = {"conclusions": 0, "pair_parse_failed": 0}
+        rows = self.connection.execute(
+            "SELECT id, kind, text, memory_refs_json FROM conclusions WHERE status='current'"
+        ).fetchall()
+        for row in rows:
+            refs = _from_json(row["memory_refs_json"], [])
+            deps = self._derive_conclusion_deps_tx(row["kind"], row["text"], refs, backfill=True)
+            report["conclusions"] += 1
+            if row["kind"] == "warning" and _CONDITION_PAIR_MARKER not in (row["text"] or "") \
+                    and not any(dep["dep_kind"] == "medication_pair" for dep in deps):
+                report["pair_parse_failed"] += 1
+            for dep in deps:
+                self.connection.execute(
+                    """INSERT OR IGNORE INTO conclusion_dependencies
+                       (conclusion_id, dep_kind, dep_key, dep_version, recorded_hash, created_at)
+                       VALUES(?,?,?,?,?,?)""",
+                    (row["id"], dep["dep_kind"], dep["dep_key"],
+                     dep["dep_version"], dep["recorded_hash"], utc_now()),
+                )
+        report["dependency_rows"] = self.connection.execute(
+            "SELECT COUNT(*) FROM conclusion_dependencies"
+        ).fetchone()[0]
+        return report
+
+    def _direct_dependents_tx(self, seeds: Sequence[tuple[str, str]]) -> list[int]:
+        if not seeds:
+            return []
+        clauses = " OR ".join("(dep_kind=? AND dep_key=?)" for _ in seeds)
+        parameters = [value for seed in seeds for value in seed]
+        return [
+            row["conclusion_id"]
+            for row in self.connection.execute(
+                f"SELECT DISTINCT conclusion_id FROM conclusion_dependencies WHERE {clauses}",
+                parameters,
+            )
+        ]
+
+    def _dependents_of_tx(self, seeds: Sequence[tuple[str, str]]) -> list[int]:
+        """Conclusion ids depending on any seed, with transitive closure.
+
+        The closure over conclusion->conclusion edges is visited-guarded and
+        unbounded rather than depth-capped: real chains are depth <= 2 today
+        (recheck successors), and on anomalous data over-invalidation is the
+        safe direction (design doc A1.3).
+        """
+        direct = self._direct_dependents_tx(seeds)
+        seen: set[int] = set(direct)
+        frontier = direct
+        while frontier:
+            marks = [f"conclusion:{cid}" for cid in frontier]
+            placeholders = ",".join("?" for _ in marks)
+            nxt = [
+                row["conclusion_id"]
+                for row in self.connection.execute(
+                    "SELECT DISTINCT conclusion_id FROM conclusion_dependencies "
+                    f"WHERE dep_kind='conclusion' AND dep_key IN ({placeholders})",
+                    marks,
+                )
+            ]
+            frontier = [cid for cid in nxt if cid not in seen]
+            seen.update(frontier)
+        return sorted(seen)
+
+    def _conclusions_depending_on_semantic_key_tx(self, namespace: str, key: str) -> list[int]:
+        return self._dependents_of_tx([("semantic_fact", f"{namespace}:{key}")])
+
+    def _conclusions_depending_on_refs_tx(self, refs: Sequence[str]) -> list[int]:
+        """Index-assisted replacement for the ref scan (conflict reopen path).
+
+        Refs resolving to semantic facts match by fact key — broader than the
+        exact id@version string match (any version of that key), which is the
+        conservative direction.  Unresolvable shapes fall back to the scan.
+        """
+        if "dependency_index" in self.ablations:
+            return self._conclusions_citing_refs_tx(refs)
+        seeds: list[tuple[str, str]] = []
+        for ref in refs:
+            match = re.fullmatch(r"memory:([a-z_]+):(\d+)(?:@v\d+)?", str(ref))
+            if not match:
+                return self._conclusions_citing_refs_tx(refs)
+            layer, item_id = match.group(1), int(match.group(2))
+            if layer == "semantic":
+                row = self.connection.execute(
+                    "SELECT namespace, fact_key FROM semantic_memory WHERE id=?", (item_id,)
+                ).fetchone()
+                if row is None:
+                    return self._conclusions_citing_refs_tx(refs)
+                seeds.append(("semantic_fact", f"{row['namespace']}:{row['fact_key']}"))
+            elif layer == "medication":
+                row = self.connection.execute(
+                    "SELECT display_name FROM medications WHERE id=?", (item_id,)
+                ).fetchone()
+                if row is None:
+                    return self._conclusions_citing_refs_tx(refs)
+                seeds.append(("medication", _drug_dep_key(row["display_name"])))
+            elif layer == "conclusion":
+                seeds.append(("conclusion", f"conclusion:{item_id}"))
+            else:
+                return self._conclusions_citing_refs_tx(refs)
+        return self._dependents_of_tx(seeds) if seeds else []
+
     def _after_fact_change_tx(self, namespace: str, key: str) -> None:
         """Same-transaction invalidation of conclusions that consumed this fact."""
         self._bump_scope_tx("semantic")
         if "dependency" in self.ablations:
             return
-        stale = self._conclusions_citing_semantic_key_tx(namespace, key)
+        if "dependency_index" in self.ablations:
+            stale = self._conclusions_citing_semantic_key_tx(namespace, key)
+        else:
+            stale = self._conclusions_depending_on_semantic_key_tx(namespace, key)
         if stale:
             self._invalidate_conclusions_tx(stale, f"semantic fact {namespace}:{key} changed")
 
@@ -845,14 +1200,47 @@ class MemoryStore:
             affected.append(conclusion_id)
         return affected
 
-    def _invalidate_medication_dependents_tx(self) -> None:
+    def _invalidate_medication_dependents_tx(self, changed_name: str | None = None) -> None:
         """Scope-dependency rule: a medication-list change invalidates every
         current conclusion that consumed an older revision of the full list —
         including warnings whose citations could not have mentioned a drug
-        that did not exist yet."""
+        that did not exist yet.
+
+        Stage 7 selective path (``changed_name`` given, ``selective_invalidation``
+        not ablated): only conclusions that cited the changed drug, whose pair
+        contains it, or whose recorded medication-set hash no longer matches
+        are invalidated.  Whole-list pair warnings keep the set-scoped rule —
+        a full-list scan produced them (S14 semantics) — while
+        patient-condition findings survive unrelated list changes.  Anything
+        unresolvable degrades to the set-scoped dependency, so the selective
+        path can only miss what the full path would also have caught.
+        """
         revision = self._bump_scope_tx("medications")
         if "dependency" in self.ablations:
             return
+        if changed_name is not None and "selective_invalidation" not in self.ablations:
+            key = _drug_dep_key(changed_name)
+            current_hash = self._medication_set_hash_tx()
+            ids = set(self._direct_dependents_tx([("medication", key)]))
+            for row in self.connection.execute(
+                "SELECT DISTINCT conclusion_id, dep_key FROM conclusion_dependencies "
+                "WHERE dep_kind='medication_pair'"
+            ).fetchall():
+                if key in row["dep_key"].split("|"):
+                    ids.add(row["conclusion_id"])
+            for row in self.connection.execute(
+                "SELECT DISTINCT conclusion_id FROM conclusion_dependencies "
+                "WHERE dep_kind='medication_set' AND (recorded_hash IS NULL OR recorded_hash<>?)",
+                (current_hash,),
+            ).fetchall():
+                ids.add(row["conclusion_id"])
+            for conclusion_id in sorted(ids):
+                self._invalidate_conclusions_tx(
+                    [conclusion_id],
+                    f"medication list changed via '{changed_name}' (selective; set hash {current_hash})",
+                )
+            return
+        # Full scope path: pre-Stage-7 behaviour and the ablation baseline.
         rows = self.connection.execute(
             "SELECT id, kind, memory_refs_json, input_revision FROM conclusions WHERE status='current'"
         ).fetchall()
@@ -1004,7 +1392,7 @@ class MemoryStore:
                 medication = self._medication_row(current)
                 self._audit("remove", "medication", medication["id"], {"ref": medication["ref"], "name": name}, source)
 
-            self._invalidate_medication_dependents_tx()
+            self._invalidate_medication_dependents_tx(changed_name=name)
 
             event_type = {"add": "medication_add", "remove": "medication_remove", "dose_change": "medication_dose_change"}[action]
             payload = {
@@ -1067,6 +1455,15 @@ class MemoryStore:
         item["resolution"] = _from_json(item.pop("resolution_json"))
         item["ref"] = memory_ref("conflict", item["id"], 1)
         self._audit("surface", "conflict", item["id"], {"ref": item["ref"], "description": description}, source)
+        if conflict_type == "semantic_fact_conflict":
+            # A4: an open semantic dispute downgrades the key's provenance
+            # quality marker until it is resolved.  Belief state (status) is
+            # untouched; resolution never happens here.
+            self.connection.execute(
+                "UPDATE semantic_memory SET verification_status='disputed' "
+                "WHERE namespace||':'||fact_key=? AND verification_status='recorded_as_reported'",
+                (subject_key,),
+            )
         return item
 
     def consolidate_interaction(
@@ -1210,6 +1607,15 @@ class MemoryStore:
                     result.semantic.append(write["item"])
                     if write["conflict"]:
                         result.conflicts.append(write["conflict"])
+                    # A4 report ledger: this event reported that (key, value).
+                    # Replayed event keys never add a second row, so replay
+                    # can never accumulate toward promotion.
+                    self.connection.execute(
+                        """INSERT OR IGNORE INTO fact_reports
+                           (namespace, fact_key, value_fingerprint, event_key, created_at)
+                           VALUES(?,?,?,?,?)""",
+                        (fact.namespace, fact.key, _fingerprint(fact.value), event_key, utc_now()),
+                    )
 
                 seen_episodes: set[tuple[str, str, str]] = set()
                 for event in episodic_candidates:
@@ -1228,6 +1634,16 @@ class MemoryStore:
                 )
                 self._audit("consolidate_committed", "interaction", None,
                             {"event_key": event_key, "mode": mode}, source)
+            try:
+                # A4: rule-triggered promotion scan after T1.  Promotion is a
+                # knowledge-quality upgrade, never a belief change, so it must
+                # not invalidate dependents or fail the consolidation.
+                self._promotion_scan()
+            except Exception as exc:  # promotion must never fail a consolidation
+                with self._lock, self.connection:
+                    self._audit("promotion_scan_error", "semantic", None,
+                                {"event_key": event_key, "error": f"{type(exc).__name__}: {exc}"},
+                                "memory_promotion")
             return result
         except Exception as exc:
             # Separate small transaction: T1 rolled back, mark the event failed
@@ -1271,8 +1687,16 @@ class MemoryStore:
         subject_key: str | None = None,
         limit: int = 50,
         as_of: str | datetime | None = None,
+        occurred_before: str | datetime | None = None,
     ) -> list[dict[str, Any]]:
-        """Exact filtered recall, ranked by salience multiplied by time decay."""
+        """Exact filtered recall, ranked by salience multiplied by time decay.
+
+        ``as_of`` is a knowledge cutoff: only rows recorded at or before it
+        are visible (mirroring ``query_state``'s known_at), and it remains
+        the decay reference time.  ``occurred_before`` is an independent
+        valid-time filter and is never implied by ``as_of`` — a late-recorded
+        past event becomes visible only after its recording time.
+        """
         sql = "SELECT * FROM episodic_memory WHERE 1=1"
         parameters: list[Any] = []
         if event_types:
@@ -1281,6 +1705,12 @@ class MemoryStore:
         if subject_key is not None:
             sql += " AND subject_key=?"
             parameters.append(subject_key)
+        if as_of is not None:
+            sql += " AND recorded_at<=?"
+            parameters.append(_iso(as_of))
+        if occurred_before is not None:
+            sql += " AND occurred_at<=?"
+            parameters.append(_iso(occurred_before))
         rows = self.connection.execute(sql, parameters).fetchall()
         now = _as_utc(as_of)
         out: list[dict[str, Any]] = []
@@ -1367,6 +1797,9 @@ class MemoryStore:
             "predecessor_id": predecessor_id,
         }
         self._audit("conclude", "conclusion", item["id"], item, "agent", actor="agent")
+        self._write_conclusion_dependencies_tx(
+            item["id"], kind, text, memory_refs, predecessor_id=predecessor_id,
+        )
         return item
 
     def current_conclusions(self, status: str = "current") -> list[dict[str, Any]]:
@@ -1466,9 +1899,11 @@ class MemoryStore:
         visible only if it was committed at or before ``known_at`` — a later
         backdated correction never leaks into an earlier known_at view.
 
-        Approximation (documented): the *status* column is current state, so a
-        conflict that is resolved today still appears in older views with both
-        sides; only membership/validity is reconstructed exactly.
+        Conflicts are reconstructed as-of (Stage 7): the open set at
+        ``known_at`` folds the conflict_actions trail (resolve / reopen /
+        undo) up to that time, so a conflict resolved today still appears open
+        in earlier views and disappears from current ones.  Rows without an
+        action trail fall back to the ``resolved_at`` column.
         """
         valid_dt = _as_utc(valid_at)
         known_dt = _as_utc(known_at)
@@ -1501,9 +1936,10 @@ class MemoryStore:
         conflicts = [
             dict(row)
             for row in self.connection.execute(
-                "SELECT * FROM conflicts WHERE created_at<=? AND status='open' ORDER BY created_at",
+                "SELECT * FROM conflicts WHERE created_at<=? ORDER BY created_at",
                 (known_iso,),
-            )
+            ).fetchall()
+            if self._conflict_open_as_of_tx(row, known_iso)
         ]
         return {
             "valid_at": valid_iso,
@@ -1518,6 +1954,42 @@ class MemoryStore:
                 "future_leak_guard": "bitemporal" not in self.ablations,
             },
         }
+
+    def _conflict_open_as_of_tx(self, row: sqlite3.Row, known_iso: str) -> bool:
+        """Reconstruct whether one conflict was open at ``known_iso``.
+
+        Folds the conflict_actions trail up to the known time; the current
+        ``status`` column alone cannot answer this, because a conflict
+        resolved today must still appear open in earlier known_at views
+        (pre-Stage-7 it disappeared from them instead).  Rows without an
+        action trail (migration-era data) fall back to ``resolved_at``.
+        """
+        actions = self.connection.execute(
+            "SELECT id, action, previous_status, undone_by FROM conflict_actions "
+            "WHERE conflict_id=? AND created_at<=? ORDER BY id",
+            (row["id"], known_iso),
+        ).fetchall()
+        if not actions:
+            resolved_at = row["resolved_at"]
+            return resolved_at is None or resolved_at > known_iso
+        status = "open"
+        for action in actions:
+            if action["action"] == "undo":
+                # An undo row's own ``undone_by`` points at the action it
+                # cancels; the status reverts to that action's previous_status
+                # (mirrors resolve_conflict's undo branch).
+                if action["undone_by"] is None:
+                    continue
+                target = self.connection.execute(
+                    "SELECT previous_status FROM conflict_actions WHERE id=?",
+                    (action["undone_by"],),
+                ).fetchone()
+                status = (target["previous_status"] if target and target["previous_status"] else "open")
+            elif action["action"] == "reopened":
+                status = "open"
+            else:  # resolved | dismissed
+                status = action["action"]
+        return status == "open"
 
     def resolve_conflict(
         self,
@@ -1589,7 +2061,7 @@ class MemoryStore:
                 )
                 action_taken = action
                 if action == "reopened" and "dependency" not in self.ablations:
-                    stale = self._conclusions_citing_refs_tx([row["left_ref"], row["right_ref"]])
+                    stale = self._conclusions_depending_on_refs_tx([row["left_ref"], row["right_ref"]])
                     if stale:
                         self._invalidate_conclusions_tx(stale, f"conflict #{row['id']} reopened")
             updated = self.connection.execute("SELECT * FROM conflicts WHERE id=?", (row["id"],)).fetchone()
@@ -1644,13 +2116,138 @@ class MemoryStore:
                         {"ref": ref, "reason": reason, "actor": actor}, actor)
             self._bump_scope_tx("semantic")
             if "dependency" not in self.ablations:
-                stale = self._conclusions_citing_semantic_key_tx(row["namespace"], row["fact_key"])
+                if "dependency_index" in self.ablations:
+                    stale = self._conclusions_citing_semantic_key_tx(row["namespace"], row["fact_key"])
+                else:
+                    stale = self._conclusions_depending_on_semantic_key_tx(row["namespace"], row["fact_key"])
                 if stale:
                     self._invalidate_conclusions_tx(stale, f"supporting fact {row['namespace']}:{row['fact_key']} retracted")
             item = self._semantic_row(self.connection.execute(
                 "SELECT * FROM semantic_memory WHERE id=?", (resolved["item_id"],)
             ).fetchone())
             return {"outcome": "retracted", "item": item}
+
+    # ---- Stage 7: promotion state machine (verification_status) --------
+
+    def _promotion_scan(self) -> list[dict[str, Any]]:
+        """Promote consistently re-reported facts to verified (design doc A4).
+
+        Rule-triggered, never model-judged: a fact whose current version is
+        still ``recorded_as_reported`` (or was disputed and the conflict has
+        since closed) and whose value was reported by at least N distinct
+        event keys is promoted by writing a new version with
+        ``verification_status='verified'``.  An open conflict on the key
+        blocks promotion and is audited — 巩固 never adjudicates a dispute.
+        Promotion changes provenance quality only: same value, no scope bump,
+        no dependent invalidation.
+        """
+        try:
+            threshold = max(2, int(os.getenv("MEMORY_PROMOTION_REPORTS", "2")))
+        except ValueError:
+            threshold = 2
+        promoted: list[dict[str, Any]] = []
+        with self._lock, self.connection:
+            rows = self.connection.execute(
+                "SELECT namespace, fact_key, value_json FROM semantic_memory "
+                "WHERE status IN ('active','disputed') AND verification_status<>'verified' "
+                "ORDER BY namespace, fact_key, version DESC"
+            ).fetchall()
+            seen_keys: set[tuple[str, str]] = set()
+            for row in rows:
+                fact_key = (row["namespace"], row["fact_key"])
+                if fact_key in seen_keys:
+                    continue  # only the latest version of each key
+                seen_keys.add(fact_key)
+                fingerprint = _fingerprint(_from_json(row["value_json"]))
+                reports = self.connection.execute(
+                    "SELECT COUNT(DISTINCT event_key) FROM fact_reports "
+                    "WHERE namespace=? AND fact_key=? AND value_fingerprint=?",
+                    (row["namespace"], row["fact_key"], fingerprint),
+                ).fetchone()[0]
+                if reports < threshold:
+                    continue
+                conflict_open = self.connection.execute(
+                    "SELECT 1 FROM conflicts WHERE subject_key=? AND status='open' LIMIT 1",
+                    (f"{row['namespace']}:{row['fact_key']}",),
+                ).fetchone()
+                if conflict_open is not None:
+                    self._audit("promotion_blocked_by_conflict", "semantic", None,
+                                {"namespace": row["namespace"], "fact_key": row["fact_key"],
+                                 "reports": int(reports)}, "memory_promotion")
+                    continue
+                item = self._promote_to_verified_tx(
+                    row["namespace"], row["fact_key"], row["value_json"],
+                    basis=f"{int(reports)} consistent reports from distinct events",
+                )
+                if item is not None:
+                    promoted.append(item)
+        return promoted
+
+    def _promote_to_verified_tx(
+        self, namespace: str, fact_key: str, value_json: str, *, basis: str,
+        actor: str = "memory_promotion",
+    ) -> dict[str, Any] | None:
+        """Write the verified version of one fact inside the caller's tx."""
+        current = self.connection.execute(
+            "SELECT * FROM semantic_memory WHERE namespace=? AND fact_key=? AND status IN ('active','disputed') "
+            "ORDER BY version DESC LIMIT 1",
+            (namespace, fact_key),
+        ).fetchone()
+        if current is None or current["value_json"] != value_json:
+            return None  # the key moved on between the scan and this write
+        if current["verification_status"] == "verified":
+            return self._semantic_row(current)
+        now = utc_now()
+        self.connection.execute(
+            "UPDATE semantic_memory SET status='superseded', valid_to=?, updated_at=? WHERE id=?",
+            (now, now, current["id"]),
+        )
+        cursor = self.connection.execute(
+            """INSERT INTO semantic_memory(namespace,fact_key,value_json,status,valid_from,valid_to,
+               source,source_uri,version,salience,created_at,updated_at,extraction_mode,verification_status)
+               VALUES(?,?,?,'active',?,NULL,?,?,?,?,?,?, 'consolidated','verified')""",
+            (namespace, fact_key, value_json, current["valid_from"], actor,
+             current["source_uri"], current["version"] + 1, current["salience"], now, now),
+        )
+        item = self._semantic_row(self.connection.execute(
+            "SELECT * FROM semantic_memory WHERE id=?", (cursor.lastrowid,)
+        ).fetchone())
+        self._audit("promote_to_verified", "semantic", item["id"],
+                    {"ref": item["ref"], "previous_ref": memory_ref("semantic", current["id"], current["version"]),
+                     "basis": basis, "previous_status": current["status"]}, actor)
+        return item
+
+    def verify_semantic_fact(self, ref: str, *, actor: str, basis: str) -> dict[str, Any]:
+        """Caregiver confirmation action: promote one fact to verified.
+
+        Recording a confirmation is a record-keeping act by the named actor,
+        not a clinical adjudication.  An open conflict on the key blocks the
+        promotion and is audited instead of silently resolved.
+        """
+        resolved = self.resolve_ref(ref)
+        if resolved["layer"] != "semantic":
+            raise ValueError("verify_semantic_fact only accepts semantic fact refs")
+        with self._lock, self.connection:
+            row = self.connection.execute(
+                "SELECT * FROM semantic_memory WHERE id=?", (resolved["item_id"],)
+            ).fetchone()
+            if row is None or row["status"] not in {"active", "disputed"}:
+                raise ValueError(f"ref is not currently active: {ref}")
+            conflict_open = self.connection.execute(
+                "SELECT 1 FROM conflicts WHERE subject_key=? AND status='open' LIMIT 1",
+                (f"{row['namespace']}:{row['fact_key']}",),
+            ).fetchone()
+            if conflict_open is not None:
+                self._audit("verify_blocked_by_conflict", "semantic", row["id"],
+                            {"ref": ref, "actor": actor, "basis": basis}, actor)
+                return {"outcome": "blocked_by_conflict", "item": self._semantic_row(row)}
+            item = self._promote_to_verified_tx(
+                row["namespace"], row["fact_key"], row["value_json"],
+                basis=f"caregiver confirmation: {basis}", actor=actor,
+            )
+            if item is None:
+                raise ValueError(f"ref is not currently active: {ref}")
+            return {"outcome": "verified", "item": item}
 
     # ---- P1: durable recheck task consumption --------------------------
 
@@ -1662,14 +2259,56 @@ class MemoryStore:
     def stale_conclusions(self) -> list[dict[str, Any]]:
         return self.current_conclusions(status="stale")
 
+    def recover_expired_rechecks(self) -> int:
+        """Reset recheck tasks whose lease expired (crashed-worker recovery).
+
+        Each recovery counts as one attempt — hook failures and crashed
+        claims share the counter — so a task claimed three times without
+        finishing is marked failed and stays visible for manual reopening
+        instead of looping forever (design doc A2.1).
+        """
+        with self._lock, self.connection:
+            return self._recover_expired_rechecks_tx()
+
+    def _recover_expired_rechecks_tx(self) -> int:
+        now = utc_now()
+        expired = self.connection.execute(
+            "SELECT id, attempts FROM dependency_tasks "
+            "WHERE status='running' AND lease_expires_at IS NOT NULL AND lease_expires_at<?",
+            (now,),
+        ).fetchall()
+        for row in expired:
+            attempts = int(row["attempts"] or 0) + 1
+            status = "failed" if attempts >= 3 else "open"
+            self.connection.execute(
+                "UPDATE dependency_tasks SET status=?, attempts=?, lease_token=NULL, lease_expires_at=NULL, updated_at=? WHERE id=?",
+                (status, attempts, now, row["id"]),
+            )
+            self._audit("recheck_lease_expired", "dependency_task", row["id"],
+                        {"attempts": attempts, "new_status": status}, "memory_recheck")
+        return len(expired)
+
     def recheck_pending(self, *, max_jobs: int = 2) -> dict[str, Any]:
-        """Consume pending recheck tasks.
+        """Consume pending recheck tasks (at-least-once, effectively-once).
 
         Without a registered recheck hook the tasks stay open — a stale
         conclusion is never silently promoted back to current, and "no finding"
         is recorded as an explicit new conclusion version, not as risk removal.
+
+        Stage 7 semantics: claims carry an expiring lease so a crashed worker
+        is recoverable; a task whose conclusion already has a recheck
+        successor (crash between commit and task flip) is marked done instead
+        of executing twice.  Delivery is at-least-once; the effect is
+        effectively-once via the predecessor-successor check in the same
+        transaction as the claim.
         """
+        lease_ttl = 300
+        try:
+            lease_ttl = max(1, int(os.getenv("RECHECK_LEASE_TTL_SECONDS", "300")))
+        except ValueError:
+            pass
         with self._lock, self.connection:
+            self._recover_expired_rechecks_tx()
             tasks = [dict(row) for row in self.connection.execute(
                 "SELECT * FROM dependency_tasks WHERE status='open' ORDER BY id LIMIT ?", (max_jobs,)
             )]
@@ -1681,12 +2320,27 @@ class MemoryStore:
         completed = []
         for task in tasks:
             token = uuid.uuid4().hex
+            lease_expires = (_as_utc(None) + timedelta(seconds=lease_ttl)).isoformat(timespec="seconds")
             with self._lock, self.connection:
                 cursor = self.connection.execute(
-                    "UPDATE dependency_tasks SET status='running', lease_token=?, updated_at=? WHERE id=? AND status='open'",
-                    (token, utc_now(), task["id"]),
+                    "UPDATE dependency_tasks SET status='running', lease_token=?, lease_expires_at=?, updated_at=? WHERE id=? AND status='open'",
+                    (token, lease_expires, utc_now(), task["id"]),
                 )
                 if cursor.rowcount != 1:
+                    continue
+                successor = self.connection.execute(
+                    "SELECT id FROM conclusions WHERE predecessor_id=? AND session_id='recheck' LIMIT 1",
+                    (task["target_id"],),
+                ).fetchone()
+                if successor is not None:
+                    self.connection.execute(
+                        "UPDATE dependency_tasks SET status='done', lease_token=NULL, lease_expires_at=NULL, updated_at=? WHERE id=?",
+                        (utc_now(), task["id"]),
+                    )
+                    self._audit("recheck_deduplicated", "conclusion", task["target_id"],
+                                {"task_id": task["id"], "existing_successor": successor["id"]}, "memory_recheck")
+                    completed.append({"task_id": task["id"], "status": "deduplicated",
+                                      "existing_conclusion": successor["id"]})
                     continue
                 conclusion_row = self.connection.execute(
                     "SELECT * FROM conclusions WHERE id=?", (task["target_id"],)
@@ -1707,7 +2361,7 @@ class MemoryStore:
                     attempts = task["attempts"] + 1
                     status = "failed" if attempts >= 3 else "open"
                     self.connection.execute(
-                        "UPDATE dependency_tasks SET status=?, attempts=?, lease_token=NULL, updated_at=? WHERE id=?",
+                        "UPDATE dependency_tasks SET status=?, attempts=?, lease_token=NULL, lease_expires_at=NULL, updated_at=? WHERE id=?",
                         (status, attempts, utc_now(), task["id"]),
                     )
                 completed.append({"task_id": task["id"], "status": "error", "error": f"{type(exc).__name__}: {exc}"})
@@ -1729,7 +2383,7 @@ class MemoryStore:
                     (new_conclusion["id"], conclusion["id"]),
                 )
                 self.connection.execute(
-                    "UPDATE dependency_tasks SET status='done', lease_token=NULL, updated_at=? WHERE id=?",
+                    "UPDATE dependency_tasks SET status='done', lease_token=NULL, lease_expires_at=NULL, updated_at=? WHERE id=?",
                     (utc_now(), task["id"]),
                 )
                 self._audit("recheck_complete", "conclusion", conclusion["id"],

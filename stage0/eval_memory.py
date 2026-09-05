@@ -6,12 +6,14 @@ conflicts, citable sources and conclusions that must be refused — the checks
 are code-decidable assertions, not model-judged answers.
 
 Ablations: scenarios tagged ``protects`` are run again with the corresponding
-mechanism disabled (``policy`` / ``bitemporal`` / ``dependency``).  The
-ablated run is expected to fail those protections; if it still passes, the
-scenario is not actually testing the mechanism.
+mechanism disabled (``policy`` / ``bitemporal`` / ``dependency`` /
+``selective_invalidation``).  The ablated run is expected to fail those
+protections; if it still passes, the scenario is not actually testing the
+mechanism.
 
-This is a starter set (22 scenarios), not the full 52-scenario matrix from the
-design document, and not a medical safety certification.
+This is a starter set (28 scenarios: S01–S22 from the memory upgrade plus
+S23–S28 from the Stage 7 production upgrade), not the full 52-scenario matrix
+from the design document, and not a medical safety certification.
 
 Usage::
 
@@ -363,6 +365,186 @@ def s22_cross_session_persistence(store: MemoryStore) -> list[dict[str, Any]]:
     ]
 
 
+def s23_conflict_asof_view(store: MemoryStore) -> list[dict[str, Any]]:
+    """AS-OF 补全（设计文档 A3.1）：冲突解决的时间重建。
+
+    修复前，resolved 的冲突会从历史视图中错误消失（status='open' 是当前
+    态过滤）；修复后按 conflict_actions 折叠重建 known_at 时刻的 open 集。
+    """
+    store.write_semantic_fact(SemanticFact("allergy", "磺胺", {"status": "reported"}, conflict_policy="conflict"),
+                              source="caregiver")
+    store.write_semantic_fact(SemanticFact("allergy", "磺胺", {"status": "cleared"}, conflict_policy="conflict"),
+                              source="caregiver")
+    conflict = store.open_conflicts()[0]
+    store.connection.execute("UPDATE conflicts SET created_at='2026-09-01T00:00:00+00:00' WHERE id=?",
+                             (conflict["id"],))
+    store.connection.commit()
+    store.resolve_conflict(conflict["ref"], action="resolved", basis="家属确认原记录", actor="caregiver")
+    mid = store.query_state(valid_at="2026-09-02T00:00:00+00:00", known_at="2026-09-02T00:00:00+00:00")
+    current = store.query_state()
+    return [
+        _check("open_before_resolution", [c["id"] for c in mid["open_conflicts"]] == [conflict["id"]]),
+        _check("hidden_after_resolution", current["open_conflicts"] == []),
+    ]
+
+
+def s24_episodic_asof_filter(store: MemoryStore) -> list[dict[str, Any]]:
+    """AS-OF 补全（A3.2）：retrieve_episodic 的 as_of 是知识截止。"""
+    store.record_event(
+        EpisodicFact("caregiver_message", {"reported_text": "上周头晕了一次"}, subject_key="头晕",
+                     occurred_at="2026-09-01T00:00:00+00:00", salience=0.7),
+        session_id="s", turn_id="t1", source="caregiver")
+    store.connection.execute("UPDATE episodic_memory SET recorded_at='2026-09-05T00:00:00+00:00'")
+    store.connection.commit()
+    before = store.retrieve_episodic(as_of="2026-09-03T00:00:00+00:00")
+    after = store.retrieve_episodic(as_of="2026-09-06T00:00:00+00:00")
+    unfiltered = store.retrieve_episodic()
+    return [
+        _check("not_visible_before_recording", before == []),
+        _check("visible_after_recording", len(after) == 1),
+        _check("no_asof_keeps_current_behaviour", len(unfiltered) == 1),
+    ]
+
+
+def s25_conflict_action_sequence_asof(store: MemoryStore) -> list[dict[str, Any]]:
+    """AS-OF 补全（A3.1）：resolve→reopen 序列的逐时刻重建。"""
+    store.write_semantic_fact(SemanticFact("allergy", "磺胺", {"status": "reported"}, conflict_policy="conflict"),
+                              source="caregiver")
+    store.write_semantic_fact(SemanticFact("allergy", "磺胺", {"status": "cleared"}, conflict_policy="conflict"),
+                              source="caregiver")
+    conflict = store.open_conflicts()[0]
+    store.connection.execute("UPDATE conflicts SET created_at='2026-09-01T00:00:00+00:00' WHERE id=?",
+                             (conflict["id"],))
+    store.resolve_conflict(conflict["ref"], action="resolved", basis="家属确认", actor="caregiver")
+    store.resolve_conflict(conflict["ref"], action="reopened", basis="新记录需要重新核对")
+    store.connection.execute(
+        "UPDATE conflict_actions SET created_at='2026-09-02T00:00:00+00:00' WHERE conflict_id=? AND action='resolved'",
+        (conflict["id"],))
+    store.connection.execute(
+        "UPDATE conflict_actions SET created_at='2026-09-04T00:00:00+00:00' WHERE conflict_id=? AND action='reopened'",
+        (conflict["id"],))
+    store.connection.commit()
+    view_3rd = store.query_state(valid_at="2026-09-03T00:00:00+00:00", known_at="2026-09-03T00:00:00+00:00")
+    view_5th = store.query_state(valid_at="2026-09-05T00:00:00+00:00", known_at="2026-09-05T00:00:00+00:00")
+    return [
+        _check("resolved_at_mid_view", view_3rd["open_conflicts"] == []),
+        _check("reopened_at_later_view", [c["id"] for c in view_5th["open_conflicts"]] == [conflict["id"]]),
+    ]
+
+
+def s26_promotion_state_machine(store: MemoryStore) -> list[dict[str, Any]]:
+    """巩固状态机（A4）：N 次一致报告晋升、冲突阻断、照护者确认。"""
+    store.consolidate_interaction(session_id="s", turn_id="t1", user_text="妈妈有高血压", client_event_id="e1")
+    single = store.current_semantic(["chronic_disease"])
+    first_status = single[0]["verification_status"] if single else None
+    store.consolidate_interaction(session_id="s", turn_id="t2", user_text="妈妈有高血压", client_event_id="e2")
+    promoted = store.current_semantic(["chronic_disease"])
+    promotion_audit = store.connection.execute(
+        "SELECT COUNT(*) FROM audit_log WHERE action='promote_to_verified'").fetchone()[0]
+    # 矛盾阻断：同键冲突保持打开，且该键不被晋升
+    store.write_semantic_fact(SemanticFact("allergy", "青霉素", {"status": "reported"}, conflict_policy="conflict"),
+                              source="caregiver")
+    store.write_semantic_fact(SemanticFact("allergy", "青霉素", {"status": "cleared"}, conflict_policy="update"),
+                              source="caregiver")
+    blocked = store.current_semantic(["allergy"])
+    # 照护者显式确认晋升（无冲突键）
+    preference = store.write_semantic_fact(
+        SemanticFact("preference", "diet", "低盐", 0.5, "update"), source="caregiver")
+    verified = store.verify_semantic_fact(preference["item"]["ref"], actor="caregiver", basis="照护者当面确认")
+    return [
+        _check("single_report_not_promoted", first_status == "recorded_as_reported"),
+        _check("two_consistent_reports_promote",
+               bool(promoted) and promoted[0]["verification_status"] == "verified"),
+        _check("promotion_audited", promotion_audit >= 1),
+        _check("conflict_marks_disputed_not_verified",
+               bool(blocked) and blocked[0]["verification_status"] == "disputed"),
+        _check("caregiver_confirmation_promotes", verified["outcome"] == "verified"),
+    ]
+
+
+class _ConditionRAG:
+    """Fake label retrieval for the condition-recheck scenario."""
+
+    def __call__(self, query: str, **_: object) -> dict:
+        return {"query": query, "mode": "test", "results": [
+            {"drug_name": "药B", "section": "注意事项",
+             "text": "肾功能不全患者慎用，应在医师指导下调整剂量。",
+             "source_url": "https://example.test/labelb"},
+        ]}
+
+
+def s27_condition_recheck(store: MemoryStore) -> list[dict[str, Any]]:
+    """重查健壮化（A2.3）：condition 类旧结论重跑确定性标签推导。"""
+    store.apply_medication_change(action="add", name="药B", ingredients=[], session_id="s", turn_id="m1",
+                                  source="caregiver")
+    renal = store.write_semantic_fact(
+        SemanticFact("renal_function", "renal_status", "中度受损", 0.9, "update"), source="caregiver")
+    medication = store.current_medications()[0]
+    store.record_conclusion(
+        session_id="s", turn_id="t1", kind="warning",
+        text="药B×患者个体风险：肾功能：中度受损，需由医生/药师复核适用性（moderate / medium）",
+        memory_refs=[medication["ref"], renal["item"]["ref"]],
+        source_refs=[{"uri": "https://example.test/labelb"}])
+    # 事实更正触发选择性失效与重查任务
+    store.write_semantic_fact(
+        SemanticFact("renal_function", "renal_status", "重度受损", 0.9, "update"), source="caregiver")
+    agent = MedicationCoordinatorAgent(store, ddi_tool=DDITool(fake_detect), rag_tool=_ConditionRAG())
+    receipt = agent.run_pending_rechecks()
+    current = store.current_conclusions()
+    return [
+        _check("condition_conclusion_staled", len(store.stale_conclusions()) == 1),
+        _check("condition_recheck_executed",
+               receipt["status"] == "ok" and receipt["completed"]
+               and receipt["completed"][0]["status"] == "done"),
+        _check("new_version_derived_from_labels", any(
+            c["predecessor_id"] is not None and "仍检出" in c["text"] and "肾功能" in c["text"]
+            for c in current)),
+        _check("recheck_keeps_escalation", any("咨询医生" in c["text"] for c in current)),
+    ]
+
+
+def s28_selective_invalidation(store: MemoryStore) -> list[dict[str, Any]]:
+    """选择性失效（A1.2）：无关药物变更只打 stale 该失效的结论。
+
+    全药单 DDI 警告保持集合级语义（S14）；患者个体条件结论只依赖焦点药
+    与引用事实。``selective_invalidation`` 消融（回到全量失效）时，
+    unrelated_condition_finding_kept 必须失败——这是该开关的承重场景。
+    """
+    for name, turn in (("药A", "m1"), ("药B", "m2")):
+        store.apply_medication_change(action="add", name=name, ingredients=[], session_id="s",
+                                      turn_id=turn, source="caregiver")
+    medications = {item["display_name"]: item for item in store.current_medications()}
+    pair_warning = store.record_conclusion(
+        session_id="s", turn_id="t1", kind="warning",
+        text="药A×药B：测试相互作用提示（moderate / medium）",
+        memory_refs=[medications["药A"]["ref"], medications["药B"]["ref"]],
+        source_refs=[{"uri": "https://example.test"}])
+    renal = store.write_semantic_fact(
+        SemanticFact("renal_function", "renal_status", "中度受损", 0.9, "update"), source="caregiver")
+    condition_finding = store.record_conclusion(
+        session_id="s", turn_id="t2", kind="warning",
+        text="药B×患者个体风险：肾功能：中度受损，需由医生/药师复核适用性（moderate / medium）",
+        memory_refs=[medications["药B"]["ref"], renal["item"]["ref"]],
+        source_refs=[{"uri": "https://example.test"}])
+    # 新增与两者均无关的药物
+    store.apply_medication_change(action="add", name="药E", ingredients=[], session_id="s",
+                                  turn_id="m3", source="caregiver")
+    stale = {item["id"] for item in store.stale_conclusions()}
+    tasks = store.pending_rechecks()
+    # 停用成员药：条件结论与对警告都应失效
+    store.apply_medication_change(action="remove", name="药B", ingredients=[], session_id="s",
+                                  turn_id="m4", source="caregiver")
+    stale_after_remove = {item["id"] for item in store.stale_conclusions()}
+    return [
+        _check("list_scoped_warning_staled", pair_warning["id"] in stale),
+        _check("unrelated_condition_finding_kept", condition_finding["id"] not in stale),
+        _check("recheck_tasks_track_staled_only",
+               sorted(task["target_id"] for task in tasks) == [pair_warning["id"]]),
+        _check("member_removal_stales_condition_finding",
+               condition_finding["id"] in stale_after_remove),
+    ]
+
+
 SCENARIOS: list[dict[str, Any]] = [
     {"id": "S01", "group": "negation", "protects": None, "fn": s01_negated_disease,
      "setup": None},
@@ -394,6 +576,14 @@ SCENARIOS: list[dict[str, Any]] = [
     {"id": "S21", "group": "context_budget", "protects": None, "fn": s21_context_packet_budget, "setup": None},
     {"id": "S22", "group": "cross_session", "protects": None, "fn": s22_cross_session_persistence,
      "setup": "妈妈有糖尿病"},
+    {"id": "S23", "group": "asof_conflict", "protects": None, "fn": s23_conflict_asof_view, "setup": None},
+    {"id": "S24", "group": "asof_episodic", "protects": None, "fn": s24_episodic_asof_filter, "setup": None},
+    {"id": "S25", "group": "asof_conflict", "protects": None, "fn": s25_conflict_action_sequence_asof,
+     "setup": None},
+    {"id": "S26", "group": "promotion", "protects": None, "fn": s26_promotion_state_machine, "setup": None},
+    {"id": "S27", "group": "recheck_condition", "protects": None, "fn": s27_condition_recheck, "setup": None},
+    {"id": "S28", "group": "selective_invalidation", "protects": "selective_invalidation",
+     "fn": s28_selective_invalidation, "setup": None},
 ]
 
 
@@ -441,7 +631,10 @@ def run_scenarios(*, ablate: bool = False) -> dict[str, Any]:
 
     ablation_results = []
     if ablate:
-        for mechanism in ("policy", "bitemporal", "dependency"):
+        # 'dependency_index' is deliberately absent: disabling it switches the
+        # lookup back to the full scan and is verified by equivalence tests in
+        # test_memory_p2, not by a scenario that should fail.
+        for mechanism in ("policy", "bitemporal", "dependency", "selective_invalidation"):
             targets = [s for s in SCENARIOS if s["protects"] == mechanism]
             rows = []
             for scenario in targets:

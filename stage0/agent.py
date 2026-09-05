@@ -1731,6 +1731,39 @@ class MedicationCoordinatorAgent:
         return self.memory.recheck_pending(max_jobs=max_jobs)
 
     def _recheck_hook(self, store: MemoryStore, conclusion: dict[str, Any]) -> dict[str, Any] | None:
+        """Dispatch one stale conclusion to its kind's recheck executor.
+
+        ``warning`` conclusions produced by the whole-list DDI scan re-run the
+        real detector — memoized per current medication set so a batch of
+        stale conclusions pays for one detection (design doc A2.2).
+        Patient-condition findings (kind ``condition_warning`` or the
+        患者个体风险 pair marker, which is how the recorder actually tags
+        them) re-run the deterministic label-vs-facts derivation (A2.3).
+        Anything else returns None so the memory layer records the
+        conservative no-match conclusion — never phrased as risk removal.
+        """
+        text = conclusion.get("text", "")
+        if conclusion.get("kind") == "condition_warning" or (
+            conclusion.get("kind") == "warning" and "患者个体风险" in text
+        ):
+            return self._recheck_condition(store, conclusion)
+        return self._recheck_ddi(store, conclusion)
+
+    def _current_detect_result(self, store: MemoryStore, ddi_tool: Any, medications: list[str]) -> dict[str, Any]:
+        """One detector run per current medication set (A2.2 batch dedup)."""
+        set_hash = store.medication_set_hash()
+        cache = getattr(self, "_recheck_detect_cache", None)
+        if cache is None:
+            cache = self._recheck_detect_cache = {}
+        if set_hash in cache:
+            return dict(cache[set_hash])
+        result = ddi_tool(medications)
+        if len(cache) >= 64:
+            cache.pop(next(iter(cache)))
+        cache[set_hash] = result
+        return dict(result)
+
+    def _recheck_ddi(self, store: MemoryStore, conclusion: dict[str, Any]) -> dict[str, Any] | None:
         """Re-run the real detector over the current medication list.
 
         Findings matching the stale conclusion's drug pair become a new
@@ -1741,7 +1774,7 @@ class MedicationCoordinatorAgent:
         medications = [item["display_name"] for item in store.current_medications()]
         if ddi_tool is None or not medications:
             return None
-        result = ddi_tool(medications)
+        result = self._current_detect_result(store, ddi_tool, medications)
         warnings = result.get("warnings", []) if isinstance(result, dict) else []
         old_text = conclusion.get("text", "")
         related = [
@@ -1760,6 +1793,62 @@ class MedicationCoordinatorAgent:
         for warning in related:
             lines.append(
                 f"- {warning.get('drug_a')} × {warning.get('drug_b')}（{warning.get('severity')}）：{warning.get('effect')}"
+            )
+        lines.append("以上为按当前记录重新检查的结果；未检出的其他风险不因此排除，用药调整请咨询医生/药师。")
+        return {
+            "text": "\n".join(lines),
+            "memory_refs": list(conclusion.get("memory_refs", [])),
+            "source_refs": source_refs,
+        }
+
+    def _recheck_condition(self, store: MemoryStore, conclusion: dict[str, Any]) -> dict[str, Any] | None:
+        """Re-derive patient-condition warnings for the focus drug (A2.3).
+
+        Deterministic throughout: the focus drug comes from the conclusion's
+        medication refs, the label text from the rag_search tool (fake-able in
+        tests), and the derivation is the same executor-side rule used during
+        the original turn.  No finding returns None for the conservative
+        memory-layer template.
+        """
+        focus: str | None = None
+        for ref in conclusion.get("memory_refs", []):
+            if isinstance(ref, str) and ref.startswith("memory:medication:"):
+                try:
+                    resolved = store.resolve_ref(ref)
+                except ValueError:
+                    continue
+                focus = resolved["row"]["display_name"]
+                break
+        rag_tool = self.tools.get("rag_search")
+        if not focus or rag_tool is None:
+            return None
+        snapshot = store.snapshot()
+        context = {
+            "semantic": snapshot.get("semantic", []),
+            "medications": snapshot.get("medications", []),
+        }
+        try:
+            rag_result = rag_tool(f"{focus} 注意事项 禁忌 慎用", drug_name=focus, top_k=5)
+        except Exception:
+            return None
+        warnings = AgentPlanner._condition_warnings(
+            focus,
+            PlannerPolicyGuard()._critical_facts(context),
+            context.get("medications", []),
+            rag_result,
+        )
+        if not warnings:
+            return None
+        source_refs = [
+            {"uri": warning.get("source_url"), "text": warning.get("source_text")}
+            for warning in warnings
+        ]
+        lines = [
+            f"重查完成：按当前已记录的患者事实重新核对 {focus} 的注意事项，仍检出 {len(warnings)} 条与原结论相关的个体风险提示："
+        ]
+        for warning in warnings:
+            lines.append(
+                f"- {warning.get('drug_a')}×{warning.get('drug_b')}（{warning.get('severity')}）：{warning.get('effect')}"
             )
         lines.append("以上为按当前记录重新检查的结果；未检出的其他风险不因此排除，用药调整请咨询医生/药师。")
         return {

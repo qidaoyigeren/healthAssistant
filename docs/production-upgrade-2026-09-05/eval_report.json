@@ -1,0 +1,757 @@
+{
+  "evaluated_at": "2026-09-05T10:55:32+00:00",
+  "total": 28,
+  "passed": 28,
+  "failed": [],
+  "scenarios": [
+    {
+      "id": "S01",
+      "group": "negation",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "no_patient_diagnosis",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "preserved_as_pending",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S02",
+      "group": "third_person",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "no_patient_diagnosis",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "subject_mention_kept",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S03",
+      "group": "hypothetical",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "no_patient_diagnosis",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "mode_hypothetical",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S04",
+      "group": "uncertainty",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "not_verified_fact",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "kept_pending",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S05",
+      "group": "affirmation",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "diagnosis_recorded",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S06",
+      "group": "policy_guard",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "update_forced_to_conflict",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "prior_not_superseded",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "conflict_recorded",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S07",
+      "group": "wrong_subject_correction",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "removed_from_current",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "history_kept",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "dependent_marked_stale",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "no_auto_profile_for_other",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S08",
+      "group": "idempotency",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "replayed_flag",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "same_refs",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "no_duplicate_rows",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S09",
+      "group": "idempotency",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "reuse_rejected",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S10",
+      "group": "transaction",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "no_partial_state",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "event_marked_failed",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "retry_commits",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S11",
+      "group": "bitemporal",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "no_future_leak",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "retrospective_view_has_it",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S12",
+      "group": "bitemporal",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "active_before_stop",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "inactive_after_stop",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S13",
+      "group": "conflict_lifecycle",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "resolution_hides_conflict",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "reopens_to_open",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "undo_restores_previous",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "action_trail_kept",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "resolution_is_record_not_verdict",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S14",
+      "group": "dependency_scope",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "old_warning_staled",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "task_persisted",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "recheck_completes",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "new_version_linked",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "recheck_not_risk_removal",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S15",
+      "group": "dependency_fact",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "dependent_staled",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "recheck_task_open",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S16",
+      "group": "recheck_failure",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "no_hook_keeps_task_open",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "stale_not_current",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S17",
+      "group": "strict_ref",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "version_mismatch_rejected",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S18",
+      "group": "refusal",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "empty_state_is_empty",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "empty_scope_has_revision",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S19",
+      "group": "prompt_injection",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "injection_creates_no_patient_fact",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "existing_fact_survives",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "injection_kept_as_data",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S20",
+      "group": "history_search",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "found_history_mention",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "results_carry_refs",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S21",
+      "group": "context_budget",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "tiny_budget_marks_incomplete",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "full_budget_complete",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "exclusions_recorded",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "snapshot_carries_revisions",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S22",
+      "group": "cross_session",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "facts_survive",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "state_query_works",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S23",
+      "group": "asof_conflict",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "open_before_resolution",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "hidden_after_resolution",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S24",
+      "group": "asof_episodic",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "not_visible_before_recording",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "visible_after_recording",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "no_asof_keeps_current_behaviour",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S25",
+      "group": "asof_conflict",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "resolved_at_mid_view",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "reopened_at_later_view",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S26",
+      "group": "promotion",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "single_report_not_promoted",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "two_consistent_reports_promote",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "promotion_audited",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "conflict_marks_disputed_not_verified",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "caregiver_confirmation_promotes",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S27",
+      "group": "recheck_condition",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "condition_conclusion_staled",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "condition_recheck_executed",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "new_version_derived_from_labels",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "recheck_keeps_escalation",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    {
+      "id": "S28",
+      "group": "selective_invalidation",
+      "passed": true,
+      "checks": [
+        {
+          "assertion": "list_scoped_warning_staled",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "unrelated_condition_finding_kept",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "recheck_tasks_track_staled_only",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "assertion": "member_removal_stales_condition_finding",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    }
+  ],
+  "ablations": [
+    {
+      "mechanism": "policy",
+      "meaningful": true,
+      "scenarios": [
+        {
+          "id": "S06",
+          "protection_removed": true,
+          "checks": [
+            {
+              "assertion": "update_forced_to_conflict",
+              "passed": false,
+              "detail": ""
+            },
+            {
+              "assertion": "prior_not_superseded",
+              "passed": false,
+              "detail": ""
+            },
+            {
+              "assertion": "conflict_recorded",
+              "passed": false,
+              "detail": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "mechanism": "bitemporal",
+      "meaningful": true,
+      "scenarios": [
+        {
+          "id": "S11",
+          "protection_removed": true,
+          "checks": [
+            {
+              "assertion": "no_future_leak",
+              "passed": false,
+              "detail": ""
+            },
+            {
+              "assertion": "retrospective_view_has_it",
+              "passed": true,
+              "detail": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "mechanism": "dependency",
+      "meaningful": true,
+      "scenarios": [
+        {
+          "id": "S07",
+          "protection_removed": true,
+          "checks": [
+            {
+              "assertion": "removed_from_current",
+              "passed": true,
+              "detail": ""
+            },
+            {
+              "assertion": "history_kept",
+              "passed": true,
+              "detail": ""
+            },
+            {
+              "assertion": "dependent_marked_stale",
+              "passed": false,
+              "detail": ""
+            },
+            {
+              "assertion": "no_auto_profile_for_other",
+              "passed": true,
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "id": "S14",
+          "protection_removed": true,
+          "checks": [
+            {
+              "assertion": "old_warning_staled",
+              "passed": false,
+              "detail": ""
+            },
+            {
+              "assertion": "task_persisted",
+              "passed": false,
+              "detail": ""
+            },
+            {
+              "assertion": "recheck_completes",
+              "passed": false,
+              "detail": ""
+            },
+            {
+              "assertion": "new_version_linked",
+              "passed": false,
+              "detail": ""
+            },
+            {
+              "assertion": "recheck_not_risk_removal",
+              "passed": false,
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "id": "S15",
+          "protection_removed": true,
+          "checks": [
+            {
+              "assertion": "dependent_staled",
+              "passed": false,
+              "detail": ""
+            },
+            {
+              "assertion": "recheck_task_open",
+              "passed": false,
+              "detail": ""
+            }
+          ]
+        },
+        {
+          "id": "S16",
+          "protection_removed": true,
+          "checks": [
+            {
+              "assertion": "no_hook_keeps_task_open",
+              "passed": false,
+              "detail": ""
+            },
+            {
+              "assertion": "stale_not_current",
+              "passed": false,
+              "detail": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "mechanism": "selective_invalidation",
+      "meaningful": true,
+      "scenarios": [
+        {
+          "id": "S28",
+          "protection_removed": true,
+          "checks": [
+            {
+              "assertion": "list_scoped_warning_staled",
+              "passed": true,
+              "detail": ""
+            },
+            {
+              "assertion": "unrelated_condition_finding_kept",
+              "passed": false,
+              "detail": ""
+            },
+            {
+              "assertion": "recheck_tasks_track_staled_only",
+              "passed": false,
+              "detail": ""
+            },
+            {
+              "assertion": "member_removal_stales_condition_finding",
+              "passed": true,
+              "detail": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -11,3 +11,7 @@ stage0/memory.db*
 
 # Local browser smoke-test snapshots
 .playwright-cli/
+
+# Stage 7 backup/export artifacts (stage0/backup.py)
+stage0/backups/
+stage0/exports/
