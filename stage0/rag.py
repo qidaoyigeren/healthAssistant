@@ -38,6 +38,9 @@ SECTION_ALIASES = {"药物相互作用": "药物相互作用", "相互作用": "
 # Names cover common long-term cardiovascular, diabetes, lipid, respiratory,
 # endocrine, psychiatric, and osteoporosis therapies. The selection is still a
 # data-engineering sample, not a prevalence estimate.
+# Stage 9 (C1): theophylline-class drugs were the held-out recall gap (all 5
+# FN pairs were theophylline combinations) and were absent from this list, so
+# their labels could only enter the corpus via the diverse hash sample.
 CHRONIC_DRUG_TERMS = (
     "氨氯地平", "硝苯地平", "非洛地平", "缬沙坦", "厄贝沙坦", "氯沙坦", "替米沙坦",
     "贝那普利", "依那普利", "培哚普利", "卡托普利", "美托洛尔", "比索洛尔", "卡维地洛",
@@ -46,6 +49,7 @@ CHRONIC_DRUG_TERMS = (
     "瑞舒伐他汀", "辛伐他汀", "非诺贝特", "阿司匹林", "氯吡格雷", "华法林",
     "利伐沙班", "地高辛", "胺碘酮", "奥美拉唑", "左甲状腺素", "阿仑膦酸",
     "孟鲁司特", "布地奈德", "沙美特罗", "氟替卡松", "舍曲林", "帕罗西汀",
+    "茶碱", "氨茶碱", "多索茶碱",
 )
 
 

@@ -17,6 +17,7 @@ import hashlib
 import json
 import math
 import os
+import random
 import re
 import sqlite3
 import threading
@@ -92,6 +93,32 @@ class IdempotencyKeyReused(MemoryPolicyError):
     """Raised when a client event id is replayed with a different payload."""
 
 
+class LeaseRejected(MemoryPolicyError):
+    """Raised when a task update fails lease fencing (stale/expired worker).
+
+    A worker whose lease was expired and re-issued must never overwrite the
+    new owner's state: every complete/fail/heartbeat validates the current
+    lease token, running status and expiry, and rejects the write otherwise.
+    """
+
+
+class OperationConflict(MemoryPolicyError):
+    """Raised when an operation id is replayed with a different input.
+
+    The receipt protects against a second domain effect under the same
+    logical operation; a same-id/different-input attempt is a caller bug or
+    a replay of a genuinely different action, not a dedup hit.
+    """
+
+
+# Reliability P0: retry/backoff policy for failed outbox tasks (ADR-004: the
+# outbox re-claim owns process recovery only; per-call retry lives with the
+# executor).  next_attempt_at = now + base*2^n + jitter, capped.
+OUTBOX_BACKOFF_BASE_SECONDS = 5.0
+OUTBOX_BACKOFF_CAP_SECONDS = 300.0
+OUTBOX_TASK_DEADLINE_SECONDS = 30 * 60
+
+
 @dataclass(frozen=True)
 class EpisodicFact:
     event_type: str
@@ -117,6 +144,10 @@ class ConsolidationResult:
     # True when this result was replayed from a committed client event id
     # instead of re-running extraction and writes.
     replayed: bool = False
+    # Frontend round (2026-09-06): the actual per-fact write outcomes
+    # (inserted/update/conflict/deduplicated), kept beside ``semantic`` rows
+    # so the API layer can report what the store did without inferring it.
+    semantic_outcomes: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def memory_refs(self) -> list[str]:
@@ -411,6 +442,154 @@ CREATE TABLE IF NOT EXISTS agent_checkpoints (
     created_at TEXT NOT NULL,
     PRIMARY KEY(session_id, turn_id, cycle)
 );
+
+-- Stage 8 (B6): per-phase turn traces.  Division of labour with audit_log:
+-- audit_log records data mutations (who changed which memory item);
+-- turn_traces records the planning/budget/breaker process that produced
+-- them, and never duplicates mutation content.
+CREATE TABLE IF NOT EXISTS turn_traces (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    turn_id TEXT NOT NULL,
+    cycle INTEGER,
+    phase TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_turn_traces_turn ON turn_traces(session_id, turn_id, id);
+
+-- Stage 10: request-level idempotency.  The key guards API acceptance: the
+-- same key with the same payload replays the stored response, and the same
+-- key with a different payload is rejected.  Domain-level dedup remains the
+-- event_key on interactions — the two layers are deliberately separate.
+CREATE TABLE IF NOT EXISTS idempotency_keys (
+    key TEXT PRIMARY KEY,
+    request_hash TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('in_flight','committed','failed')),
+    response_json TEXT,
+    status_code INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    -- Reliability P0: server-side event/run identity.  The turn_id sent to
+    -- the agent is the run_id (a uuid), never a truncation of the key.
+    event_id TEXT, run_id TEXT
+);
+
+-- Reliability P0: durable receipts for domain side effects.  One logical
+-- operation is executed at most once with a given input; the same
+-- operation_id with a different input_hash is refused instead of silently
+-- producing a second fact.  Receipts are audit evidence and are never cleaned.
+CREATE TABLE IF NOT EXISTS operation_receipts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope_id TEXT NOT NULL DEFAULT 'local-demo',
+    operation_id TEXT NOT NULL,
+    event_id TEXT,
+    run_id TEXT,
+    operation_type TEXT NOT NULL,
+    target_ref TEXT,
+    input_hash TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('succeeded','failed','effect_unknown')),
+    result_json TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (scope_id, operation_id)
+);
+
+-- Reliability P1: workflow run lifecycle.  One run processes one event; the
+-- thread_id maps the run onto its LangGraph checkpoint thread.  Versions are
+-- snapshotted at start so a paused run resumes on the runner version that
+-- created it (in-flight runs are never silently re-routed).
+CREATE TABLE IF NOT EXISTS workflow_runs (
+    run_id TEXT PRIMARY KEY,
+    event_id TEXT,
+    idempotency_key TEXT,
+    thread_id TEXT,
+    graph_version TEXT NOT NULL,
+    state_schema_version TEXT,
+    model_id TEXT,
+    status TEXT NOT NULL CHECK(status IN ('running','waiting_review','succeeded','degraded','failed','cancelled')),
+    budget_json TEXT,
+    result_json TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_workflow_runs_status ON workflow_runs(status, updated_at);
+
+-- Reliability P2: human review closed loop.  One case per (event, reason,
+-- round): replays and crash rebuilds hit the unique logic key instead of
+-- creating a second ticket.  ``overdue`` is an OPERATIONAL state — timeout
+-- never auto-approves anything.  ``fact_medication_set_hash`` /
+-- ``fact_scope_revision`` snapshot what the reviewer decided against; a
+-- resume whose facts moved is review_stale and must re-review.
+CREATE TABLE IF NOT EXISTS review_cases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope_id TEXT NOT NULL DEFAULT 'local-demo',
+    logic_key TEXT NOT NULL UNIQUE,
+    event_id TEXT, run_id TEXT, thread_id TEXT,
+    reason_codes TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('open','assigned','in_review','waiting_user','resolved','cancelled','overdue')),
+    priority TEXT NOT NULL DEFAULT 'normal',
+    assignee TEXT,
+    revision INTEGER NOT NULL DEFAULT 1,
+    summary_json TEXT NOT NULL,
+    fact_medication_set_hash TEXT,
+    fact_scope_revision INTEGER,
+    due_at TEXT,
+    round INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL, resolved_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_review_cases_status ON review_cases(status, due_at);
+
+-- Reviewer decisions.  Idempotent by client Idempotency-Key; CAS via the
+-- case revision captured at claim/decision time.
+CREATE TABLE IF NOT EXISTS review_decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    decision_id TEXT NOT NULL UNIQUE,
+    case_id INTEGER NOT NULL,
+    case_revision INTEGER NOT NULL,
+    action TEXT NOT NULL CHECK(action IN ('request_more_info','confirm_reported_fact','resolve_conflict','reject_candidate','close_with_safe_guidance')),
+    payload_json TEXT,
+    idempotency_key TEXT NOT NULL UNIQUE,
+    actor_id TEXT NOT NULL,
+    outcome TEXT NOT NULL DEFAULT 'recorded',   -- recorded/applied/review_stale
+    created_at TEXT NOT NULL
+);
+
+-- Bridge from a recorded decision back to the parked workflow run.  Consumed
+-- exactly once; the run-side apply_review node re-validates everything.
+CREATE TABLE IF NOT EXISTS resume_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    operation_id TEXT NOT NULL UNIQUE,
+    run_id TEXT NOT NULL,
+    case_id INTEGER NOT NULL,
+    decision_id TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pending','consumed')),
+    created_at TEXT NOT NULL, consumed_at TEXT
+);
+
+-- Stage 10: transactional outbox for the async /events flow and other LLM
+-- side effects.  The intent row is written in the same transaction as the
+-- idempotency-key claim; a single in-process worker consumes tasks with the
+-- same lease semantics as dependency_tasks.
+CREATE TABLE IF NOT EXISTS outbox_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_type TEXT NOT NULL CHECK(task_type IN ('process_event','extract_facts','ddi_live_fallback')),
+    payload_json TEXT NOT NULL,
+    dedup_key TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL CHECK(status IN ('open','running','done','failed','cancelled')),
+    attempts INTEGER NOT NULL DEFAULT 0,
+    lease_token TEXT, lease_expires_at TEXT,
+    result_json TEXT, error TEXT,
+    -- Reliability P0: classified retries.  next_attempt_at gates reclaiming
+    -- (backoff + jitter); heartbeat_at/lease_expires_at are renewed while a
+    -- live worker holds the task; last_error_class feeds the retry decision;
+    -- max_attempts counts the first try; deadline_at bounds total task time.
+    next_attempt_at TEXT, heartbeat_at TEXT, last_error_class TEXT,
+    max_attempts INTEGER NOT NULL DEFAULT 3, deadline_at TEXT,
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox_tasks(status, id);
 """
 
 
@@ -425,6 +604,32 @@ def _ensure_p2_schema(connection: sqlite3.Connection) -> bool:
         connection.execute("ALTER TABLE dependency_tasks ADD COLUMN lease_expires_at TEXT")
         altered = True
     connection.executescript(P2_TABLES)
+    return altered
+
+
+def _ensure_r0_schema(connection: sqlite3.Connection) -> bool:
+    """Reliability P0 migration.  Additive only: existing rows keep their
+    identity; new columns are nullable so no historical data is rewritten."""
+    altered = False
+
+    def _add_column(table: str, column: str, decl: str) -> None:
+        nonlocal altered
+        columns = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
+        if column not in columns:
+            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+            altered = True
+
+    _add_column("idempotency_keys", "event_id", "TEXT")
+    _add_column("idempotency_keys", "run_id", "TEXT")
+    _add_column("outbox_tasks", "next_attempt_at", "TEXT")
+    _add_column("outbox_tasks", "heartbeat_at", "TEXT")
+    _add_column("outbox_tasks", "last_error_class", "TEXT")
+    _add_column("outbox_tasks", "deadline_at", "TEXT")
+    # max_attempts has a NOT NULL default; SQLite allows ADD COLUMN with a
+    # non-NULL default (existing rows read back the default).
+    _add_column("outbox_tasks", "max_attempts", "INTEGER NOT NULL DEFAULT 3")
+    # operation_receipts lives in the main SCHEMA (IF NOT EXISTS), so legacy
+    # databases pick it up on the next open without a separate script here.
     return altered
 
 
@@ -718,6 +923,7 @@ class MemoryStore:
         migrated = _ensure_p0_columns(self.connection)
         migrated = _ensure_p1_schema(self.connection) or migrated
         migrated = _ensure_p2_schema(self.connection) or migrated
+        migrated = _ensure_r0_schema(self.connection) or migrated
         if migrated:
             self.connection.execute(
                 "INSERT OR REPLACE INTO schema_meta(key,value) VALUES('schema_version',?)",
@@ -1605,6 +1811,12 @@ class MemoryStore:
                     seen_semantic.add(key)
                     write = self._write_semantic_fact_tx(fact, source=source)
                     result.semantic.append(write["item"])
+                    result.semantic_outcomes.append({
+                        "ref": write["item"].get("ref"),
+                        "namespace": fact.namespace,
+                        "key": fact.key,
+                        "outcome": write["outcome"],
+                    })
                     if write["conflict"]:
                         result.conflicts.append(write["conflict"])
                     # A4 report ledger: this event reported that (key, value).
@@ -2258,6 +2470,754 @@ class MemoryStore:
 
     def stale_conclusions(self) -> list[dict[str, Any]]:
         return self.current_conclusions(status="stale")
+
+    # ---- Stage 8: persistent turn traces -------------------------------
+
+    def record_turn_trace(self, session_id: str, turn_id: str, cycle: int | None,
+                          phase: str, payload: Any) -> None:
+        """Persist one trace entry (plan/act/observe/reflect/respond/...)."""
+        with self._lock, self.connection:
+            self.connection.execute(
+                "INSERT INTO turn_traces(session_id,turn_id,cycle,phase,payload_json,created_at) "
+                "VALUES(?,?,?,?,?,?)",
+                (session_id, turn_id, cycle, phase, _json(payload), utc_now()),
+            )
+
+    def traces_for_turn(self, session_id: str, turn_id: str) -> list[dict[str, Any]]:
+        """All persisted trace entries for one turn, oldest first."""
+        out = []
+        for row in self.connection.execute(
+            "SELECT * FROM turn_traces WHERE session_id=? AND turn_id=? ORDER BY id",
+            (session_id, turn_id),
+        ):
+            item = dict(row)
+            item["payload"] = _from_json(item.pop("payload_json"))
+            out.append(item)
+        return out
+
+    # ---- Stage 10: request-level idempotency + transactional outbox -----
+
+    def accept_api_event(self, *, idempotency_key: str, request_hash: str,
+                         task_payload: dict[str, Any],
+                         event_id: str | None = None,
+                         run_id: str | None = None) -> dict[str, Any]:
+        """Atomically claim the request-level idempotency key and enqueue the
+        ``process_event`` outbox task.
+
+        Both writes share one transaction, so a crash can never leave a
+        claimed key without a task to fulfil it.  ``event_id``/``run_id`` are
+        the server-generated business identities (Reliability P0): the task's
+        ``turn_id`` is the ``run_id`` — never a truncation of the key, so two
+        legal keys sharing a long prefix can no longer collide.  Returns one
+        of: ``new`` | ``replay_committed`` | ``replay_in_flight`` |
+        ``retry_failed`` | ``conflict`` (same key, different payload).
+        """
+        now = utc_now()
+        with self._lock, self.connection:
+            existing = self.connection.execute(
+                "SELECT * FROM idempotency_keys WHERE key=?", (idempotency_key,)
+            ).fetchone()
+            if existing is not None:
+                row = dict(existing)
+                if row["request_hash"] != request_hash:
+                    return {"state": "conflict", "row": row}
+                state = {"committed": "replay_committed", "in_flight": "replay_in_flight",
+                         "failed": "retry_failed"}[row["status"]]
+                return {"state": state, "row": row}
+            self.connection.execute(
+                "INSERT INTO idempotency_keys(key,request_hash,status,created_at,updated_at,event_id,run_id) "
+                "VALUES(?,?, 'in_flight', ?, ?, ?, ?)",
+                (idempotency_key, request_hash, now, now, event_id, run_id))
+            self.connection.execute(
+                """INSERT OR IGNORE INTO outbox_tasks(task_type,payload_json,dedup_key,status,attempts,deadline_at,created_at,updated_at)
+                   VALUES('process_event', ?, ?, 'open', 0, ?, ?, ?)""",
+                (_json(task_payload), f"api-event:{idempotency_key}",
+                 (_as_utc(None) + timedelta(seconds=OUTBOX_TASK_DEADLINE_SECONDS)).isoformat(timespec="seconds"),
+                 now, now))
+            task_row = self.connection.execute(
+                "SELECT * FROM outbox_tasks WHERE dedup_key=?", (f"api-event:{idempotency_key}",)
+            ).fetchone()
+            self._audit("api_event_accepted", "interaction", None,
+                        {"idempotency_key": idempotency_key, "event_id": event_id,
+                         "run_id": run_id}, "api")
+            return {"state": "new", "task": dict(task_row) if task_row is not None else None}
+
+    def complete_idempotency_key(self, key: str, *, response: Any,
+                                 status_code: int, failed: bool = False) -> None:
+        with self._lock, self.connection:
+            self.connection.execute(
+                "UPDATE idempotency_keys SET status=?, response_json=?, status_code=?, updated_at=? WHERE key=?",
+                ("failed" if failed else "committed",
+                 _json(response) if response is not None else None,
+                 status_code, utc_now(), key))
+
+    def idempotency_key(self, key: str) -> dict[str, Any] | None:
+        row = self.connection.execute(
+            "SELECT * FROM idempotency_keys WHERE key=?", (key,)).fetchone()
+        if row is None:
+            return None
+        item = dict(row)
+        item["response"] = _from_json(item.pop("response_json"))
+        return item
+
+    def enqueue_outbox_task(self, task_type: str, payload: dict[str, Any], *,
+                            dedup_key: str) -> dict[str, Any]:
+        """Enqueue an outbox task for a non-event side effect (idempotent by
+        ``dedup_key``); the async event flow uses ``accept_api_event`` instead."""
+        now = utc_now()
+        with self._lock, self.connection:
+            self.connection.execute(
+                """INSERT OR IGNORE INTO outbox_tasks(task_type,payload_json,dedup_key,status,attempts,created_at,updated_at)
+                   VALUES(?,?,?,'open',0,?,?)""",
+                (task_type, _json(payload), dedup_key, now, now))
+            return self.outbox_task_for(dedup_key) or {}
+
+    def claim_outbox_task(self, *, lease_ttl_seconds: int = 300) -> dict[str, Any] | None:
+        """Claim the oldest claimable open outbox task with an expiring lease.
+
+        Claimable = ``next_attempt_at`` due (classified backoff, P0) and the
+        task deadline not passed.  A task whose deadline has expired is marked
+        permanently failed instead of being handed out again.
+        """
+        now = utc_now()
+        now_dt = _as_utc(None)
+        lease_expires = (now_dt + timedelta(seconds=max(1, lease_ttl_seconds))).isoformat(timespec="seconds")
+        with self._lock, self.connection:
+            self._recover_expired_outbox_tx()
+            for row in self.connection.execute(
+                "SELECT * FROM outbox_tasks WHERE status='open' ORDER BY id"
+            ).fetchall():
+                if row["next_attempt_at"] is not None and row["next_attempt_at"] > now:
+                    continue
+                if row["deadline_at"] is not None and row["deadline_at"] <= now:
+                    self.connection.execute(
+                        "UPDATE outbox_tasks SET status='failed', last_error_class='deadline_exceeded', "
+                        "error=COALESCE(error,''), error='deadline exceeded before execution', "
+                        "lease_token=NULL, lease_expires_at=NULL, updated_at=? WHERE id=?",
+                        (now, row["id"]))
+                    self._audit("outbox_deadline_exceeded", "outbox_task", row["id"],
+                                {"attempts": row["attempts"]}, "outbox_worker")
+                    continue
+                token = uuid.uuid4().hex
+                cursor = self.connection.execute(
+                    "UPDATE outbox_tasks SET status='running', lease_token=?, lease_expires_at=?, "
+                    "heartbeat_at=?, attempts=attempts+1, updated_at=? WHERE id=? AND status='open'",
+                    (token, lease_expires, now, now, row["id"]))
+                if cursor.rowcount != 1:
+                    continue
+                updated = dict(self.connection.execute(
+                    "SELECT * FROM outbox_tasks WHERE id=?", (row["id"],)).fetchone())
+                updated["payload"] = _from_json(updated.pop("payload_json"))
+                updated["result"] = _from_json(updated.pop("result_json"))
+                return updated
+            return None
+
+    def _recover_expired_outbox_tx(self) -> int:
+        now = utc_now()
+        expired = self.connection.execute(
+            "SELECT id, attempts, max_attempts FROM outbox_tasks "
+            "WHERE status='running' AND lease_expires_at IS NOT NULL AND lease_expires_at<?",
+            (now,),
+        ).fetchall()
+        for row in expired:
+            attempts = int(row["attempts"] or 0)
+            max_attempts = int(row["max_attempts"] or 3)
+            status = "failed" if attempts >= max_attempts else "open"
+            self.connection.execute(
+                "UPDATE outbox_tasks SET status=?, lease_token=NULL, lease_expires_at=NULL, updated_at=? WHERE id=?",
+                (status, now, row["id"]))
+            self._audit("outbox_lease_expired", "outbox_task", row["id"],
+                        {"attempts": attempts, "new_status": status}, "outbox_worker")
+        return len(expired)
+
+    def heartbeat_outbox_task(self, task_id: int, *, lease_token: str,
+                              lease_ttl_seconds: int = 300) -> bool:
+        """Renew a held lease.  Returns False when the caller no longer owns
+        the task (expired and re-issued) — the caller must stop working."""
+        now = utc_now()
+        lease_expires = (_as_utc(None) + timedelta(seconds=max(1, lease_ttl_seconds))).isoformat(timespec="seconds")
+        with self._lock, self.connection:
+            cursor = self.connection.execute(
+                "UPDATE outbox_tasks SET lease_expires_at=?, heartbeat_at=?, updated_at=? "
+                "WHERE id=? AND status='running' AND lease_token=? AND lease_expires_at > ?",
+                (lease_expires, now, now, task_id, lease_token, now))
+            return cursor.rowcount == 1
+
+    def complete_outbox_task(self, task_id: int, *, lease_token: str,
+                             result: Any = None) -> None:
+        """Mark a task done — lease-fenced (Reliability P0).
+
+        Raises LeaseRejected when the caller no longer owns the task: an
+        expired worker's late completion must never overwrite the new owner.
+        """
+        with self._lock, self.connection:
+            cursor = self.connection.execute(
+                "UPDATE outbox_tasks SET status='done', result_json=?, lease_token=NULL, "
+                "lease_expires_at=NULL, updated_at=? "
+                "WHERE id=? AND status='running' AND lease_token=? AND lease_expires_at > ?",
+                (_json(result) if result is not None else None, utc_now(), task_id,
+                 lease_token, utc_now()))
+            if cursor.rowcount != 1:
+                raise LeaseRejected(f"task {task_id} is not owned by this lease token")
+
+    def fail_outbox_task(self, task_id: int, *, lease_token: str, error: str,
+                         error_class: str = "retryable") -> str:
+        """Record a classified failure — lease-fenced (Reliability P0).
+
+        ``error_class``: retryable → re-open with ``next_attempt_at`` backoff
+        (+jitter); permanent/safety/effect_unknown → straight to the failure
+        queue (explicit re-open via the retry operation only).  Returns the
+        new status.  Raises LeaseRejected for a stale worker, like complete.
+        """
+        now_dt = _as_utc(None)
+        now = now_dt.isoformat(timespec="seconds")
+        with self._lock, self.connection:
+            row = self.connection.execute(
+                "SELECT attempts, max_attempts FROM outbox_tasks WHERE id=? AND status='running' "
+                "AND lease_token=? AND lease_expires_at > ?",
+                (task_id, lease_token, now)).fetchone()
+            if row is None:
+                raise LeaseRejected(f"task {task_id} is not owned by this lease token")
+            attempts = int(row["attempts"] or 0)
+            max_attempts = int(row["max_attempts"] or 3)
+            if error_class == "retryable" and attempts < max_attempts:
+                backoff = min(
+                    OUTBOX_BACKOFF_CAP_SECONDS,
+                    OUTBOX_BACKOFF_BASE_SECONDS * (2 ** max(0, attempts - 1)),
+                )
+                jitter = random.uniform(0, backoff * 0.2)
+                next_attempt = (now_dt + timedelta(seconds=backoff + jitter)).isoformat(timespec="seconds")
+                self.connection.execute(
+                    "UPDATE outbox_tasks SET status='open', error=?, last_error_class=?, "
+                    "next_attempt_at=?, lease_token=NULL, lease_expires_at=NULL, updated_at=? WHERE id=?",
+                    (error[:2000], error_class, next_attempt, now, task_id))
+                return "open"
+            self.connection.execute(
+                "UPDATE outbox_tasks SET status='failed', error=?, last_error_class=?, "
+                "lease_token=NULL, lease_expires_at=NULL, updated_at=? WHERE id=?",
+                (error[:2000], error_class, now, task_id))
+            return "failed"
+
+    def reopen_failed_outbox_task(self, dedup_key: str) -> dict[str, Any] | None:
+        """Explicit recovery operation for a failed task (Reliability P0).
+
+        Keeps the event/operation identity: the same task row is re-opened,
+        attempts reset, and the idempotency key returns to in_flight.  Tasks
+        failed as ``effect_unknown`` are refused — the external effect must be
+        reconciled first, never blindly retried.
+        """
+        now = utc_now()
+        with self._lock, self.connection:
+            row = self.connection.execute(
+                "SELECT * FROM outbox_tasks WHERE dedup_key=?", (dedup_key,)).fetchone()
+            if row is None:
+                return None
+            if row["status"] != "failed":
+                return None
+            if (row["last_error_class"] or "") == "effect_unknown":
+                return None
+            self.connection.execute(
+                "UPDATE outbox_tasks SET status='open', attempts=0, error=NULL, "
+                "last_error_class=NULL, next_attempt_at=NULL, lease_token=NULL, "
+                "lease_expires_at=NULL, updated_at=? WHERE id=?",
+                (now, row["id"]))
+            payload = _from_json(row["payload_json"]) or {}
+            key = payload.get("idempotency_key")
+            if key:
+                self.connection.execute(
+                    "UPDATE idempotency_keys SET status='in_flight', updated_at=? WHERE key=?",
+                    (now, key))
+            self._audit("outbox_task_reopened", "outbox_task", row["id"],
+                        {"dedup_key": dedup_key}, "ops")
+            return self.outbox_task_for(dedup_key)
+
+    def publish_event_result(self, task_id: int, *, lease_token: str,
+                             idempotency_key: str | None = None,
+                             event_key: str | None = None,
+                             result: Any = None) -> None:
+        """Publish a finished event turn in ONE transaction (Reliability P0).
+
+        Task completion, the request-level key state and the stored response
+        commit together, closing the window where the task was done but the
+        key still looked in_flight (or vice versa).  Raises LeaseRejected for
+        a stale worker.
+        """
+        with self._lock, self.connection:
+            now = utc_now()
+            cursor = self.connection.execute(
+                "UPDATE outbox_tasks SET status='done', result_json=?, lease_token=NULL, "
+                "lease_expires_at=NULL, updated_at=? "
+                "WHERE id=? AND status='running' AND lease_token=? AND lease_expires_at > ?",
+                (_json(result) if result is not None else None, now, task_id,
+                 lease_token, now))
+            if cursor.rowcount != 1:
+                raise LeaseRejected(f"task {task_id} is not owned by this lease token")
+            if idempotency_key:
+                body = {"event_key": event_key, "status": "committed", "response": result}
+                self.connection.execute(
+                    "UPDATE idempotency_keys SET status='committed', response_json=?, "
+                    "status_code=200, updated_at=? WHERE key=?",
+                    (_json(body), now, idempotency_key))
+            self._audit("event_result_published", "outbox_task", task_id,
+                        {"idempotency_key": idempotency_key}, "outbox_worker")
+
+    def outbox_task_for(self, dedup_key: str) -> dict[str, Any] | None:
+        row = self.connection.execute(
+            "SELECT * FROM outbox_tasks WHERE dedup_key=?", (dedup_key,)).fetchone()
+        if row is None:
+            return None
+        item = dict(row)
+        item["payload"] = _from_json(item.pop("payload_json"))
+        item["result"] = _from_json(item.pop("result_json"))
+        return item
+
+    # ---- Reliability P0: operation receipts -----------------------------
+    def operation_receipt(self, scope_id: str, operation_id: str) -> dict[str, Any] | None:
+        row = self.connection.execute(
+            "SELECT * FROM operation_receipts WHERE scope_id=? AND operation_id=?",
+            (scope_id, operation_id)).fetchone()
+        if row is None:
+            return None
+        item = dict(row)
+        item["result"] = _from_json(item.pop("result_json"))
+        return item
+
+    def execute_with_receipt(
+        self,
+        *,
+        operation_id: str,
+        operation_type: str,
+        input_hash: str,
+        executor: Callable[[], Any],
+        scope_id: str = "local-demo",
+        event_id: str | None = None,
+        run_id: str | None = None,
+        target_ref: str | None = None,
+    ) -> tuple[Any, bool]:
+        """Run one logical domain operation under a durable receipt.
+
+        A receipt hit with the same input returns the stored result without
+        re-executing (replayed=True); the same id with a different input_hash
+        raises OperationConflict instead of silently creating a second fact.
+
+        Honest boundary: the executor's writes commit in their own
+        transactions, so a crash between the domain commit and the receipt
+        insert leaves a replay that re-enters the executor.  Call sites must
+        wrap writes that are themselves domain-deduped (consolidation by
+        event_key, identical medication adds) — the receipt then converges on
+        the replayed pass.  For all-or-nothing batches use a dedicated _tx
+        method (see ``record_warnings_batch``).
+        """
+        with self._lock:
+            existing = self.operation_receipt(scope_id, operation_id)
+            if existing is not None:
+                if existing["input_hash"] != input_hash:
+                    raise OperationConflict(
+                        f"operation '{operation_id}' was already executed with different input")
+                if existing["status"] == "succeeded":
+                    return existing["result"], True
+            result = executor()
+            now = utc_now()
+            with self.connection:
+                self.connection.execute(
+                    """INSERT OR REPLACE INTO operation_receipts
+                       (scope_id,operation_id,event_id,run_id,operation_type,target_ref,
+                        input_hash,status,result_json,created_at,updated_at)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+                    (scope_id, operation_id, event_id, run_id, operation_type,
+                     target_ref, input_hash, "succeeded", _json(result), now, now))
+            self._audit("operation_receipt", "operation_receipt", None,
+                        {"operation_id": operation_id, "operation_type": operation_type,
+                         "replayed": False}, "agent")
+            return result, False
+
+    def record_warnings_batch(
+        self,
+        *,
+        session_id: str,
+        turn_id: str,
+        source: str,
+        items: Sequence[dict[str, Any]],
+        context_refs: Sequence[str],
+        operation_id: str,
+        input_hash: str,
+        event_id: str | None = None,
+        run_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Record DDI warning episodes + conclusions atomically under a receipt.
+
+        One transaction covers the receipt check, every episode/conclusion
+        write and the receipt insert, so a crash can never leave half a batch
+        to be replayed into duplicates.  ``items`` carry the already-derived
+        warning dict, salience, text and source_refs (agent-side policy).
+        """
+        if not operation_id:
+            raise ValueError("record_warnings_batch requires an operation id")
+        with self._lock, self.connection:
+            existing = self.connection.execute(
+                "SELECT * FROM operation_receipts WHERE scope_id='local-demo' AND operation_id=?",
+                (operation_id,)).fetchone()
+            if existing is not None:
+                if existing["input_hash"] != input_hash:
+                    raise OperationConflict(
+                        f"operation '{operation_id}' was already executed with different input")
+                if existing["status"] == "succeeded":
+                    stored = _from_json(existing["result_json"])
+                    stored["replayed"] = True
+                    return stored
+            now = utc_now()
+            recorded: list[dict[str, Any]] = []
+            for item in items:
+                warning = item["warning"]
+                source_refs = item["source_refs"]
+                episode = self._record_event_tx(
+                    EpisodicFact(
+                        event_type="warning",
+                        subject_key="|".join(sorted((warning.get("drug_a", "?"), warning.get("drug_b", "?")))),
+                        payload={"warning": warning, "source_refs": source_refs,
+                                 "context_refs": list(context_refs)},
+                        occurred_at=item.get("occurred_at"),
+                        salience=float(item["salience"]),
+                        severity=warning.get("severity"),
+                        source_uri=source_refs[0].get("uri") if source_refs else None,
+                    ),
+                    session_id=session_id, turn_id=turn_id, source=source,
+                )
+                warning_refs = list(dict.fromkeys([*context_refs, episode["ref"]]))
+                conclusion = self._record_conclusion_tx(
+                    session_id=session_id, turn_id=turn_id, kind="warning",
+                    text=item["text"], memory_refs=warning_refs, source_refs=source_refs,
+                )
+                enriched = dict(warning)
+                enriched["citations"] = source_refs
+                enriched["audit_trail"] = {
+                    "warning_memory": episode["ref"],
+                    "conclusion": conclusion["ref"],
+                    "memory_refs": warning_refs,
+                    "source_refs": source_refs,
+                }
+                recorded.append(enriched)
+            result = {
+                "recorded_warnings": recorded,
+                "memory_refs": [ref for warning in recorded
+                                for ref in warning["audit_trail"]["memory_refs"]],
+                "replayed": False,
+            }
+            self.connection.execute(
+                """INSERT INTO operation_receipts
+                   (scope_id,operation_id,event_id,run_id,operation_type,target_ref,
+                    input_hash,status,result_json,created_at,updated_at)
+                   VALUES('local-demo',?,?,?,?,?,?,'succeeded',?,?,?)""",
+                (operation_id, event_id, run_id, "record_warnings", None,
+                 input_hash, _json(result), now, now))
+            self._audit("operation_receipt", "operation_receipt", None,
+                        {"operation_id": operation_id, "operation_type": "record_warnings",
+                         "warnings": len(recorded)}, source)
+            return result
+
+    # ---- Reliability P1: workflow run lifecycle --------------------------
+
+    def workflow_run_start(
+        self,
+        *,
+        run_id: str,
+        event_id: str | None = None,
+        idempotency_key: str | None = None,
+        thread_id: str | None = None,
+        graph_version: str,
+        state_schema_version: str | None = None,
+        model_id: str | None = None,
+        budget: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create (or idempotently return) the run row.  The runner version is
+        snapshotted once: an in-flight run is never silently re-routed."""
+        now = utc_now()
+        with self._lock, self.connection:
+            existing = self.connection.execute(
+                "SELECT * FROM workflow_runs WHERE run_id=?", (run_id,)).fetchone()
+            if existing is not None:
+                item = dict(existing)
+                item["budget"] = _from_json(item.pop("budget_json"))
+                item["result"] = _from_json(item.pop("result_json"))
+                return item
+            self.connection.execute(
+                """INSERT INTO workflow_runs(run_id,event_id,idempotency_key,thread_id,graph_version,
+                                            state_schema_version,model_id,status,budget_json,created_at,updated_at)
+                   VALUES(?,?,?,?,?,?,?,'running',?,?,?)""",
+                (run_id, event_id, idempotency_key, thread_id or run_id, graph_version,
+                 state_schema_version, model_id, _json(budget) if budget else None, now, now))
+            self._audit("workflow_run_started", "workflow_run", None,
+                        {"run_id": run_id, "graph_version": graph_version}, "runner")
+            item = self.connection.execute(
+                "SELECT * FROM workflow_runs WHERE run_id=?", (run_id,)).fetchone()
+            out = dict(item)
+            out["budget"] = _from_json(out.pop("budget_json"))
+            out["result"] = _from_json(out.pop("result_json"))
+            return out
+
+    def workflow_run_get(self, run_id: str) -> dict[str, Any] | None:
+        row = self.connection.execute(
+            "SELECT * FROM workflow_runs WHERE run_id=?", (run_id,)).fetchone()
+        if row is None:
+            return None
+        item = dict(row)
+        item["budget"] = _from_json(item.pop("budget_json"))
+        item["result"] = _from_json(item.pop("result_json"))
+        return item
+
+    def workflow_run_update(self, run_id: str, *, status: str | None = None,
+                            budget: dict[str, Any] | None = None,
+                            result: Any = None, error: str | None = None) -> None:
+        """Update the run row.  ``budget`` is MERGED into the stored budget so
+        accumulated active-time/token consumption survives restarts (the
+        budget must never reset because a process restarted)."""
+        with self._lock, self.connection:
+            row = self.connection.execute(
+                "SELECT budget_json FROM workflow_runs WHERE run_id=?", (run_id,)).fetchone()
+            if row is None:
+                return
+            merged = _from_json(row["budget_json"]) or {}
+            if budget:
+                merged.update(budget)
+            fields: list[str] = ["budget_json=?", "updated_at=?"]
+            values: list[Any] = [_json(merged), utc_now()]
+            if status is not None:
+                fields.append("status=?")
+                values.append(status)
+            if result is not None:
+                fields.append("result_json=?")
+                values.append(_json(result))
+            if error is not None:
+                fields.append("error=?")
+                values.append(error[:2000])
+            values.append(run_id)
+            self.connection.execute(
+                f"UPDATE workflow_runs SET {', '.join(fields)} WHERE run_id=?", values)
+
+    # ---- Reliability P2: human review closed loop ------------------------
+
+    def open_review_case(
+        self,
+        *,
+        logic_key: str,
+        event_id: str | None = None,
+        run_id: str | None = None,
+        thread_id: str | None = None,
+        reason_codes: Sequence[str],
+        summary: dict[str, Any],
+        due_at: str | None = None,
+        round_number: int = 1,
+        priority: str = "normal",
+    ) -> dict[str, Any]:
+        """Idempotent case creation (transaction ③a).  A replay or crash
+        rebuild hits the unique ``logic_key`` and returns the existing case —
+        a second ticket is never created for the same trigger."""
+        now = utc_now()
+        with self._lock, self.connection:
+            existing = self.connection.execute(
+                "SELECT * FROM review_cases WHERE logic_key=?", (logic_key,)).fetchone()
+            if existing is not None:
+                return self._review_case_row(existing)
+            cursor = self.connection.execute(
+                """INSERT INTO review_cases(scope_id,logic_key,event_id,run_id,thread_id,reason_codes,
+                                            status,priority,summary_json,fact_medication_set_hash,
+                                            fact_scope_revision,due_at,round,created_at,updated_at)
+                   VALUES('local-demo',?,?,?,?,?, 'open', ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (logic_key, event_id, run_id, thread_id or run_id, _json(list(reason_codes)),
+                 priority, _json(summary), self._medication_set_hash_tx(),
+                 self.scope_revision("medications") + self.scope_revision("semantic"),
+                 due_at, round_number, now, now))
+            case_id = cursor.lastrowid
+            self._audit("review_case_opened", "review_case", case_id,
+                        {"logic_key": logic_key, "reason_codes": list(reason_codes),
+                         "round": round_number}, "runner")
+            row = self.connection.execute(
+                "SELECT * FROM review_cases WHERE id=?", (case_id,)).fetchone()
+            return self._review_case_row(row)
+
+    @staticmethod
+    def _review_case_row(row: sqlite3.Row) -> dict[str, Any]:
+        item = dict(row)
+        item["reason_codes"] = _from_json(item.pop("reason_codes"), [])
+        item["summary"] = _from_json(item.pop("summary_json"), {})
+        return item
+
+    def review_case(self, case_id: int) -> dict[str, Any] | None:
+        row = self.connection.execute(
+            "SELECT * FROM review_cases WHERE id=?", (case_id,)).fetchone()
+        return self._review_case_row(row) if row is not None else None
+
+    def review_case_by_logic_key(self, logic_key: str) -> dict[str, Any] | None:
+        row = self.connection.execute(
+            "SELECT * FROM review_cases WHERE logic_key=?", (logic_key,)).fetchone()
+        return self._review_case_row(row) if row is not None else None
+
+    def review_cases(self, *, statuses: Sequence[str] | None = None,
+                     limit: int = 100) -> list[dict[str, Any]]:
+        query = "SELECT * FROM review_cases"
+        params: list[Any] = []
+        if statuses:
+            query += " WHERE status IN (%s)" % ",".join("?" * len(statuses))
+            params.extend(statuses)
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(max(1, min(limit, 500)))
+        return [self._review_case_row(row) for row in self.connection.execute(query, params)]
+
+    def claim_review_case(self, case_id: int, *, expected_revision: int,
+                          assignee: str) -> dict[str, Any]:
+        """CAS claim (open → assigned).  Re-claim by the same assignee is
+        idempotent; a different reviewer on a claimed case is a conflict."""
+        now = utc_now()
+        with self._lock, self.connection:
+            row = self.connection.execute(
+                "SELECT * FROM review_cases WHERE id=?", (case_id,)).fetchone()
+            if row is None:
+                raise MemoryPolicyError(f"review case {case_id} does not exist")
+            case = self._review_case_row(row)
+            if case["status"] == "assigned" and case["assignee"] == assignee:
+                return case
+            cursor = self.connection.execute(
+                "UPDATE review_cases SET status='assigned', assignee=?, revision=revision+1, updated_at=? "
+                "WHERE id=? AND revision=? AND status='open'",
+                (assignee, now, case_id, expected_revision))
+            if cursor.rowcount != 1:
+                raise MemoryPolicyError(
+                    f"review case {case_id} claim conflict: revision moved or status is "
+                    f"'{case['status']}' (expected revision {expected_revision})")
+            self._audit("review_case_claimed", "review_case", case_id,
+                        {"assignee": assignee, "revision": expected_revision + 1}, assignee)
+            return self.review_case(case_id)
+
+    def record_review_decision(
+        self,
+        *,
+        case_id: int,
+        expected_revision: int,
+        action: str,
+        payload: dict[str, Any] | None = None,
+        idempotency_key: str,
+        actor_id: str,
+    ) -> dict[str, Any]:
+        """Transaction ③: decision + resume task commit together.  Idempotent
+        by ``idempotency_key`` (double submit / repeat callbacks act once);
+        CAS via ``expected_revision``; the run-side node re-validates."""
+        allowed = {"request_more_info", "confirm_reported_fact", "resolve_conflict",
+                   "reject_candidate", "close_with_safe_guidance"}
+        if action not in allowed:
+            raise MemoryPolicyError(f"unsupported review action: {action}")
+        now = utc_now()
+        with self._lock, self.connection:
+            existing = self.connection.execute(
+                "SELECT * FROM review_decisions WHERE idempotency_key=?",
+                (idempotency_key,)).fetchone()
+            if existing is not None:
+                item = dict(existing)
+                item["payload"] = _from_json(item.pop("payload_json"))
+                item["replayed"] = True
+                return item
+            row = self.connection.execute(
+                "SELECT status, revision, assignee FROM review_cases WHERE id=?",
+                (case_id,)).fetchone()
+            if row is None:
+                raise MemoryPolicyError(f"review case {case_id} does not exist")
+            if row["status"] not in {"assigned", "in_review"}:
+                raise MemoryPolicyError(
+                    f"review case {case_id} is '{row['status']}'; only assigned/in_review "
+                    "cases accept decisions")
+            if int(row["revision"]) != int(expected_revision):
+                raise MemoryPolicyError(
+                    f"review case {case_id} revision conflict: expected {expected_revision}, "
+                    f"current {row['revision']}")
+            decision_id = uuid.uuid4().hex
+            cursor = self.connection.execute(
+                """INSERT INTO review_decisions(decision_id,case_id,case_revision,action,payload_json,
+                                                idempotency_key,actor_id,outcome,created_at)
+                   VALUES(?,?,?,?,?,?,?,'recorded',?)""",
+                (decision_id, case_id, expected_revision, action, _json(payload or {}),
+                 idempotency_key, actor_id, now))
+            self.connection.execute(
+                "UPDATE review_cases SET status='in_review', revision=revision+1, updated_at=? WHERE id=?",
+                (now, case_id))
+            self.connection.execute(
+                """INSERT INTO resume_tasks(operation_id,run_id,case_id,decision_id,status,created_at)
+                   SELECT 'resume:'||?, run_id, ?, ?, 'pending', ? FROM review_cases WHERE id=?""",
+                (decision_id, case_id, decision_id, now, case_id))
+            self._audit("review_decision_recorded", "review_case", case_id,
+                        {"action": action, "actor_id": actor_id,
+                         "decision_id": decision_id}, actor_id)
+            item = dict(self.connection.execute(
+                "SELECT * FROM review_decisions WHERE id=?",
+                (cursor.lastrowid,)).fetchone())
+            item["payload"] = _from_json(item.pop("payload_json"))
+            item["replayed"] = False
+            return item
+
+    def review_decisions_for(self, case_id: int) -> list[dict[str, Any]]:
+        out = []
+        for row in self.connection.execute(
+            "SELECT * FROM review_decisions WHERE case_id=? ORDER BY id", (case_id,)
+        ):
+            item = dict(row)
+            item["payload"] = _from_json(item.pop("payload_json"))
+            out.append(item)
+        return out
+
+    def review_decision(self, decision_id: str) -> dict[str, Any] | None:
+        row = self.connection.execute(
+            "SELECT * FROM review_decisions WHERE decision_id=?", (decision_id,)).fetchone()
+        if row is None:
+            return None
+        item = dict(row)
+        item["payload"] = _from_json(item.pop("payload_json"))
+        return item
+
+    def pending_resume_tasks(self, *, limit: int = 10) -> list[dict[str, Any]]:
+        return [dict(row) for row in self.connection.execute(
+            "SELECT * FROM resume_tasks WHERE status='pending' ORDER BY id LIMIT ?",
+            (max(1, min(limit, 50)),))]
+
+    def consume_resume_task(self, task_id: int, *, operation_id: str) -> bool:
+        """CAS consume: exactly one worker applies a given decision."""
+        with self._lock, self.connection:
+            cursor = self.connection.execute(
+                "UPDATE resume_tasks SET status='consumed', consumed_at=? "
+                "WHERE id=? AND operation_id=? AND status='pending'",
+                (utc_now(), task_id, operation_id))
+            return cursor.rowcount == 1
+
+    def set_review_decision_outcome(self, decision_id: str, *, outcome: str) -> None:
+        with self._lock, self.connection:
+            self.connection.execute(
+                "UPDATE review_decisions SET outcome=? WHERE decision_id=?",
+                (outcome, decision_id))
+
+    def close_review_case(self, case_id: int, *, status: str, reason: str,
+                          actor: str) -> dict[str, Any]:
+        """Terminal case transition (resolved / cancelled / waiting_user)."""
+        if status not in {"resolved", "cancelled", "waiting_user"}:
+            raise MemoryPolicyError(f"unsupported terminal review status: {status}")
+        now = utc_now()
+        with self._lock, self.connection:
+            self.connection.execute(
+                "UPDATE review_cases SET status=?, resolved_at=COALESCE(? , resolved_at), updated_at=? WHERE id=?",
+                (status, now if status == "resolved" else None, now, case_id))
+            self._audit(f"review_case_{status}", "review_case", case_id,
+                        {"reason": reason}, actor)
+            return self.review_case(case_id)
+
+    def mark_overdue_review_cases(self) -> int:
+        """Sweep past-due non-terminal cases to ``overdue``.  Overdue is an
+        operational state only — timeout NEVER auto-approves."""
+        now = utc_now()
+        with self._lock, self.connection:
+            cursor = self.connection.execute(
+                "UPDATE review_cases SET status='overdue', updated_at=? "
+                "WHERE status IN ('open','assigned','in_review') AND due_at IS NOT NULL AND due_at < ?",
+                (now, now))
+            if cursor.rowcount:
+                self._audit("review_cases_overdue", "review_case", None,
+                            {"count": cursor.rowcount}, "review_sla")
+            return cursor.rowcount
 
     def recover_expired_rechecks(self) -> int:
         """Reset recheck tasks whose lease expired (crashed-worker recovery).

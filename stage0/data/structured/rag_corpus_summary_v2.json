@@ -1,0 +1,25 @@
+{
+  "source": "data\\raw\\mnbvc_medical_output.jsonl.gz",
+  "output": "data\\rag_corpus_v2.jsonl",
+  "selection_version": "stage1-rag-v2",
+  "selection_method": "complete three-key-section labels; chronic-name priority then SHA-256-ordered diverse sample",
+  "requested_labels": 1200,
+  "selected_labels": 1200,
+  "unique_approval_numbers": 1200,
+  "chronic_priority_labels": 500,
+  "diverse_labels": 700,
+  "eligible_unique_complete_labels": 104047,
+  "duplicate_approval_rows_skipped": 6695,
+  "sections_per_label": [
+    "药物相互作用",
+    "禁忌",
+    "注意事项"
+  ],
+  "stage9_addendum": {
+    "change": "CHRONIC_DRUG_TERMS gained 茶碱/氨茶碱/多索茶碱 (theophylline class)",
+    "theophylline_labels_in_v2": 90,
+    "v2_index_chunks": 4051,
+    "v1_index_chunks": 4158,
+    "heldout_recall_delta": "待测 — held-out DDI re-run pending provider/network availability"
+  }
+}

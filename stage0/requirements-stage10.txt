@@ -1,0 +1,5 @@
+# Stage 10 service layer (Python 3.11+). Versions frozen from the working
+# .venv on 2026-09-05; install on top of requirements-stage1.txt.
+fastapi==0.141.1
+uvicorn==0.52.4
+httpx==0.28.1

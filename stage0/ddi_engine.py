@@ -513,7 +513,14 @@ def _load_fallback_cache() -> dict:
 def _get_retriever() -> rag.HybridRetriever:
     global _RETRIEVER
     if _RETRIEVER is None:
-        _RETRIEVER = rag.HybridRetriever(local_files_only=True)
+        # Stage 9 (C1): allow attribution runs to point at an alternate index
+        # (e.g. the theophylline-fixed v2 corpus) without touching the v1
+        # artifacts the recorded baselines were measured against.
+        index_dir = os.getenv("DDI_ENGINE_RAG_INDEX_DIR")
+        if index_dir:
+            _RETRIEVER = rag.HybridRetriever(index_dir=Path(index_dir), local_files_only=True)
+        else:
+            _RETRIEVER = rag.HybridRetriever(local_files_only=True)
     return _RETRIEVER
 
 

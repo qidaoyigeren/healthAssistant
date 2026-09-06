@@ -214,6 +214,11 @@ def s12_out_of_order_stop(store: MemoryStore) -> list[dict[str, Any]]:
                                   source="caregiver", occurred_at="2026-09-01T00:00:00+00:00")
     store.apply_medication_change(action="remove", name="药B", ingredients=[], session_id="s", turn_id="t2",
                                   source="caregiver", occurred_at="2026-09-04T00:00:00+00:00")
+    # Backdate the record time into the hard-coded query window: the scenario
+    # pins known_at to a fixed instant, so a run on/after that calendar day
+    # would otherwise hide the (just-recorded) rows behind the known-at cut.
+    store.connection.execute("UPDATE medications SET created_at=?", ("2026-09-02T00:00:00+00:00",))
+    store.connection.commit()
     state_3rd = store.query_state(valid_at="2026-09-03T00:00:00+00:00", known_at="2026-09-06T00:00:00+00:00")
     state_5th = store.query_state(valid_at="2026-09-05T00:00:00+00:00", known_at="2026-09-06T00:00:00+00:00")
     return [

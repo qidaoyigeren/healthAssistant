@@ -606,11 +606,144 @@ variability at the fallback boundary and single-run divergence counts are explic
 not stable model-quality estimates.
 
 
-## GO / NO-GO
+## 8. Stage 7 — memory deepening: dependency index, selective invalidation, recheck hardening
+
+Implemented 2026-09-05 against the production-upgrade design document; schema
+moves additively from `4-p1` to `4-p2` and the live `memory.db` is migrated on
+next open (verified against a copy: integrity ok, 54 dependency rows backfilled
+from 6 existing conclusions). Full change list, the four design corrections
+found during implementation, and the ablation table are in
+`docs/production-upgrade-2026-09-05/stage7_implementation_report.md`.
+
+### 8.1 Conclusion dependency index and selective invalidation
+
+`conclusion_dependencies` records, per conclusion and inside the same
+transaction: cited `semantic_fact` keys, cited `medication` ingredient keys,
+the `medication_pair` parsed from a warning's own text, and a
+`medication_set` hash for whole-list scan warnings (backfilled rows use a
+NULL hash — always re-verify). Lookups that previously scanned every current
+conclusion and parsed its JSON refs now hit the index; the
+`dependency_index` ablation restores the scan and an equivalence test asserts
+both paths produce identical stale sets.
+
+Selective invalidation keeps the S14 scope semantics for whole-list pair
+warnings (any list change re-verifies them) while patient-condition findings
+(focus drug + cited facts, no set dependency) survive unrelated list changes.
+Measured on scenario S28: over-invalidation 1.0 → 0 with coverage unchanged
+at 1.0; stopping a member still stales both kinds. The
+`selective_invalidation` ablation is load-bearing.
+
+### 8.2 Recheck hardening
+
+Claims write `lease_expires_at`; expired leases are recovered at the next
+`recheck_pending()` (or explicitly), each recovery counts as one attempt, and
+three attempts without completion mark the task failed for manual reopening.
+A batch of stale conclusions pays for one `detect()` run, memoized by the
+current medication-set hash (3 tasks → 1 detection in tests). A task whose
+conclusion already has a recheck successor (crash between commit and task
+flip) is marked done instead of executing twice — at-least-once delivery,
+effectively-once effect. Patient-condition conclusions are rechecked by
+re-running the deterministic label-vs-facts derivation over the current
+snapshot (scenario S27).
+
+### 8.3 As-of reconstruction and the promotion state machine
+
+`query_state(known_at=...)` folds the `conflict_actions` trail so resolve →
+reopen → undo sequences reconstruct exactly (an equivalence test asserts the
+fold at "now" equals the `status='open'` filter); `retrieve_episodic(as_of=...)`
+filters on `recorded_at` as a knowledge cutoff with an independent
+`occurred_before` valid-time parameter. `verification_status` promotions are
+rule-triggered only (two consistent reports from distinct event keys, or a
+caregiver confirmation via `verify_semantic_fact`); open conflicts block and
+audit, replays never count, and a `fact_reports` ledger carries the counts.
+Backups/exports/restores ship as `stage0/backup.py` with checksum sidecars
+and a JSON interchange format.
+
+### 8.4 Result
+
+- `python -m unittest stage0.test_stage3 stage0.test_stage5 stage0.test_stage6
+  stage0.test_memory_p0 stage0.test_memory_p1 stage0.test_memory_p2` — **92/92 OK**.
+- `python -m stage0.eval_memory --ablate` — **28/28 scenarios** (S01–S22 retained
+  unchanged, S23–S28 new); policy / bitemporal / dependency /
+  **selective_invalidation** ablations all load-bearing.
+- Migration smoke test on a copy of the live database: schema 4-p2, integrity
+  ok, deterministic backfill audited.
+
+These are deterministic scenario assertions, not performance measurements;
+`dependency_index` lookup speed is instrumentation deferred to Stage 11.
+
+
+## 9. Stage 8 / 9 / 10 — agent hardening, corpus fix, service layer
+
+Implemented 2026-09-05 in one round per the confirmed one-month cut (user
+decisions the same day: async-first `/events`, reranker download accepted,
+~1-month target). Full change list, deviations and rollback:
+`docs/production-upgrade-2026-09-05/stage8-10_implementation_report.md`.
+
+### 9.1 Stage 8 — budgets, circuit breaker, bounded payloads, veto-only verifier, persistent traces
+
+The agent turn now carries a `TurnBudget` (wall-clock 120s default,
+token-estimate backstop, cycles); the first exhausted budget degrades to a
+deterministic completion whose fixed code-owned notice (“结果可能不完整”) is
+appended **before** the final safety check, so checked text equals delivered
+text. Two consecutive safety rejections trip a breaker that finishes the turn
+on the deterministic planner without further LLM calls (one rejection still
+replans through the LLM, preserving Stage 6 semantics). Planner payloads are
+bounded: the current cycle plus the two before it keep full observations,
+earlier ones keep tool/purpose/ok plus a result digest, RAG chunk text is
+truncated, and `recent_trace` drops its embedded observation copies —
+compression applies only to the serialized view; hydration reads originals
+(tested). Measured on synthetic RAG-sized stacks: 12 observation cycles cost
+77k → 9k payload characters (`docs/production-upgrade-2026-09-05/payload_budget.json`).
+A veto-only `ResponseVerifier` (explicit `--llm-verifier` opt-in) can clear
+semantic rule flags or reject with line-numbered, code-re-verified verbatim
+evidence; hard gates are never adjudicable and any verifier failure falls
+back to the full rule checker. Per-phase traces persist to a `turn_traces`
+table, separate from `audit_log` (process record vs data-mutation record).
+Deviations from the design: the token budget default was recalibrated
+24k → 150k estimated units because the chars/1.5 estimator over-counts
+JSON/catalog overhead (caught by the full regression), and clean rule passes
+do not spend a verifier call.
+
+### 9.2 Stage 9 (C1) — theophylline corpus fix
+
+`CHRONIC_DRUG_TERMS` gained 茶碱/氨茶碱/多索茶碱 (the held-out FN root cause),
+and a v2 corpus was rebuilt under seed `stage1-rag-v2` without touching v1
+artifacts: 1,200 labels (500 priority + 700 hash-diverse, same shape), **90
+theophylline labels** (v1 had only hash-sample coverage), 4,051 chunks.
+`ddi_engine._get_retriever` gained a `DDI_ENGINE_RAG_INDEX_DIR` override for
+attribution runs. The held-out re-run for the recall delta is **pending**
+(live KEGG + provider window); no number is claimed until it runs.
+
+### 9.3 Stage 10 — async-first service layer with two-layer idempotency
+
+`stage0/server.py` (FastAPI) exposes `POST /v1/events` (Idempotency-Key
+header): the request-level key claim and the `process_event` outbox enqueue
+share **one transaction**, then the endpoint returns 202 with a polling URL;
+a single in-process worker (lease semantics shared with dependency_tasks,
+three failed claims → failed) executes agent turns and drains durable
+rechecks. Same key + same payload replays the same acceptance (concurrent
+same-key submissions receive the identical 202); same key + different
+payload → 422; a key whose underlying task failed → 409. The domain-level
+event key derives from the idempotency key, so replays dedup in the
+projection itself. Read endpoints, conflict actions, `/v1/rechecks`,
+`/v1/health`, and a four-category error model (validation/safety/provider/
+internal with trace_id) complete the contract. `stage0/api_client.py` +
+`STAGE0_API_URL` turn the Streamlit UI into a pure API client; the default
+direct offline path is unchanged. Deployment boundary: one writer process
+(`--workers >1` unsupported by design).
+
+Result: `test_stage8_agent` 14/14 and `test_stage10_server` 11/11; combined
+offline suite **117/117**; `eval_memory --ablate` **28/28** with all four
+mechanisms load-bearing.
+
+
 
 - **GO for the detector implementation and regression protection:** Stage 2 architecture, normalization/compound expansion, persisted index, evidence gates, and the six required severe regression cases are implemented. The regression replay passes its engineering checks, but its 1.0000 values are explicitly not generalization evidence.
 - **GO for the Stage 3 single-patient engineering demo:** the three memory layers, consolidation/versioning, salience decay, explicit conflicts, event-driven tool selection, reflection branch, safety enforcement, cross-session persistence, and end-to-end audit trail are implemented and behavior-tested.
 - **GO for controlled Stage 6 engineering evaluation:** the offline default and unchanged final boundary remain; safety rejection replans through the LLM; a fresh live pass of the final revision reached 4/4 outcomes with 0 unsafe actions and 0 unsafe delivered texts, and a zero-call replay of the same outputs accepted 3/4 LLM compositions after one documented checker correction. Raw online and replay artifacts are retained separately.
+- **GO for the Stage 7 memory-deepening mechanisms:** the dependency index, selective invalidation, lease-based recheck recovery with batch dedup, as-of conflict reconstruction and the promotion state machine are implemented, migration is additive (4-p1 → 4-p2, verified on a copy of the live database), 92/92 tests and 28/28 scenarios pass, and all four ablation switches are load-bearing. The numbers are deterministic scenario assertions, not performance or clinical measurements.
+- **GO for the Stage 8/10 engineering hardening:** the bounded/breakable/verifiable agent loop and the async-first service layer with two-layer idempotency pass 117/117 offline tests (28/28 memory scenarios); the offline default and the final SafetyBoundary are unchanged, verifier failures degrade to the full rule checker, and crash recovery is tested. **NO-GO for quoting the Stage 9 recall delta** until the held-out re-run actually executes; the corpus fix itself is lineage-recorded (90 theophylline labels in v2) but its downstream effect is unmeasured.
 - **NO-GO for claiming the Stage 2 performance gates passed:** the isolated TokenDance/GLM composite run completed and the leakage audit passed, but recall is 0.7500, severity accuracy 0.6667, high-risk severity accuracy 0.4444, and citation coverage 0.4000. Only precision (1.0000) and the 6/6 clean controls pass; the result is a baseline for improvement, not an acceptance pass.
 - **NO-GO for product or clinical use, and against over-reading the Stage 6 numbers:** the fresh live pass sits exactly at the 0.20 fallback target boundary on four provider timeouts, produced only 1 of the ≥2 qualitative divergence witnesses (an earlier recorded run produced 3), needed one further checker correction that replay cannot validate as a second online run, and planning remains less efficient than the deterministic baseline (20 vs 17 cycles; median 5.5 vs 4.5). Finite text checks do not prove clinical safety. The system remains a single-patient/single-caregiver demonstration with no auth, clinical governance, prospective validation, or authoritative-label freshness guarantee. KEGG is corroborative, class inference is deliberately uncertain, the held-out labels/controls remain small and single-evaluator, Stage 2 fails several held-out gates, and Stage 1 production all-core extraction was only 53.3%. These metrics and behavior tests are not clinical validation.
 
@@ -682,6 +815,16 @@ python stage0/test_stage6.py --replay-live stage0/data/structured/agentic_eval_l
 
 # Rebuild the offline fake-provider planner artifact without network access.
 python stage0/test_stage5.py --evaluate-offline
+
+# Stage 7: run the full offline memory suite plus the 28-scenario evaluation.
+python -m unittest stage0.test_stage3 stage0.test_stage5 stage0.test_stage6 stage0.test_memory_p0 stage0.test_memory_p1 stage0.test_memory_p2
+python -m stage0.eval_memory --ablate
+
+# Stage 7: backup, export, restore-drill and verify the family memory database.
+python -m stage0.backup --backup
+python -m stage0.backup --export
+python -m stage0.backup --restore backups/memory-<ts>.db --to /tmp/drill.db
+python -m stage0.backup --verify backups/memory-<ts>.db
 
 # Explicit configured-model planner evaluation; rewrites the Stage 5 metrics.
 python stage0/test_stage5.py --evaluate-live

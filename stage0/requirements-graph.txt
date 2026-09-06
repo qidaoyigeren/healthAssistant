@@ -1,0 +1,17 @@
+# Reliability P1: LangGraph minimal migration dependencies.
+# Install on top of requirements-stage1.txt + requirements-stage10.txt:
+#   python -m pip install -r stage0/requirements-graph.txt
+# Versions frozen from the working .venv (pip freeze) on 2026-09-06 after the
+# P1 tests passed (legacy/graph parity, node-level crash recovery with the
+# persistent checkpointer, persisted budget, interrupt/resume wiring smoke);
+# see docs/reliability-implementation/p1_implementation_report.md.
+langgraph==1.2.11
+langgraph-checkpoint==4.2.0
+langgraph-checkpoint-sqlite==3.1.1
+langgraph-prebuilt==1.1.0
+langgraph-sdk==0.4.4
+langchain-core==1.6.2
+langsmith==0.12.2
+orjson==3.12.0
+ormsgpack==1.12.2
+xxhash==4.0.1

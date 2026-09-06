@@ -74,6 +74,12 @@ class BiTemporalTests(unittest.TestCase):
                 action="remove", name="药B", ingredients=[], session_id="s", turn_id="t2",
                 source="caregiver", occurred_at="2026-09-04T00:00:00+00:00",
             )
+            # The stop was recorded NOW (the day the test runs); backdate the
+            # record time into the query window so this scenario does not
+            # break when the calendar moves past the hard-coded known_at.
+            store.connection.execute(
+                "UPDATE medications SET created_at=?", ("2026-09-02T00:00:00+00:00",))
+            store.connection.commit()
             active_on_3rd = store.query_state(
                 valid_at="2026-09-03T00:00:00+00:00", known_at="2026-09-06T00:00:00+00:00"
             )

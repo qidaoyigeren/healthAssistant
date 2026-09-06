@@ -11,7 +11,9 @@ not a medical device and must not be used for diagnosis or prescribing.
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import re
 import time
 import uuid
@@ -34,6 +36,10 @@ except ImportError:  # Support ``python stage0/agent.py`` style imports.
 
 
 ROOT = Path(__file__).resolve().parent
+
+# Reliability P0: wall-clock reserve kept for the deterministic completion
+# (compose + final safety check) after the loop stops making planner calls.
+PLANNER_RESERVE_SECONDS = 15.0
 
 AGENT_SYSTEM_PROMPT = """你是“用药协管员”，只做记录、检索、风险提示和就医沟通辅助。
 硬性边界：
@@ -69,6 +75,9 @@ class Observation:
     arguments: dict[str, Any]
     result: Any
     ok: bool = True
+    # Stage 8 B2: the cycle this observation belongs to; the planner payload
+    # keeps the most recent cycles in full and summarizes the rest by it.
+    cycle: int = 0
 
 
 @dataclass
@@ -76,11 +85,20 @@ class AgentState:
     session_id: str
     turn_id: str
     event: CareEvent
+    # Reliability P0: the API-level domain event identity (``api:{key}``),
+    # threaded through to consolidate_interaction so the projection dedups on
+    # the same key the request layer accepted — not on a turn_id truncation.
+    client_event_id: str | None = None
     observations: list[Observation] = field(default_factory=list)
     trace: list[dict[str, Any]] = field(default_factory=list)
     reflection_notes: list[str] = field(default_factory=list)
     cycle: int = 0
     degraded_reason: str | None = None
+    # Stage 8 B6: how many trace entries have been persisted to turn_traces,
+    # and a one-way flag when persistence fails (trace storage must never
+    # break a turn).
+    trace_flushed: int = 0
+    trace_persistence_failed: bool = False
 
     def observation(self, tool: str, purpose: str | None = None) -> Observation | None:
         for item in reversed(self.observations):
@@ -106,6 +124,10 @@ class AgentResponse:
     audit_trail: dict[str, Any]
     tool_trace: list[dict[str, Any]]
     safety_status: str = "enforced"
+    # Frontend round (2026-09-06): structured per-operation outcomes taken from
+    # the actual tool results (semantic fact write outcome + medication_change
+    # outcome incl. deduplicated/unresolved).  Never a blanket "success".
+    operation_outcomes: list[dict[str, Any]] = field(default_factory=list)
 
 
 class DDITool:
@@ -251,80 +273,103 @@ class MemoryWriteTool:
                     occurred_at=event.occurred_at,
                     salience=0.9,
                 ))
-            consolidated = self.memory.consolidate_interaction(
-                session_id=state.session_id,
-                turn_id=state.turn_id,
-                user_text=event.text,
-                source=event.source,
-                semantic_hints=semantic_hints,
-                episodic_hints=episodic_hints,
-                working_hints=[{"key": "goal", "value": {"event_type": event.event_type, "text": event.text}}],
+            # Reliability P0: the domain event identity is the client_event_id
+            # accepted at the API layer (``api:{key}``), not a turn_id
+            # derivative.  The receipt guards the whole consolidate+medication
+            # change command: replay with the same input returns the stored
+            # result; the same id with different input is refused.
+            event_key = (state.client_event_id
+                         or f"{state.session_id}:{state.turn_id}").strip()
+            input_hash = hashlib.sha256(json.dumps(
+                {"event_type": event.event_type, "text": event.text,
+                 "payload": event.payload, "source": event.source},
+                sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+            def _consolidate() -> dict[str, Any]:
+                consolidated = self.memory.consolidate_interaction(
+                    session_id=state.session_id,
+                    turn_id=state.turn_id,
+                    user_text=event.text,
+                    source=event.source,
+                    client_event_id=event_key,
+                    semantic_hints=semantic_hints,
+                    episodic_hints=episodic_hints,
+                    working_hints=[{"key": "goal", "value": {"event_type": event.event_type, "text": event.text}}],
+                )
+                result: dict[str, Any] = {
+                    "consolidation": asdict(consolidated),
+                    "memory_refs": consolidated.memory_refs,
+                    "medication_change": None,
+                }
+                if event.event_type == "medication_change":
+                    medication = event.payload.get("medication")
+                    action = event.payload.get("action")
+                    if medication and action:
+                        normalized = ddi_engine.normalize_medications([medication])
+                        result["medication_change"] = self.memory.apply_medication_change(
+                            action=action,
+                            name=medication,
+                            ingredients=normalized,
+                            session_id=state.session_id,
+                            turn_id=state.turn_id,
+                            source=event.source,
+                            occurred_at=event.occurred_at,
+                            dose=event.payload.get("dose"),
+                            route=event.payload.get("route"),
+                            schedule=event.payload.get("schedule"),
+                        )
+                        change = result["medication_change"]
+                        for key in ("medication", "event"):
+                            if change.get(key) and change[key].get("ref"):
+                                result["memory_refs"].append(change[key]["ref"])
+                return result
+
+            result, replayed = self.memory.execute_with_receipt(
+                operation_id=f"consolidate:{event_key}",
+                operation_type="consolidate_event",
+                input_hash=input_hash,
+                executor=_consolidate,
             )
-            result: dict[str, Any] = {
-                "consolidation": asdict(consolidated),
-                "memory_refs": consolidated.memory_refs,
-                "medication_change": None,
-            }
-            if event.event_type == "medication_change":
-                medication = event.payload.get("medication")
-                action = event.payload.get("action")
-                if medication and action:
-                    normalized = ddi_engine.normalize_medications([medication])
-                    result["medication_change"] = self.memory.apply_medication_change(
-                        action=action,
-                        name=medication,
-                        ingredients=normalized,
-                        session_id=state.session_id,
-                        turn_id=state.turn_id,
-                        source=event.source,
-                        occurred_at=event.occurred_at,
-                        dose=event.payload.get("dose"),
-                        route=event.payload.get("route"),
-                        schedule=event.payload.get("schedule"),
-                    )
-                    change = result["medication_change"]
-                    for key in ("medication", "event"):
-                        if change.get(key) and change[key].get("ref"):
-                            result["memory_refs"].append(change[key]["ref"])
+            result["operation_replayed"] = replayed
             return result
 
         if operation == "record_warnings":
             warnings = arguments.get("warnings", [])
             context_refs = list(arguments.get("context_refs", []))
-            recorded: list[dict[str, Any]] = []
-            for warning in warnings:
-                source_refs = self._warning_sources(warning)
-                episode = self.memory.record_event(
-                    EpisodicFact(
-                        event_type="warning",
-                        subject_key="|".join(sorted((warning.get("drug_a", "?"), warning.get("drug_b", "?")))),
-                        payload={"warning": warning, "source_refs": source_refs, "context_refs": context_refs},
-                        occurred_at=event.occurred_at,
-                        salience=self._warning_salience(warning),
-                        severity=warning.get("severity"),
-                        source_uri=source_refs[0].get("uri"),
-                    ),
-                    session_id=state.session_id, turn_id=state.turn_id, source="agent:ddi_check",
-                )
-                warning_refs = list(dict.fromkeys([*context_refs, episode["ref"]]))
-                conclusion = self.memory.record_conclusion(
-                    session_id=state.session_id,
-                    turn_id=state.turn_id,
-                    kind="warning",
-                    text=self._warning_text(warning),
-                    memory_refs=warning_refs,
-                    source_refs=source_refs,
-                )
-                enriched = dict(warning)
-                enriched["citations"] = source_refs
-                enriched["audit_trail"] = {
-                    "warning_memory": episode["ref"],
-                    "conclusion": conclusion["ref"],
-                    "memory_refs": warning_refs,
-                    "source_refs": source_refs,
+            # Reliability P0: episodes + conclusions + receipt commit in ONE
+            # store transaction, so a crash mid-batch can never replay into
+            # duplicate warnings.  A legitimately different re-check (new pair
+            # set) derives a different operation id and records fresh.
+            items = [
+                {
+                    "warning": warning,
+                    "salience": self._warning_salience(warning),
+                    "text": self._warning_text(warning),
+                    "source_refs": self._warning_sources(warning),
+                    "occurred_at": event.occurred_at,
                 }
-                recorded.append(enriched)
-            return {"recorded_warnings": recorded, "memory_refs": [ref for warning in recorded for ref in warning["audit_trail"]["memory_refs"]]}
+                for warning in warnings
+            ]
+            event_key = (state.client_event_id
+                         or f"{state.session_id}:{state.turn_id}").strip()
+            pair_fingerprint = [[
+                item["warning"].get("drug_a"), item["warning"].get("drug_b"),
+                item["warning"].get("severity"), item["warning"].get("effect"),
+            ] for item in items]
+            pair_hash = hashlib.sha256(json.dumps(
+                pair_fingerprint, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:16]
+            input_hash = hashlib.sha256(json.dumps(
+                {"warnings": pair_fingerprint, "context_refs": sorted(context_refs)},
+                sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+            return self.memory.record_warnings_batch(
+                session_id=state.session_id,
+                turn_id=state.turn_id,
+                source="agent:ddi_check",
+                items=items,
+                context_refs=context_refs,
+                operation_id=f"warnings:{event_key}:{pair_hash}",
+                input_hash=input_hash,
+            )
 
         if operation == "create_clinical_conflict":
             conflict = self.memory.create_conflict(
@@ -1225,12 +1270,15 @@ class LLMPlanner:
         self.guard = guard or PlannerPolicyGuard(self.tool_schemas)
         self.context_provider = context_provider
         self.config: dict[str, str] | None = None
+        # Stage 8 B1: size of the last serialized payload (token estimate input).
+        self.last_payload_chars = 0
         if proposal_provider is None and model is None:
             self.config = extract_ddi.resolve_llm_config(require_key=False)
             self.model = self.config["model"]
 
     def propose(self, state: AgentState) -> Any:
         payload = self.prompt_payload(state)
+        self.last_payload_chars = len(json.dumps(payload, ensure_ascii=False, default=str))
         if self.proposal_provider is not None:
             try:
                 return self._parse_json(self.proposal_provider(payload))
@@ -1331,12 +1379,88 @@ class LLMPlanner:
                 {"name": name, "arguments_schema": schema}
                 for name, schema in self.tool_schemas.items()
             ],
-            "observations": [asdict(item) for item in state.observations],
+            "observations": self._bounded_observations(state),
             "reflection_notes": [note[:800] for note in state.reflection_notes[-6:]],
             "completed_steps": successful[-12:],
             "pending_safety_goals": self.guard.unmet_requirements(state),
-            "recent_trace": state.trace,
+            "recent_trace": self._bounded_trace(state),
         }
+
+    # ---- Stage 8 B2: bounded planner payload ----------------------------
+    # Compression applies ONLY to this serialized planner view.  materialize()
+    # and the response path keep reading the original Observation objects, so
+    # safety-critical hydration is unaffected.
+
+    OBSERVATION_FULL_CYCLES = 2
+    RESULT_CHARS = 600
+    RAG_TEXT_CHARS = 200
+    TRACE_KEEP = 8
+    PROPOSAL_CHARS = 400
+
+    @classmethod
+    def _bounded_observations(cls, state: AgentState) -> list[Any]:
+        """The most recent cycles keep full observations; earlier ones keep a
+        tool/purpose/ok summary with a result digest, so payload growth per
+        cycle is bounded instead of stacking full observations indefinitely."""
+        out: list[Any] = []
+        for observation in state.observations:
+            if observation.cycle >= state.cycle - cls.OBSERVATION_FULL_CYCLES:
+                item = asdict(observation)
+                cls._truncate_result_strings(item, cls.RESULT_CHARS)
+                result = item.get("result")
+                if isinstance(result, dict) and isinstance(result.get("results"), list):
+                    # RAG chunk text is truncated to what citations need; the
+                    # exact-substring evidence gate reads the tool result, not
+                    # this payload.
+                    for chunk in result["results"]:
+                        if isinstance(chunk, dict) and isinstance(chunk.get("text"), str):
+                            chunk["text"] = chunk["text"][: cls.RAG_TEXT_CHARS]
+                out.append(item)
+            else:
+                try:
+                    rendered = json.dumps(observation.result, ensure_ascii=False, default=str, sort_keys=True)
+                    size, digest = len(rendered), hashlib.sha256(rendered.encode("utf-8")).hexdigest()[:8]
+                except Exception:
+                    size, digest = 0, "unserializable"
+                out.append({
+                    "tool": observation.tool, "purpose": observation.purpose,
+                    "ok": observation.ok, "cycle": observation.cycle,
+                    "result_size": size, "result_digest": digest,
+                })
+        return out
+
+    @classmethod
+    def _truncate_result_strings(cls, value: Any, limit: int) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if isinstance(item, str) and len(item) > limit:
+                    value[key] = item[:limit]
+                else:
+                    cls._truncate_result_strings(item, limit)
+        elif isinstance(value, list):
+            for item in value:
+                cls._truncate_result_strings(item, limit)
+
+    @classmethod
+    def _bounded_trace(cls, state: AgentState) -> list[dict[str, Any]]:
+        """recent_trace without the embedded full observation (it duplicates
+        the observations field) and with truncated planner proposals."""
+        out: list[dict[str, Any]] = []
+        for entry in state.trace[-cls.TRACE_KEEP:]:
+            item = {key: value for key, value in entry.items() if key != "observation"}
+            planner = item.get("planner")
+            if isinstance(planner, dict):
+                planner = dict(planner)
+                proposal = planner.get("proposal")
+                if proposal is not None:
+                    rendered = proposal if isinstance(proposal, str) else json.dumps(
+                        proposal, ensure_ascii=False, default=str)
+                    planner["proposal"] = rendered[: cls.PROPOSAL_CHARS]
+                item["planner"] = planner
+            if isinstance(item.get("candidate"), str):
+                item["candidate"] = item["candidate"][: cls.PROPOSAL_CHARS]
+            out.append(item)
+        return out
 
     def _patient_snapshot(self) -> dict[str, Any]:
         """Bounded patient memory snapshot for grounding; never credentials."""
@@ -1461,6 +1585,8 @@ class HybridPlanner:
         )
         self.model = self.llm_planner.model
         self.last_decision_trace: dict[str, Any] = {}
+        # Stage 8 B1: last planner payload size, for the turn token estimate.
+        self.last_payload_chars = 0
 
     def bind_tools(self, tools: dict[str, Any]) -> None:
         """Bind schemas to the concrete executor registry owned by the agent."""
@@ -1482,7 +1608,9 @@ class HybridPlanner:
 
         try:
             proposal = self.llm_planner.propose(state)
+            self.last_payload_chars = self.llm_planner.last_payload_chars
         except PlannerProposalError as exc:
+            self.last_payload_chars = getattr(self.llm_planner, "last_payload_chars", 0)
             category = "schema" if exc.kind == "schema_error" else exc.kind
             error = {"code": exc.code, "category": category, "message": str(exc)}
             # Provider/parse failure: the only emergency fallback path.
@@ -1664,6 +1792,175 @@ class ResponseComposer:
         )
 
 
+@dataclass(frozen=True)
+class TurnBudget:
+    """Per-turn resource ceiling (Stage 8 B1).
+
+    The first exhausted budget degrades the turn to a deterministic completion
+    with an explicit "结果可能不完整" notice; it never skips the response safety
+    checks.  Token accounting is a conservative chars/1.5 estimate over every
+    planner payload (each cycle resends the full prompt): the estimator
+    over-counts JSON/catalog overhead relative to real tokenizer usage, so the
+    default backstop is 150k estimated units — enough for a full 16-cycle turn
+    of realistic payloads — while the wall-clock budget is the primary limiter
+    for live turns.  Provider usage values replace the estimate in Stage 11.
+    """
+
+    max_cycles: int = 16
+    wall_clock_seconds: float = 120.0
+    token_budget: int = 150_000
+
+    @classmethod
+    def from_env(cls, max_cycles: int) -> "TurnBudget":
+        def as_float(name: str, default: float) -> float:
+            try:
+                return max(0.0, float(os.getenv(name, str(default))))
+            except ValueError:
+                return default
+
+        def as_int(name: str, default: int) -> int:
+            try:
+                return max(0, int(os.getenv(name, str(default))))
+            except ValueError:
+                return default
+
+        return cls(
+            max_cycles=max_cycles,
+            wall_clock_seconds=as_float("AGENT_TURN_BUDGET_SECONDS", 120.0),
+            token_budget=as_int("AGENT_TURN_TOKEN_BUDGET", 150_000),
+        )
+
+
+# Stage 8 B1: fixed, code-owned notice prepended to budget-degraded responses.
+BUDGET_DEGRADED_NOTICE = "本次处理在预算内未完成全部检查，结果可能不完整；建议咨询医生/药师。"
+
+
+VERIFIER_SYSTEM_PROMPT = """你是“用药协管员”最终回复的否决式验证器。输入包括：带行号的候选回复、结构化事实（warnings/conflicts/允许的 memory refs）以及规则检查器标记的语义类问题。
+你只能做两件事：判定被标记的问题其实良性（verdict=pass），或维持/新增否决（verdict=reject）。你绝对不能改写、增补或修复文本。
+规则层无法判定的语义问题（良性免责声明、对已记录内容的摘要、否定式拒绝）由你裁决；伪造引用、缺失升级语等硬性违规不归你管，也不要推翻它们。
+输出一个 JSON 对象：{"verdict":"pass"|"reject","findings":[{"type":"uncited_warning|missing_escalation|prescribe_risk|fabricated_claim|other_safety","line":行号,"excerpt":"该行逐字摘录","rationale":"一句话依据"}]}
+findings 可为空数组。只输出 JSON。"""
+
+VERIFIER_TIMEOUT_SECONDS = 15
+
+
+class ResponseVerifier:
+    """Veto-only LLM verification layer (Stage 8 B4).
+
+    Safety asymmetry: a verdict can only (a) clear semantic rule flags or
+    (b) reject with verifiable evidence; it can never rewrite or add text.
+    Any verifier failure — timeout, parse error, invalid verdict shape, or a
+    finding whose excerpt cannot be re-verified against its line — returns
+    None and the caller falls back to the full rule checker, so degradation
+    is never weaker than the rule-only path.
+    """
+
+    FINDING_TYPES = {"fabricated_claim", "uncited_warning", "missing_escalation",
+                     "prescribe_risk", "other_safety"}
+
+    def __init__(self, *, client: Any | None = None, model: str | None = None,
+                 provider: Callable[[str], str] | None = None,
+                 timeout_seconds: float | None = None):
+        self.provider = provider
+        self.client = client
+        self.model = model
+        if timeout_seconds is None:
+            try:
+                timeout_seconds = max(1.0, float(os.getenv(
+                    "AGENT_VERIFIER_TIMEOUT_SECONDS", str(VERIFIER_TIMEOUT_SECONDS))))
+            except ValueError:
+                timeout_seconds = float(VERIFIER_TIMEOUT_SECONDS)
+        self.timeout_seconds = timeout_seconds
+        self.last_error: str | None = None
+
+    def review(self, text: str, *, warnings: list[dict[str, Any]],
+               conflicts: list[dict[str, Any]], memory_refs: list[str],
+               semantic_errors: list[str]) -> dict[str, Any] | None:
+        """Return a validated verdict dict, or None on any failure."""
+        self.last_error = None
+        payload = json.dumps({
+            "candidate_response_with_line_numbers": "\n".join(
+                f"{index}: {line}" for index, line in enumerate(text.splitlines(), 1)),
+            "structured_facts": {
+                "warnings": warnings,
+                "conflicts": conflicts,
+                "allowed_memory_refs": memory_refs,
+            },
+            "rule_flagged_semantic_issues": semantic_errors,
+        }, ensure_ascii=False, default=str)
+        try:
+            if self.provider is not None:
+                raw = str(self.provider(payload))
+            else:
+                if self.client is None:
+                    from openai import OpenAI
+                    config = extract_ddi.resolve_llm_config(self.model)
+                    if not config.get("api_key"):
+                        self.last_error = "no_api_key"
+                        return None
+                    # B7: the verifier gets its own short timeout — 15s by
+                    # default, not the 60s interactive-planner ceiling.
+                    self.client = OpenAI(api_key=config["api_key"], base_url=config["base_url"],
+                                         timeout=self.timeout_seconds, max_retries=0)
+                    self.model = config["model"]
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": VERIFIER_SYSTEM_PROMPT},
+                        {"role": "user", "content": payload},
+                    ],
+                    temperature=0,
+                    max_tokens=1024,
+                )
+                raw = str(response.choices[0].message.content or "")
+            return self._validate(raw, text)
+        except Exception as exc:
+            self.last_error = f"{type(exc).__name__}: {exc}"
+            return None
+
+    def _validate(self, raw: str, text: str) -> dict[str, Any] | None:
+        try:
+            candidate = raw.strip()
+            fenced = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", candidate, re.DOTALL)
+            if fenced:
+                candidate = fenced.group(1).strip()
+            start = candidate.find("{")
+            if start >= 0:
+                candidate = candidate[start:candidate.rfind("}") + 1]
+            verdict = json.loads(candidate)
+        except Exception:
+            self.last_error = "verdict_parse_error"
+            return None
+        if not isinstance(verdict, dict) or verdict.get("verdict") not in {"pass", "reject"}:
+            self.last_error = "invalid_verdict"
+            return None
+        findings = verdict.get("findings", [])
+        if not isinstance(findings, list):
+            self.last_error = "invalid_findings"
+            return None
+        lines = text.splitlines()
+        cleaned: list[dict[str, Any]] = []
+        for finding in findings:
+            if not isinstance(finding, dict) or finding.get("type") not in self.FINDING_TYPES:
+                self.last_error = "invalid_finding"
+                return None
+            try:
+                line_number = int(finding.get("line"))
+            except (TypeError, ValueError):
+                self.last_error = "invalid_finding_line"
+                return None
+            excerpt = str(finding.get("excerpt") or "")
+            if not 1 <= line_number <= len(lines) or excerpt not in lines[line_number - 1]:
+                # Evidence must quote the candidate verbatim; a finding the
+                # code cannot re-verify is a verifier failure, not a veto.
+                self.last_error = "unverifiable_finding_evidence"
+                return None
+            cleaned.append({"type": finding["type"], "line": line_number,
+                            "excerpt": excerpt,
+                            "rationale": str(finding.get("rationale") or "")[:200]})
+        return {"verdict": verdict["verdict"], "findings": cleaned}
+
+
 class MedicationCoordinatorAgent:
     """Plan → act → observe → reflect loop with event-driven safety goals."""
 
@@ -1680,6 +1977,8 @@ class MedicationCoordinatorAgent:
         llm_planner_model: str | None = None,
         proposal_provider: Callable[[dict[str, Any]], Any] | None = None,
         response_provider: Callable[[dict[str, Any]], str] | None = None,
+        verifier: "ResponseVerifier | None" = None,
+        llm_verifier_enabled: bool = False,
     ):
         self.memory = memory
         self.safety = SafetyBoundary()
@@ -1721,6 +2020,13 @@ class MedicationCoordinatorAgent:
             if (llm_planner_enabled or response_provider is not None)
             else None
         )
+        # Stage 8 B4: veto-only LLM verifier; explicit opt-in, and any
+        # verifier failure falls back to the full rule checker (never weaker
+        # than today's behaviour).
+        self.verifier = verifier
+        self._last_verifier_info: dict[str, Any] | None = None
+        if self.verifier is None and llm_verifier_enabled:
+            self.verifier = ResponseVerifier(client=llm_planner_client, model=llm_planner_model)
         # P1: the agent owns the recheck consumer — stale conclusions are
         # re-verified with the real detector over the current medication list.
         if hasattr(self.memory, "recheck_hook"):
@@ -1857,18 +2163,80 @@ class MedicationCoordinatorAgent:
             "source_refs": source_refs,
         }
 
-    def handle(self, event: CareEvent, *, session_id: str, turn_id: str | None = None) -> AgentResponse:
+    def handle(self, event: CareEvent, *, session_id: str, turn_id: str | None = None,
+               client_event_id: str | None = None) -> AgentResponse:
         turn_id = turn_id or f"turn-{uuid.uuid4().hex[:10]}"
         self.memory.expire_working(session_id, except_turn=turn_id)
-        state = AgentState(session_id=session_id, turn_id=turn_id, event=event)
-        while state.cycle < self.max_cycles:
+        state = AgentState(session_id=session_id, turn_id=turn_id, event=event,
+                           client_event_id=client_event_id)
+        # Stage 8 B1: per-turn budget (wall-clock / estimated tokens / cycles).
+        budget = TurnBudget.from_env(self.max_cycles)
+        turn_started = time.perf_counter()
+        tokens_estimated = 0
+        # Stage 8 B3: consecutive-rejection circuit breaker.
+        try:
+            rejection_limit = max(1, int(os.getenv("PLANNER_SAFETY_REJECTION_LIMIT", "2")))
+        except ValueError:
+            rejection_limit = 2
+        consecutive_rejections = 0
+        circuit_broken = False
+        while state.cycle < budget.max_cycles:
+            elapsed = time.perf_counter() - turn_started
+            exhausted = None
+            # Reliability P0: reserve a safety margin before the wall-clock
+            # limit so the *next* planner call (up to 60s) cannot silently
+            # cross the deadline — the loop-top check alone could not bound a
+            # running call.  Budgets smaller than the reserve keep the original
+            # threshold unchanged.
+            reserve = PLANNER_RESERVE_SECONDS if budget.wall_clock_seconds > PLANNER_RESERVE_SECONDS else 0.0
+            if elapsed > budget.wall_clock_seconds - reserve:
+                exhausted = "wall_clock"
+            elif tokens_estimated > budget.token_budget:
+                exhausted = "tokens"
+            if exhausted is not None and state.cycle > 0:
+                state.degraded_reason = f"budget_exhausted:{exhausted}"
+                state.trace.append({
+                    "phase": "budget", "cycle": state.cycle,
+                    "exhausted": exhausted,
+                    "elapsed_seconds": round(elapsed, 3),
+                    "tokens_estimated": tokens_estimated,
+                    "limits": {"wall_clock_seconds": budget.wall_clock_seconds,
+                               "token_budget": budget.token_budget,
+                               "max_cycles": budget.max_cycles},
+                    "note": "回合预算耗尽；停止工具执行并生成明确降级响应（结果可能不完整）。",
+                })
+                break
             state.cycle += 1
-            try:
-                action = self.planner.decide(state)
-            except PlanningRejected:
-                state.trace.append({"phase": "plan", "cycle": state.cycle, "decision": {"tool": "replan"},
-                                    "planner": self.planner.last_decision_trace})
-                continue
+            if circuit_broken:
+                # B3: the breaker has tripped — finish the turn deterministically
+                # without spending further planner LLM calls.
+                action = self.planner._fallback(
+                    state, None, "circuit_break", [], "planner_circuit_break",
+                    time.perf_counter(), fallback_kind="circuit_break",
+                )
+            else:
+                try:
+                    action = self.planner.decide(state)
+                    consecutive_rejections = 0
+                except PlanningRejected:
+                    consecutive_rejections += 1
+                    state.trace.append({"phase": "plan", "cycle": state.cycle, "decision": {"tool": "replan"},
+                                        "planner": self.planner.last_decision_trace})
+                    if (isinstance(self.planner, HybridPlanner)
+                            and consecutive_rejections >= rejection_limit):
+                        circuit_broken = True
+                        state.degraded_reason = "planner_circuit_break:safety_rejections"
+                        state.trace.append({
+                            "phase": "plan", "cycle": state.cycle, "decision": {"tool": "circuit_break"},
+                            "note": (f"连续 {consecutive_rejections} 次安全拒绝；"
+                                     "本回合剩余周期切换确定性规划，不再消耗 LLM 调用。"),
+                        })
+                    continue
+                payload_chars = getattr(self.planner, "last_payload_chars", 0)
+                if payload_chars:
+                    # Conservative estimate for Chinese-heavy payloads; provider
+                    # usage values replace it when wired in (Stage 11 埋点).
+                    tokens_estimated += int(payload_chars / 1.5)
             plan_trace = {
                 "phase": "plan", "cycle": state.cycle,
                 "decision": asdict(action) if action else {"tool": "respond"},
@@ -1894,8 +2262,9 @@ class MedicationCoordinatorAgent:
             state.trace.append(plan_trace)
             if action is None:
                 response = self._respond(state)
-                return self.safety.enforce(response)
+                return self._finalize(state, response)
             observation = self._act(state, action)
+            observation.cycle = state.cycle
             state.observations.append(observation)
             state.trace.append({
                 "phase": "observe", "cycle": state.cycle, "tool": action.tool,
@@ -1904,12 +2273,42 @@ class MedicationCoordinatorAgent:
                 "observation": asdict(observation),
             })
             self._reflect(state, observation)
-        state.degraded_reason = "max_cycles_exceeded"
-        state.trace.append({
-            "phase": "reflect", "cycle": state.cycle,
-            "note": f"达到 max_cycles={self.max_cycles}；停止工具执行并生成明确降级响应。",
-        })
-        return self.safety.enforce(self._respond(state))
+            self._flush_traces(state)
+        if state.degraded_reason is None:
+            state.degraded_reason = "max_cycles_exceeded"
+            state.trace.append({
+                "phase": "reflect", "cycle": state.cycle,
+                "note": f"达到 max_cycles={self.max_cycles}；停止工具执行并生成明确降级响应。",
+            })
+        return self._finalize(state, self._respond(state))
+
+    def _finalize(self, state: AgentState, response: AgentResponse) -> AgentResponse:
+        """Flush remaining turn traces, then apply the final safety boundary."""
+        self._flush_traces(state)
+        return self.safety.enforce(response)
+
+    def _flush_traces(self, state: AgentState) -> None:
+        """Persist new trace entries to turn_traces (Stage 8 B6).
+
+        audit_log keeps recording data mutations; turn_traces records the
+        planning/budget/breaker process.  Persistence failure disables further
+        attempts for the turn — trace storage must never break a turn.
+        """
+        if state.trace_persistence_failed:
+            return
+        fresh = state.trace[state.trace_flushed:]
+        if not fresh:
+            return
+        try:
+            for entry in fresh:
+                cycle = entry.get("cycle") if isinstance(entry.get("cycle"), int) else state.cycle
+                self.memory.record_turn_trace(
+                    state.session_id, state.turn_id, cycle,
+                    str(entry.get("phase", "unknown")), entry,
+                )
+            state.trace_flushed = len(state.trace)
+        except Exception:
+            state.trace_persistence_failed = True
 
     def _act(self, state: AgentState, action: ToolAction) -> Observation:
         plan_entry = state.trace[-1] if state.trace and state.trace[-1].get("phase") == "plan" else {}
@@ -2017,7 +2416,8 @@ class MedicationCoordinatorAgent:
             clarification = state.successful_observation("ask_clarification")
             if clarification:
                 return AgentResponse(clarification.result["question"], [], [],
-                    {"session_id": state.session_id, "turn_id": state.turn_id, "memory_refs": list(dict.fromkeys(memory_refs)), "source_refs": []}, state.trace)
+                    {"session_id": state.session_id, "turn_id": state.turn_id, "memory_refs": list(dict.fromkeys(memory_refs)), "source_refs": []}, state.trace,
+                    operation_outcomes=self._operation_outcomes(state))
         for warning in warnings:
             source_refs.extend(warning["citations"])
 
@@ -2065,9 +2465,14 @@ class MedicationCoordinatorAgent:
                     for conflict in conflicts:
                         text += f"\n未决矛盾 [{conflict['ref']}]：报告 [{conflict['left_ref']}]；证据 [{conflict['right_ref']}]。"
                     compose_error = (compose_error or "") + ";template_sanitized:" + ",".join(template_errors)
+        if (state.degraded_reason or "").startswith("budget_exhausted"):
+            # B1: fixed code-owned notice, prepended BEFORE the final check so
+            # the checked text is exactly the delivered text.
+            text = BUDGET_DEGRADED_NOTICE + "\n" + text
         if self.response_composer is not None:
-            final_errors = check_composed_response(text, warnings=warnings, escalation_required=escalation_required,
-                refusal_required=refusal_required, memory_refs=memory_refs, conflicts=conflicts)
+            final_errors = self._check_response(text, warnings=warnings, conflicts=conflicts,
+                memory_refs=memory_refs, escalation_required=escalation_required,
+                refusal_required=refusal_required)
             if final_errors:
                 raise RuntimeError("final response blocked: " + ",".join(final_errors))
         state.trace.append({
@@ -2090,7 +2495,100 @@ class MedicationCoordinatorAgent:
                 "response_fallback_reason": compose_error,
             },
             tool_trace=state.trace,
+            operation_outcomes=self._operation_outcomes(state),
         )
+
+    @staticmethod
+    def _operation_outcomes(state: AgentState) -> list[dict[str, Any]]:
+        """Structured outcomes from the most recent consolidate_event result.
+
+        Sources of truth: ``result["medication_change"]["outcome"]`` and the
+        semantic write outcomes inside ``result["consolidation"]`` — exactly
+        what the store actually did (add/remove/dose_change/deduplicated/
+        unresolved, fact dedup/conflict).  When nothing was consolidated the
+        list is simply empty; nothing is inferred from the composed text.
+        """
+        for obs in reversed(state.observations):
+            if not obs.ok or not isinstance(obs.result, dict):
+                continue
+            result = obs.result
+            consolidation = result.get("consolidation")
+            medication_change = result.get("medication_change")
+            if not isinstance(consolidation, dict) and not isinstance(medication_change, dict):
+                continue
+            outcomes: list[dict[str, Any]] = []
+            if isinstance(consolidation, dict):
+                for item in consolidation.get("semantic_outcomes", []) or []:
+                    if isinstance(item, dict) and item.get("outcome"):
+                        outcomes.append({
+                            "kind": "semantic_fact",
+                            "outcome": item["outcome"],
+                            "ref": item.get("ref"),
+                            "namespace": item.get("namespace"),
+                            "key": item.get("key"),
+                        })
+            if isinstance(medication_change, dict) and medication_change.get("outcome"):
+                medication = medication_change.get("medication") or {}
+                outcomes.append({
+                    "kind": "medication_change",
+                    "outcome": medication_change["outcome"],
+                    "ref": medication.get("ref"),
+                    "display_name": medication.get("display_name"),
+                    "event_ref": (medication_change.get("event") or {}).get("ref"),
+                    "replayed": bool(result.get("operation_replayed")),
+                })
+            return outcomes
+        return []
+
+    # Hard rule violations that the verifier can never adjudicate away.
+    HARD_RESPONSE_ERROR_PREFIXES = (
+        "fabricated_memory_ref", "fabricated_citation", "missing_refusal",
+        "missing_escalation", "medical_authority_content",
+        "warning_without_citation_or_memory", "conflict_missing_sides",
+    )
+
+    def _check_response(
+        self,
+        text: str,
+        *,
+        warnings: list[dict[str, Any]],
+        conflicts: list[dict[str, Any]],
+        memory_refs: list[str],
+        escalation_required: bool,
+        refusal_required: bool,
+    ) -> list[str]:
+        """Rule check plus optional veto-only verifier adjudication (B4).
+
+        Hard rule violations (fabricated refs/URIs, missing escalation or
+        refusal, uncited warning structure, missing conflict sides) are never
+        adjudicable.  Semantic flags — the false-positive-prone classes from
+        the Stage 6 live runs — are cleared only by an explicit verifier
+        "pass".  Any verifier failure keeps the full rule result, so the
+        degraded path is never weaker than the rule-only path.  A clean rule
+        pass does not spend a verifier call (cost-driven deviation from the
+        design's "always review": adjudication runs only when there is
+        something to adjudicate).
+        """
+        problems = check_composed_response(
+            text, warnings=warnings, escalation_required=escalation_required,
+            refusal_required=refusal_required, memory_refs=memory_refs, conflicts=conflicts)
+        self._last_verifier_info = None
+        if not problems or self.verifier is None:
+            return problems
+        hard = [problem for problem in problems
+                if any(problem.startswith(prefix) for prefix in self.HARD_RESPONSE_ERROR_PREFIXES)]
+        semantic = [problem for problem in problems if problem not in hard]
+        verdict = self.verifier.review(
+            text, warnings=warnings, conflicts=conflicts,
+            memory_refs=memory_refs, semantic_errors=semantic)
+        if verdict is None:
+            self._last_verifier_info = {"status": "unavailable", "error": self.verifier.last_error}
+            return problems  # rules-only: exactly today's behaviour
+        self._last_verifier_info = {"status": verdict["verdict"], "findings": verdict["findings"]}
+        if verdict["verdict"] == "pass":
+            return hard
+        return [*problems, *(f"verifier:{finding['type']}@line{finding['line']}"
+                             for finding in verdict["findings"])]
 
     def _compose_response(
         self,
@@ -2150,13 +2648,16 @@ class MedicationCoordinatorAgent:
         if not isinstance(text, str) or not text.strip():
             return None, "composer_empty"
         text = text.strip()
-        problems = check_composed_response(
+        problems = self._check_response(
             text,
             warnings=warnings,
+            conflicts=conflicts,
+            memory_refs=memory_refs,
             escalation_required=escalation_required,
-            refusal_required=refusal_required, memory_refs=memory_refs, conflicts=conflicts,
+            refusal_required=refusal_required,
         )
-        state.trace.append({"phase": "response_validation", "cycle": state.cycle, "candidate": text, "errors": problems})
+        state.trace.append({"phase": "response_validation", "cycle": state.cycle, "candidate": text,
+                            "errors": problems, "verifier": getattr(self, "_last_verifier_info", None)})
         if problems:
             return None, "postcheck_failed:" + ";".join(problems)
         return text, None

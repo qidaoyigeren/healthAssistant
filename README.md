@@ -42,6 +42,50 @@ flowchart LR
 
 Embeddings are useful for finding label evidence, but they are the wrong source of truth for safety-critical patient facts. The memory layer therefore uses exact SQLite keys and immutable versions for age, allergies, renal/hepatic function, chronic disease, preferences, and medication records. Exact `(namespace, key)` recall gives deterministic “what is currently recorded?” answers, stable references such as `memory:semantic:3@v1`, and a clear audit trail. Time decay only changes episodic retrieval ranking; it never deletes the underlying event. When two safety-critical facts disagree, `conflicts` stores both sides as open instead of allowing a similarity score to erase history.
 
+## Memory deepening (Stage 7)
+
+Belief revision is indexed and selective rather than a hand-written one-hop scan:
+
+- **Conclusion dependency index.** Every conclusion records what it consumed — cited facts by `(namespace, key)`, medications by normalized ingredient, DDI pairs parsed from its own text, and for whole-list scan warnings a hash of the medication set it was checked against. The `conclusion_dependencies` table replaces the pre-Stage-7 full-table scans; migration backfills it deterministically, and a NULL set-hash means "always re-verify" (the conservative pre-Stage-7 behaviour).
+- **Selective invalidation.** Adding an unrelated drug no longer stales patient-condition findings — they depend only on their focus drug and cited facts. Whole-list pair warnings keep the set-scoped rule (a full-list scan produced them), and stopping or dose-changing a member still stales everything citing it. The ablation `MemoryStore(ablations={'selective_invalidation'})` restores the full-invalidation baseline: on scenario S28 the over-invalidation rate drops from 1.0 to 0 while invalidation coverage stays 1.0.
+- **Recheck hardening.** Task claims carry an expiring lease (crashed workers are recovered; three failed claims mark the task failed instead of looping forever), one detector run serves a whole batch (memoized by the current medication-set hash — three stale conclusions, one detection), and patient-condition conclusions get a deterministic label-vs-facts recheck instead of only the conservative template.
+- **As-of reconstruction.** `query_state(known_at=...)` now folds the conflict action trail (resolve/reopen/undo), so a conflict resolved today still appears open in earlier known-at views and disappears from current ones; `retrieve_episodic(as_of=...)` is a knowledge cutoff over `recorded_at`.
+- **Promotion state machine.** `verification_status` moves `recorded_as_reported → verified` only by rule — two consistent reports from distinct events, or an explicit caregiver confirmation — while an open conflict blocks promotion and marks the key disputed. Event replays never count toward promotion.
+- **Backup and export.** `python -m stage0.backup --backup | --export | --restore <file> --to <path> | --verify <file>`: WAL-safe online backups with checksum sidecars, a JSON interchange export, and restores that refuse to overwrite existing targets.
+
+Scenario coverage grew from 22 to 28 (`python -m stage0.eval_memory --ablate`), with all four mechanisms — policy, bitemporal, dependency, and the new selective_invalidation — load-bearing under ablation. Implementation details and the four design corrections found during implementation are in `docs/production-upgrade-2026-09-05/stage7_implementation_report.md`.
+
+## Agent-loop hardening (Stage 8)
+
+The LLM-decided loop is bounded, breakable and verifiable:
+
+- **Per-turn budget** (`AGENT_TURN_BUDGET_SECONDS`, default 120s wall-clock; `AGENT_TURN_TOKEN_BUDGET`, a conservative chars/1.5 estimate backstop; max_cycles). The first exhausted budget degrades the turn to a deterministic completion with an explicit “结果可能不完整” notice — appended *before* the final safety check, so the checked text is exactly the delivered text. Live planner calls measured 18–60s in the Stage 6 run, which is why the wall-clock budget — not a shorter per-call timeout — is the limiter.
+- **Bounded planner payloads.** Only the current cycle plus the two before it keep full observations; earlier ones carry a tool/purpose/ok summary with a result digest, RAG chunk text is truncated, and `recent_trace` no longer embeds a duplicate of every observation. Compression applies only to the serialized planner view — hydration and the response path keep reading the originals. Measured on synthetic RAG-sized stacks: 12 cycles of observations cost 77k → 9k payload characters (`docs/production-upgrade-2026-09-05/payload_budget.json`).
+- **Consecutive-rejection circuit breaker.** Two consecutive safety rejections trip the breaker and the rest of the turn finishes on the deterministic planner — no more burning up to 16 LLM calls (18–60s each) on a model that keeps proposing unsafe actions. A single rejection still feeds back to the LLM as before.
+- **Veto-only response verifier** (`--llm-verifier`, explicit opt-in). When the rule checker flags a semantic class (the false-positive-prone Stage 6 classes), an LLM verifier may adjudicate it benign — or reject with line-numbered, verbatim-quoted findings that the code re-verifies. It can never rewrite or add text; hard gates (fabricated refs/URIs, missing escalation) are never adjudicable; any verifier failure falls back to the full rule checker, so degradation is never weaker.
+- **Persistent turn traces.** Every plan/act/observe/reflect/respond entry lands in a `turn_traces` table (process record), deliberately separate from `audit_log` (data-mutation record), so “why did it answer that way?” is answerable across sessions.
+
+## RAG corpus fix (Stage 9, C1)
+
+The held-out recall gap was concentrated in theophylline-class pairs because 茶碱 was absent from the chronic-drug priority list — their labels could only enter the 1,200-label corpus via the random hash sample. The term list now includes 茶碱/氨茶碱/多索茶碱, and a v2 corpus (`rag_corpus_v2.jsonl`, selection seed `stage1-rag-v2`) was rebuilt alongside the untouched v1: **90 theophylline labels** now in corpus, index at 4,051 chunks. The held-out DDI re-run for the recall delta is pending (needs live KEGG + provider); no number is claimed until it runs. Retrieval-layer work (rerank, query expansion, second-pass citation) is deferred by the one-month cut.
+
+## Service layer, two-layer idempotency, outbox (Stage 10)
+
+`stage0/server.py` exposes the system as a single-writer FastAPI service (the Streamlit default direct path is unchanged; the UI becomes an API client only when `STAGE0_API_URL` is set):
+
+- **Async-first events.** `POST /v1/events` with an `Idempotency-Key` header atomically claims the key and enqueues an outbox task in one transaction, then returns `202` with a polling URL; a single in-process worker executes agent turns (also draining durable rechecks).
+- **Two idempotency layers.** Request-level: same key + same payload replays the same acceptance (concurrent same-key submissions get the identical 202 — no 409 storm); same key + different payload → 422. Domain-level: the event key derives from the idempotency key, so replays dedup in the projection itself.
+- **At-least-once, effectively-once.** Worker claims carry expiring leases; crashed claims are recovered; three failed claims mark the task failed (409 on that key, a new key retries). Tests assert crash recovery produces exactly one projection.
+- Read endpoints (`/v1/memory/state|timeline|conflicts`, `/v1/alerts`), conflict actions, `/v1/rechecks`, `/v1/health`, and a four-category error model (validation/safety/provider/internal) with `trace_id`.
+
+Honest boundary: one writer process (`--workers >1` unsupported by design); see the design document section D7 for the documented Postgres migration triggers.
+
+**Reliability P0 (2026-09)** hardened this layer: server-generated `event_id`/`run_id` identity (the agent turn id is a uuid, no longer a truncation of the idempotency key — long-key prefix collisions cannot merge two events), lease-fenced worker writes with heartbeat renewal, one-transaction publication of task result + idempotency-key state, durable `operation_receipts` protecting consolidation/warning writes against replay, classified failures (`retryable`/`permanent`/`safety`/`effect_unknown`) with backoff+jitter and an explicit `POST /v1/events/{key}/retry` recovery endpoint, a committed-replay POST that now returns the same full body as the status endpoint, `SubmitKeyStore` so UI timeout retries reuse the same event, and a `Principal` layer (`STAGE0_AUTH_MODE=local-demo` default with an explicit warning; `deployment` refuses to start without `STAGE0_AUTH_TOKEN`). Design and audit trail: [docs/reliability-design/](docs/reliability-design/), implementation report: [docs/reliability-implementation/p0_implementation_report.md](docs/reliability-implementation/p0_implementation_report.md).
+
+**Reliability P1 (2026-09, opt-in)** adds a LangGraph StateGraph runner behind `AGENT_GRAPH_RUNNER=1` (legacy stays the default path): the turn is split into `load_context → plan → execute → compose → publish` nodes with a persistent SQLite checkpointer, so a crashed turn resumes from the last completed step; the "domain commit succeeded but checkpoint missing" window is closed by the P0 operation receipts (a replayed `execute` node returns the stored result instead of duplicating the effect); accumulated budget is persisted to `workflow_runs` and never resets on restart; the checkpointer state carries JSON-safe fields only; and in-flight runs keep the runner version that created them (`workflow_runs.graph_version`), so flag changes never silently re-route a paused run. Shadow comparison runs on isolated databases only. See [docs/reliability-implementation/p1_implementation_report.md](docs/reliability-implementation/p1_implementation_report.md).
+
+**Reliability P2 (2026-09, opt-in behind `STAGE0_REVIEW_ENABLED=1` + the graph runner)** closes the human-review loop: severe warnings or unresolved conflicts open an idempotent review case, publish a safe waiting response and park the run on a LangGraph `interrupt()` — the worker lease is released immediately, so no thread/lock/transaction ever waits for a human. Reviewers (a clearly-marked **simulated** local workbench, `streamlit run stage0/review_app.py`) claim cases with CAS revision, submit one of five structured decisions (Idempotency-Key protected; no graph goto/SQL/state patch is expressible), and the worker resumes the run via `Command(resume=...)`. The resume node re-validates everything and re-checks fact freshness: if medications or facts changed while waiting, the decision is refused as `review_stale`, the case is cancelled and a fresh round opens — an old approval never authorizes a new state. Overdue cases are an operational state only; timeout never auto-approves. No real clinician service is connected: UI, exports, and the reviewer page all say so explicitly. See [docs/reliability-implementation/p2_implementation_report.md](docs/reliability-implementation/p2_implementation_report.md).
+
 ## The agent loop and safety boundary
 
 The loop is deliberately event-driven rather than a fixed chatbot script:
@@ -104,6 +148,12 @@ python stage0/demo.py --reset
 
 # Same walkthrough with LLM-first planning. Provider failure safely falls back.
 python stage0/demo.py --reset --llm-planner
+
+# Stage 10 (optional): run the single-writer service layer instead of direct mode.
+python -m pip install -r stage0/requirements-stage10.txt
+python -m uvicorn stage0.server:app --host 127.0.0.1 --port 8000
+#   then: $env:STAGE0_API_URL="http://127.0.0.1:8000"; streamlit run stage0/app.py
+#   POST /v1/events with an Idempotency-Key header returns 202 + a polling URL.
 ```
 
 In the UI, **清空并重新开始** removes only `stage0/memory.db` and its SQLite sidecars. **开启新会话（保留记忆）** closes and reopens the database with a fresh agent, which makes cross-session recall visible. The app starts with the real local agent and memory; it does not require an API key in its default mode. See [DEMO.md](DEMO.md) for a ≤3-minute click-by-click run.
@@ -111,7 +161,7 @@ In the UI, **清空并重新开始** removes only `stage0/memory.db` and its SQL
 The existing Stage 0/1/2 reproduction commands, data lineage, and detector details remain in [stage0/REPORT.md](stage0/REPORT.md). The current offline Stage 3 and Stage 6 behavior/safety tests can be run with:
 
 ```powershell
-python -m unittest stage0.test_stage3 stage0.test_stage6
+python -m unittest stage0.test_stage3 stage0.test_stage5 stage0.test_stage6 stage0.test_memory_p0 stage0.test_memory_p1 stage0.test_memory_p2 stage0.test_stage8_agent stage0.test_stage10_server
 
 # Rebuild a separate network-free fixture artifact.
 python stage0/test_stage6.py --evaluate-offline --metrics stage0/data/structured/agentic_eval_offline.json
@@ -128,7 +178,7 @@ python stage0/test_stage6.py --evaluate-live
 - The held-out labels and controls are small and single-evaluator; they are not clinical validation.
 - KEGG is corroborative, not authoritative Chinese-label evidence.
 - Source freshness and label coverage are not guaranteed; the curated local corpus is an MNBVC-derived sample.
-- The held-out recall gap is concentrated in theophylline-class pairs (`茶碱`).
+- The held-out recall gap was concentrated in theophylline-class pairs (`茶碱`); the Stage 9 corpus fix puts 90 theophylline labels into the v2 corpus, but the held-out re-run for the recall delta has not yet been executed — no improvement is claimed until it is measured.
 - KEGG `P` interactions default to `moderate` when stronger severity evidence is absent, producing the observed high-risk severity gap.
 - Class inference (for example aspirin × ibuprofen) is deliberately low-confidence and escalated, not presented as a direct label claim.
 - Stage 6 planning sat exactly at the 0.20 fallback target in the fresh live pass (4 provider timeouts in 20 cycles) and took 3 extra cycles. The 3/4 accepted compositions come from a zero-call replay after one checker correction; only 1 live scenario qualified as a safe divergent tool order against the ≥2 target. Single-run counts are not stable model-quality estimates.

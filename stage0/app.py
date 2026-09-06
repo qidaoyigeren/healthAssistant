@@ -31,9 +31,11 @@ import streamlit as st
 
 try:
     from .agent import AgentResponse, CareEvent, MedicationCoordinatorAgent
+    from .api_client import Stage0ApiClient
     from .memory import DEFAULT_DB, MemoryStore, memory_ref
 except ImportError:  # Support ``streamlit run stage0/app.py``.
     from agent import AgentResponse, CareEvent, MedicationCoordinatorAgent  # type: ignore
+    from api_client import Stage0ApiClient  # type: ignore
     from memory import DEFAULT_DB, MemoryStore, memory_ref  # type: ignore
 
 
@@ -41,6 +43,17 @@ ROOT = Path(__file__).resolve().parent
 DB_PATH = DEFAULT_DB.resolve()
 LLM_ENABLED = "--llm" in sys.argv[1:]
 LLM_PLANNER_ENABLED = "--llm-planner" in sys.argv[1:]
+# Stage 8 B4: veto-only LLM verifier — explicit opt-in on top of the composer
+# path (it only runs when a composed response exists to verify).
+LLM_VERIFIER_ENABLED = (
+    "--llm-verifier" in sys.argv[1:]
+    or os.getenv("AGENT_LLM_VERIFIER", "").strip().lower() in {"1", "true", "yes", "on"}
+)
+# Stage 10: when STAGE0_API_URL is set the UI becomes a pure API client of the
+# service layer (async events via the outbox worker); the default stays the
+# direct in-process, offline-first path.
+API_BASE_URL = os.getenv("STAGE0_API_URL", "").strip()
+API_CLIENT = Stage0ApiClient(API_BASE_URL) if API_BASE_URL else None
 
 # Keep the normal demo reproducible and network-free.  ``--llm`` enables only
 # structured fact extraction, while ``--llm-planner`` separately opts into
@@ -312,7 +325,11 @@ def _runtime() -> tuple[MemoryStore, MedicationCoordinatorAgent]:
             old_memory.close()
         memory = MemoryStore(DB_PATH, llm_enabled=LLM_ENABLED)
         st.session_state.memory_store = memory
-        st.session_state.agent = MedicationCoordinatorAgent(memory, llm_planner_enabled=LLM_PLANNER_ENABLED)
+        st.session_state.agent = MedicationCoordinatorAgent(
+            memory,
+            llm_planner_enabled=LLM_PLANNER_ENABLED,
+            llm_verifier_enabled=LLM_VERIFIER_ENABLED and LLM_PLANNER_ENABLED,
+        )
         st.session_state.runtime_mode = requested_mode
     if "session_id" not in st.session_state:
         st.session_state.session_id = f"caregiver-ui-{uuid.uuid4().hex[:10]}"
@@ -351,10 +368,35 @@ def _reopen_session(*, clear_database: bool = False) -> None:
 
 
 def _handle_event(event: CareEvent, label: str) -> None:
-    _, agent = _runtime()
     try:
         with st.spinner("正在写入记忆、检查证据并执行安全边界…"):
-            response = agent.handle(event, session_id=st.session_state.session_id)
+            if API_CLIENT is not None:
+                # Stage 10 API mode: async submit + poll; the outbox worker
+                # runs the agent turn in the service process.
+                # Reliability P0: the idempotency key is STABLE per business
+                # submission — a timeout retry of the same content reuses the
+                # same event; only a deliberate new report (after a committed
+                # result, or in a new session) mints a new key.
+                event_body = {"event_type": event.event_type, "text": event.text,
+                              "payload": event.payload, "source": event.source,
+                              "occurred_at": event.occurred_at}
+                outcome = API_CLIENT.submit_event(
+                    event_body, session_id=st.session_state.session_id)
+                result = outcome.get("response") or {}
+                response = AgentResponse(
+                    text=result.get("text", ""),
+                    warnings=result.get("warnings", []),
+                    conflicts=result.get("conflicts", []),
+                    audit_trail=result.get("audit_trail", {}),
+                    tool_trace=[],
+                    safety_status=result.get("safety_status", "enforced"))
+                # Reliability P2: the turn may be parked at clinical review —
+                # keep the waiting case for the banner + summary export.
+                st.session_state.review_waiting = result.get("run_status") == "waiting_review"
+                st.session_state.review_case = result.get("review_case")
+            else:
+                _, agent = _runtime()
+                response = agent.handle(event, session_id=st.session_state.session_id)
         st.session_state.last_response = response
         st.session_state.last_event = label
         st.session_state.pop("runtime_error", None)
@@ -534,26 +576,48 @@ def _render_sidebar() -> None:
             _reopen_session(clear_database=False)
         st.divider()
         st.markdown("**重置演示**")
-        reset_confirmed = st.checkbox(
-            "我确认清空 stage0/memory.db",
-            key=f"reset_confirmed_{st.session_state.get('ui_revision', 0)}",
-        )
-        if st.button("清空并重新开始", disabled=not reset_confirmed, use_container_width=True):
-            _reopen_session(clear_database=True)
-        st.caption("仅删除 memory.db 及 SQLite sidecar；不会改动代码、数据或评估结果。")
+        if API_CLIENT is not None:
+            # API 模式下数据库归服务进程所有；不做任何本地清空操作。
+            st.caption("API 客户端模式：数据库由服务进程持有，重置请在服务端执行。")
+        else:
+            reset_confirmed = st.checkbox(
+                "我确认清空 stage0/memory.db",
+                key=f"reset_confirmed_{st.session_state.get('ui_revision', 0)}",
+            )
+            if st.button("清空并重新开始", disabled=not reset_confirmed, use_container_width=True):
+                _reopen_session(clear_database=True)
+            st.caption("仅删除 memory.db 及 SQLite sidecar；不会改动代码、数据或评估结果。")
         st.divider()
         st.caption("非医疗器械 · 不诊断 · 不处方 · 不建议自行停药或改量")
 
 
-memory, _agent = _runtime()
 if "ui_revision" not in st.session_state:
     st.session_state.ui_revision = 0
-snapshot = memory.snapshot()
-warning_records = _stored_warning_records(memory)
-medication_events = [
-    item for item in memory.timeline(limit=500)
-    if item.get("event_type") in {"medication_add", "medication_remove", "medication_dose_change"}
-]
+if API_CLIENT is not None:
+    # Stage 10 API mode: reads go through the service layer; no local store.
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = f"caregiver-ui-{uuid.uuid4().hex[:10]}"
+        st.session_state.session_number = 1
+    _api_state = API_CLIENT.memory_state()
+    snapshot = {
+        "semantic": _api_state.get("facts", []),
+        "medications": _api_state.get("medications", []),
+        "open_conflicts": _api_state.get("open_conflicts", []),
+    }
+    warning_records = API_CLIENT.alerts()
+    medication_events = [
+        item for item in API_CLIENT.timeline(limit=500)
+        if item.get("event_type") in {"medication_add", "medication_remove", "medication_dose_change"}
+    ]
+    memory, _agent = None, None
+else:
+    memory, _agent = _runtime()
+    snapshot = memory.snapshot()
+    warning_records = _stored_warning_records(memory)
+    medication_events = [
+        item for item in memory.timeline(limit=500)
+        if item.get("event_type") in {"medication_add", "medication_remove", "medication_dose_change"}
+    ]
 
 st.markdown(STYLES, unsafe_allow_html=True)
 _render_sidebar()
@@ -707,6 +771,23 @@ with left:
 
 with right:
     _render_response(st.session_state.get("last_response"), st.session_state.get("last_event"))
+    # Reliability P2: waiting-for-review state + exportable summary.
+    if st.session_state.get("review_waiting"):
+        case = st.session_state.get("review_case") or {}
+        st.warning(
+            f"🕐 **等待专业审核中**（工单 #{case.get('id')}，第 {case.get('round')} 轮，"
+            "SLA 截止 " + str(case.get("due_at")) + "）。超时不会自动通过；"
+            "本地演示环境尚未接入真实人工服务。", icon="⏳")
+        if API_CLIENT is not None and case.get("id"):
+            try:
+                summary = API_CLIENT.review_case_summary(case["id"])
+                st.download_button(
+                    "导出咨询摘要（JSON，供线下咨询医生/药师）",
+                    data=json.dumps(summary, ensure_ascii=False, indent=2),
+                    file_name=f"review_case_{case['id']}_summary.json",
+                    mime="application/json", key="export-review-summary")
+            except Exception as exc:  # Export must never block the UI.
+                st.caption(f"摘要导出暂不可用：{type(exc).__name__}")
 
 st.divider()
 warnings_tab, memory_tab, profile_view_tab = st.tabs(["风险预警", "记忆账本", "档案与边界"])
