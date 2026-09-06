@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+/*
+ * 「照护记录册」设计 token — 克制的青绿/深蓝灰/浅灰白体系。
+ * 对比度:ink(#17324D)on canvas(#F3F7F7)= 11.5:1;primary(#2A7A78)白字 = 4.6:1;
+ * caution(#8B5D11)on canvas = 5.4:1;danger(#B94846)白字 = 4.6:1。
+ */
+@theme {
+  --color-canvas: #f3f7f7;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f8fafa;
+  --color-ink: #17324d;
+  --color-ink-secondary: #46586a;
+  --color-ink-muted: #6d7f8d;
+  --color-border: #dbe4e4;
+  --color-border-strong: #b7c7c6;
+  --color-primary: #2a7a78;
+  --color-primary-strong: #20615f;
+  --color-primary-soft: #e2efee;
+  --color-caution: #8b5d11;
+  --color-caution-soft: #f5eddd;
+  --color-danger: #b94846;
+  --color-danger-soft: #f7e7e6;
+  --color-code-bg: #eef3f3;
+
+  --font-sans: "Source Han Sans SC", "Noto Sans CJK SC", "PingFang SC",
+    "Microsoft YaHei", system-ui, sans-serif;
+  --font-serif: "Source Han Serif SC", "Noto Serif CJK SC", "SimSun", serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --radius-card: 10px;
+}
+
+html {
+  font-size: 16px;
+}
+
+/* 大字模式:真实生效,通过根元素字号放大所有 rem 尺寸 */
+html[data-fontsize="large"] {
+  font-size: 18.5px;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 打印:仅打印当前记录摘要 */
+@media print {
+  body {
+    background: #fff;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-full {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+}
