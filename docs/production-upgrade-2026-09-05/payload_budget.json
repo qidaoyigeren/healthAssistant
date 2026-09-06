@@ -1,0 +1,47 @@
+{
+  "measurement": "synthetic RAG-sized observation stacks (5 chunks x 480 chars per cycle); chars/1.5 token estimate; single observation per cycle",
+  "rows": [
+    {
+      "observations": 2,
+      "old_chars": 14635,
+      "new_chars": 5807,
+      "old_tokens_estimated": 9756,
+      "new_tokens_estimated": 3871
+    },
+    {
+      "observations": 4,
+      "old_chars": 27119,
+      "new_chars": 7891,
+      "old_tokens_estimated": 18079,
+      "new_tokens_estimated": 5260
+    },
+    {
+      "observations": 6,
+      "old_chars": 39603,
+      "new_chars": 8403,
+      "old_tokens_estimated": 26402,
+      "new_tokens_estimated": 5602
+    },
+    {
+      "observations": 8,
+      "old_chars": 52087,
+      "new_chars": 8915,
+      "old_tokens_estimated": 34724,
+      "new_tokens_estimated": 5943
+    },
+    {
+      "observations": 12,
+      "old_chars": 77067,
+      "new_chars": 9551,
+      "old_tokens_estimated": 51378,
+      "new_tokens_estimated": 6367
+    },
+    {
+      "observations": 16,
+      "old_chars": 101887,
+      "new_chars": 10027,
+      "old_tokens_estimated": 67924,
+      "new_tokens_estimated": 6684
+    }
+  ]
+}

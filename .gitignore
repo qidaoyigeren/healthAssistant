@@ -15,3 +15,10 @@ stage0/memory.db*
 # Stage 7 backup/export artifacts (stage0/backup.py)
 stage0/backups/
 stage0/exports/
+
+# Frontend build artifacts (frontend round, 2026-09-06)
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.idea/

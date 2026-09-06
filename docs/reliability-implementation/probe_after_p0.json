@@ -1,0 +1,33 @@
+{
+ "prefix_collision": {
+  "http": [
+   202,
+   202
+  ],
+  "turn_ids": [
+   "1dbcccb2ed824bdd96e782a5ac2e36cb",
+   "cd53df29f7af4600891e71b714563033"
+  ],
+  "distinct_run_ids": 2
+ },
+ "stale_worker": {
+  "new_lease_issued": true,
+  "old_complete_accepted": false,
+  "rejection": "LeaseRejected",
+  "status_after_old_complete": "done"
+ },
+ "committed_replay_shape": {
+  "post_has_response": true,
+  "get_has_response": true,
+  "response_identical": true
+ },
+ "consolidation_event_keys": [
+  "api:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+  "api:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2"
+ ],
+ "receipts": [
+  "consolidate:api:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+  "consolidate:api:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2",
+  "warnings:api:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa2:2914fc064a7b5b5a"
+ ]
+}
