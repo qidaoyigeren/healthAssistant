@@ -22,3 +22,16 @@ frontend/dist/
 
 # IDE
 .idea/
+
+# Local run artifacts, logs and eval snapshots (not for upload)
+.artifacts/
+output/
+
+# Frontend incremental build info
+*.tsbuildinfo
+
+# Non-project working files (course doc, agent-prompt working notes) — local only
+/24050532-*.docx
+/Agent Harness分级改造Prompt.md
+/docs/agent-product-upgrade-prompts-2026-09-07.md
+/docs/harness-upgrade-prompts/
