@@ -1,0 +1,21 @@
+{
+  "task_id": "dev-product-030",
+  "phase": "P4",
+  "capability": "population",
+  "group": "synthetic-p4-contract-v1",
+  "title": "population",
+  "inputs": {
+    "seed": {},
+    "call": {
+      "action": "claim_support",
+      "quote": "儿童使用药甲与药乙合用增加出血风险"
+    }
+  },
+  "expected": {
+    "type": "db_state",
+    "status": "insufficient"
+  },
+  "requires": [
+    "fixture_db"
+  ]
+}

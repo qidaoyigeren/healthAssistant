@@ -1,0 +1,21 @@
+{
+  "task_id": "dev-product-029",
+  "phase": "P4",
+  "capability": "unrelated",
+  "group": "synthetic-p4-contract-v1",
+  "title": "unrelated",
+  "inputs": {
+    "seed": {},
+    "call": {
+      "action": "claim_support",
+      "quote": "药甲和药乙属于常见药物"
+    }
+  },
+  "expected": {
+    "type": "db_state",
+    "status": "insufficient"
+  },
+  "requires": [
+    "fixture_db"
+  ]
+}

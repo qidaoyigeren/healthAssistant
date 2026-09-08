@@ -1,0 +1,22 @@
+{
+  "task_id": "dev-product-023",
+  "phase": "P3",
+  "capability": "current_medications_continue",
+  "group": "synthetic-p3-contract-v1",
+  "title": "current_medications_continue",
+  "inputs": {
+    "seed": {},
+    "call": {
+      "action": "care_task_contract",
+      "goal_type": "current_medications",
+      "task_action": "continue"
+    }
+  },
+  "expected": {
+    "type": "db_state",
+    "status": "completed"
+  },
+  "requires": [
+    "fixture_db"
+  ]
+}

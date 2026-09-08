@@ -1,0 +1,20 @@
+{
+  "task_id": "dev-p1-imp-008",
+  "phase": "P1",
+  "capability": "change_impact",
+  "group": "g-invalidation",
+  "title": "重查失败/未运行时状态不得显示风险解除",
+  "inputs": {
+    "seed": {
+      "events": [
+        {"idempotency_key": "ev-amlo", "event_type": "medication_change", "text": "新增氨氯地平", "payload": {"action": "add", "medication": "氨氯地平", "dose": "5mg"}, "session_id": "s1"},
+        {"idempotency_key": "ev-clari", "event_type": "medication_change", "text": "新增克拉霉素", "payload": {"action": "add", "medication": "克拉霉素", "dose": "250mg"}, "session_id": "s1"}
+      ],
+      "correction": {"idempotency_key": "ev-correction", "event_type": "medication_change", "text": "更正氨氯地平剂量", "payload": {"action": "dose_change", "medication": "氨氯地平", "dose": "10mg"}, "session_id": "s1"},
+      "force_recheck_failure": "remove_hook"
+    },
+    "call": {"action": "run_recheck_then_read_status"}
+  },
+  "expected": {"type": "db_state", "no_all_clear": true},
+  "requires": ["fixture_db"]
+}

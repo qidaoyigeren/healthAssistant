@@ -1,0 +1,19 @@
+{
+  "task_id": "dev-p0-inv-010",
+  "phase": "P0",
+  "capability": "answer_bundle",
+  "group": "g-invariants",
+  "title": "AnswerBundle 与最终文本同源；安全检查仍作用于最终文本",
+  "inputs": {
+    "seed": {},
+    "call": {"action": "submit_event_and_read_bundle",
+             "event": {"event_type": "query_current_medications", "text": "当前在用什么药？", "session_id": "s1"}}
+  },
+  "expected": {
+    "type": "bundle_shape",
+    "bundle_version_prefix": "answer-bundle@",
+    "safety_status": "enforced",
+    "warnings_from_bundle_match_payload": true
+  },
+  "requires": ["fixture_db"]
+}

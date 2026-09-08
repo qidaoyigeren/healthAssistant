@@ -1,0 +1,24 @@
+{
+  "task_id": "dev-product-016",
+  "phase": "P2",
+  "capability": "wrong_subject",
+  "group": "synthetic-p2-contract-v1",
+  "title": "wrong_subject",
+  "inputs": {
+    "seed": {},
+    "call": {
+      "action": "import_reconciliation",
+      "text": "name,dose,unit,schedule,date,subject\n氨氯地平,5,mg,每日一次,2026-09-08,他人\n"
+    }
+  },
+  "expected": {
+    "type": "db_state",
+    "http_status": 200,
+    "kinds": [
+      "unresolved"
+    ]
+  },
+  "requires": [
+    "fixture_db"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "task_id": "dev-p0-inv-011",
+  "phase": "P0",
+  "capability": "write_semantics",
+  "group": "g-invariants",
+  "title": "同键同载荷重试不产生第二次领域效果",
+  "inputs": {
+    "seed": {},
+    "call": {
+      "action": "submit_event_twice",
+      "event": {"event_type": "medication_change", "text": "新增SYN-美托洛尔", "payload": {"action": "add", "medication": "SYN-美托洛尔", "dose": "25mg"}, "session_id": "s1"},
+      "idempotency_key": "syn-eval-key-001"
+    }
+  },
+  "expected": {"type": "db_state", "medication_add_effects": 1},
+  "requires": ["fixture_db"]
+}

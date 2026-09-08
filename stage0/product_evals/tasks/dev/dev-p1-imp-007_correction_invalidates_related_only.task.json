@@ -1,0 +1,25 @@
+{
+  "task_id": "dev-p1-imp-007",
+  "phase": "P1",
+  "capability": "change_impact",
+  "group": "g-invalidation",
+  "title": "更正关联事实后相关结论进入待重查，无关结论不受影响",
+  "inputs": {
+    "seed": {
+      "events": [
+        {"idempotency_key": "ev-amlo", "event_type": "medication_change", "text": "新增氨氯地平", "payload": {"action": "add", "medication": "氨氯地平", "dose": "5mg"}, "session_id": "s1"},
+        {"idempotency_key": "ev-nife", "event_type": "medication_change", "text": "新增硝苯地平", "payload": {"action": "add", "medication": "硝苯地平", "dose": "30mg"}, "session_id": "s1"},
+        {"idempotency_key": "ev-clari", "event_type": "medication_change", "text": "新增克拉霉素", "payload": {"action": "add", "medication": "克拉霉素", "dose": "250mg"}, "session_id": "s1"}
+      ],
+      "correction": {"idempotency_key": "ev-correction", "event_type": "medication_change", "text": "更正氨氯地平剂量", "payload": {"action": "dose_change", "medication": "氨氯地平", "dose": "10mg"}, "session_id": "s1"}
+    },
+    "call": {"action": "apply_correction"}
+  },
+  "expected": {
+    "type": "db_state",
+    "related_conclusion_status": "stale_pending_recheck",
+    "unrelated_conclusion_status": "current",
+    "impact_summary_consistent_with_details": true
+  },
+  "requires": ["fixture_db"]
+}

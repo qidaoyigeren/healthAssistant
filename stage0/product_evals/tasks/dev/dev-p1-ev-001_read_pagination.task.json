@@ -1,0 +1,23 @@
+{
+  "task_id": "dev-p1-ev-001",
+  "phase": "P1",
+  "capability": "evidence_readback",
+  "group": "g-evidence-api",
+  "title": "正常分页读取证据原文",
+  "inputs": {
+    "seed": {
+      "evidence": [
+        {"content": "SYNTHETIC-LABEL：阿司匹林肠溶片说明书中关于与其他抗血小板药合用的注意事项段落，用于合成评测。", "source_uri": "https://synthetic.example/label/aspirin", "corpus_version": "synthetic-1"}
+      ]
+    },
+    "call": {"evidence_id": "$evidence[0].evidence_id", "offset": 0, "limit": 10}
+  },
+  "expected": {
+    "type": "read_page",
+    "returned_chars_gt": 0,
+    "content_matches_hash": true,
+    "total_chars_eq_full": true,
+    "truncated": true
+  },
+  "requires": ["fixture_db"]
+}

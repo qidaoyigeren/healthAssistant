@@ -1,0 +1,15 @@
+{
+  "task_id": "dev-p1-ev-005",
+  "phase": "P1",
+  "capability": "evidence_readback",
+  "group": "g-evidence-api",
+  "title": "同一引用重复回读内容一致",
+  "inputs": {
+    "seed": {
+      "evidence": [{"content": "SYNTHETIC：稳定性核验正文，重复读取两次必须逐字节一致。", "source_uri": "https://synthetic.example/stable", "corpus_version": "synthetic-1"}]
+    },
+    "call": {"evidence_id": "$evidence[0].evidence_id", "offset": 0, "limit": 200, "repeat": 2}
+  },
+  "expected": {"type": "read_page", "reads_identical": true, "content_matches_hash": true},
+  "requires": ["fixture_db"]
+}

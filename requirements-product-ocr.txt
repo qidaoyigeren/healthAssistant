@@ -1,0 +1,5 @@
+# Optional local document parsing. CSV import does not require these packages.
+rapidocr==3.9.2
+onnxruntime==1.29.0
+PyMuPDF==1.28.2
+Pillow==12.3.0

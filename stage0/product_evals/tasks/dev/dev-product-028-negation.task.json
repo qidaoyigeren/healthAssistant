@@ -1,0 +1,21 @@
+{
+  "task_id": "dev-product-028",
+  "phase": "P4",
+  "capability": "negation",
+  "group": "synthetic-p4-contract-v1",
+  "title": "negation",
+  "inputs": {
+    "seed": {},
+    "call": {
+      "action": "claim_support",
+      "quote": "药甲与药乙未发现相互作用"
+    }
+  },
+  "expected": {
+    "type": "db_state",
+    "status": "contradicted"
+  },
+  "requires": [
+    "fixture_db"
+  ]
+}

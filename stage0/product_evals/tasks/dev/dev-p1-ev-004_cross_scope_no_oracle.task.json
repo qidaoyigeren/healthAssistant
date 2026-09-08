@@ -1,0 +1,15 @@
+{
+  "task_id": "dev-p1-ev-004",
+  "phase": "P1",
+  "capability": "evidence_readback",
+  "group": "g-evidence-api",
+  "title": "跨 scope 读取与缺失证据返回同一致错误（无存在性预言机）",
+  "inputs": {
+    "seed": {
+      "evidence": [{"content": "SYNTHETIC：属于其他 scope 的正文。", "source_uri": "https://synthetic.example/z", "corpus_version": "synthetic-1", "scope_id": "other-scope"}]
+    },
+    "call": {"evidence_id": "$evidence[0].evidence_id", "offset": 0, "limit": 200, "as_scope": "local-demo"}
+  },
+  "expected": {"type": "api_status", "rejects": true, "error_kind": "evidence_unavailable", "same_error_as_missing": true},
+  "requires": ["fixture_db"]
+}

@@ -1,0 +1,21 @@
+{
+  "task_id": "dev-product-027",
+  "phase": "P4",
+  "capability": "real_support",
+  "group": "synthetic-p4-contract-v1",
+  "title": "real_support",
+  "inputs": {
+    "seed": {},
+    "call": {
+      "action": "claim_support",
+      "quote": "药甲与药乙合用增加出血风险"
+    }
+  },
+  "expected": {
+    "type": "db_state",
+    "status": "supported"
+  },
+  "requires": [
+    "fixture_db"
+  ]
+}

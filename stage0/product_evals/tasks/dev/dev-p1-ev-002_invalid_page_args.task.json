@@ -1,0 +1,15 @@
+{
+  "task_id": "dev-p1-ev-002",
+  "phase": "P1",
+  "capability": "evidence_readback",
+  "group": "g-evidence-api",
+  "title": "非法分页参数被拒绝",
+  "inputs": {
+    "seed": {
+      "evidence": [{"content": "SYNTHETIC：占位正文。", "source_uri": "https://synthetic.example/x", "corpus_version": "synthetic-1"}]
+    },
+    "call": {"evidence_id": "$evidence[0].evidence_id", "offset": -1, "limit": 0}
+  },
+  "expected": {"type": "api_status", "rejects": true, "error_kind": "invalid_arguments", "no_content": true},
+  "requires": ["fixture_db"]
+}

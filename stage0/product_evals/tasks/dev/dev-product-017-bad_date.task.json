@@ -1,0 +1,24 @@
+{
+  "task_id": "dev-product-017",
+  "phase": "P2",
+  "capability": "bad_date",
+  "group": "synthetic-p2-contract-v1",
+  "title": "bad_date",
+  "inputs": {
+    "seed": {},
+    "call": {
+      "action": "import_reconciliation",
+      "text": "name,dose,unit,schedule,date,subject\n氨氯地平,5,mg,每日一次,未知,local-demo\n"
+    }
+  },
+  "expected": {
+    "type": "db_state",
+    "http_status": 200,
+    "kinds": [
+      "unresolved"
+    ]
+  },
+  "requires": [
+    "fixture_db"
+  ]
+}

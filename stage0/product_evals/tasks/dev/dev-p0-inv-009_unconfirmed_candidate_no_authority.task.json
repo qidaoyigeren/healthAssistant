@@ -1,0 +1,16 @@
+{
+  "task_id": "dev-p0-inv-009",
+  "phase": "P0",
+  "capability": "candidate_isolation",
+  "group": "g-invariants",
+  "title": "未确认候选不进入权威患者事实",
+  "inputs": {
+    "seed": {
+      "facts": [{"kind": "medication", "name": "SYN-华法林", "detail": "2.5mg qd"}],
+      "import_raw_row": "SYN-阿莫西林, 500mg, tid（合成候选，未确认）"
+    },
+    "call": {"action": "stage_candidate_only"}
+  },
+  "expected": {"type": "db_state", "authority_medication_names_excludes": ["SYN-阿莫西林"], "candidate_status": "pending"},
+  "requires": ["fixture_db"]
+}

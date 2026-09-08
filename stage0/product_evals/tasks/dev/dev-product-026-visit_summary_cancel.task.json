@@ -1,0 +1,22 @@
+{
+  "task_id": "dev-product-026",
+  "phase": "P3",
+  "capability": "visit_summary_cancel",
+  "group": "synthetic-p3-contract-v1",
+  "title": "visit_summary_cancel",
+  "inputs": {
+    "seed": {},
+    "call": {
+      "action": "care_task_contract",
+      "goal_type": "visit_summary",
+      "task_action": "cancel"
+    }
+  },
+  "expected": {
+    "type": "db_state",
+    "status": "cancelled"
+  },
+  "requires": [
+    "fixture_db"
+  ]
+}

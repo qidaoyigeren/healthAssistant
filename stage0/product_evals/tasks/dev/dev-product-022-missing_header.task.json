@@ -1,0 +1,21 @@
+{
+  "task_id": "dev-product-022",
+  "phase": "P2",
+  "capability": "missing_header",
+  "group": "synthetic-p2-contract-v1",
+  "title": "missing_header",
+  "inputs": {
+    "seed": {},
+    "call": {
+      "action": "import_reconciliation",
+      "text": "name,dose\n氨氯地平,5\n"
+    }
+  },
+  "expected": {
+    "type": "db_state",
+    "http_status": 422
+  },
+  "requires": [
+    "fixture_db"
+  ]
+}

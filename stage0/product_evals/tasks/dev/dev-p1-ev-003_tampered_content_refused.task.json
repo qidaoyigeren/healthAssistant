@@ -1,0 +1,16 @@
+{
+  "task_id": "dev-p1-ev-003",
+  "phase": "P1",
+  "capability": "evidence_readback",
+  "group": "g-evidence-api",
+  "title": "内容被篡改时读取被拒绝",
+  "inputs": {
+    "seed": {
+      "evidence": [{"content": "SYNTHETIC：完整性受保护的正文。", "source_uri": "https://synthetic.example/y", "corpus_version": "synthetic-1"}],
+      "tamper": {"evidence_index": 0, "append": "（篡改追加）"}
+    },
+    "call": {"evidence_id": "$evidence[0].evidence_id", "offset": 0, "limit": 200}
+  },
+  "expected": {"type": "api_status", "rejects": true, "error_kind": "evidence_unavailable", "integrity": "hash_mismatch"},
+  "requires": ["fixture_db"]
+}

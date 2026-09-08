@@ -1,0 +1,22 @@
+{
+  "task_id": "dev-product-025",
+  "phase": "P3",
+  "capability": "current_medications_cancel",
+  "group": "synthetic-p3-contract-v1",
+  "title": "current_medications_cancel",
+  "inputs": {
+    "seed": {},
+    "call": {
+      "action": "care_task_contract",
+      "goal_type": "current_medications",
+      "task_action": "cancel"
+    }
+  },
+  "expected": {
+    "type": "db_state",
+    "status": "cancelled"
+  },
+  "requires": [
+    "fixture_db"
+  ]
+}

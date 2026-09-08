@@ -1,0 +1,22 @@
+{
+  "task_id": "dev-product-024",
+  "phase": "P3",
+  "capability": "visit_summary_continue",
+  "group": "synthetic-p3-contract-v1",
+  "title": "visit_summary_continue",
+  "inputs": {
+    "seed": {},
+    "call": {
+      "action": "care_task_contract",
+      "goal_type": "visit_summary",
+      "task_action": "continue"
+    }
+  },
+  "expected": {
+    "type": "db_state",
+    "status": "completed"
+  },
+  "requires": [
+    "fixture_db"
+  ]
+}

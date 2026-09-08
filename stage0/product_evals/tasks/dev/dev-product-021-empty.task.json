@@ -1,0 +1,21 @@
+{
+  "task_id": "dev-product-021",
+  "phase": "P2",
+  "capability": "empty",
+  "group": "synthetic-p2-contract-v1",
+  "title": "empty",
+  "inputs": {
+    "seed": {},
+    "call": {
+      "action": "import_reconciliation",
+      "text": "name,dose,unit,schedule,date,subject\n"
+    }
+  },
+  "expected": {
+    "type": "db_state",
+    "http_status": 422
+  },
+  "requires": [
+    "fixture_db"
+  ]
+}
