@@ -4,12 +4,12 @@
  */
 import { request, newIdempotencyKey } from './http';
 import type {
-  AcceptanceDto, ArtifactDto, ArtifactReportDto,
-  ConflictActionDto, ConflictDto, ConflictRecordDto, ConclusionDto,
-  EpisodicEventDto, EventRequest, FactActionResponseDto, FailedEventDto,
+  AcceptanceDto, ArtifactDto, ArtifactReportDto, CancelRunDto,
+  ChangeImpactDto, ConflictActionDto, ConflictDto, ConflictRecordDto, ConclusionDto,
+  EpisodicEventDto, EventRequest, EvidenceReadDto, FactActionResponseDto, FailedEventDto,
   HealthDto, HistorySearchDto, MedicationRecordDto, MemoryItemDto,
-  MemoryStateDto, OverviewDto, Page, RecheckTasksDto, SessionDto,
-  SessionEventDto, TurnTraceDto, WarningDto,
+  MemoryStateDto, OverviewDto, Page, RecheckTasksDto, RunProgressDto,
+  SessionDto, SessionEventDto, TurnTraceDto, WarningDto,
 } from './types';
 
 export const api = {
@@ -65,6 +65,21 @@ export const api = {
     return request<HealthDto>('/v1/health', { signal });
   },
 
+  // ---- Harness P2: run progress + cancellation ---------------------------
+
+  runProgress(runId: string, after = 0, signal?: AbortSignal) {
+    const query = after > 0 ? `?after=${after}` : '';
+    return request<RunProgressDto>(
+      `/v1/runs/${encodeURIComponent(runId)}/progress${query}`, { signal });
+  },
+
+  cancelRun(runId: string, reason?: string) {
+    return request<CancelRunDto>(`/v1/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: 'POST',
+      body: reason ? { reason } : {},
+    });
+  },
+
   // ---- 本轮新增读模型 ----------------------------------------------------
 
   overview(signal?: AbortSignal) {
@@ -78,6 +93,22 @@ export const api = {
 
   alertRecord(id: number, signal?: AbortSignal) {
     return request<ConclusionDto>(`/v1/alert-records/${id}`, { signal });
+  },
+
+  // ---- Product P1: 证据原文回读 / 变更影响 --------------------------------
+
+  evidenceRead(evidenceId: string, offset = 0, limit = 2000, signal?: AbortSignal) {
+    const query = `?offset=${offset}&limit=${limit}`;
+    return request<EvidenceReadDto>(
+      `/v1/evidence/${encodeURIComponent(evidenceId)}${query}`, { signal });
+  },
+
+  changeImpact(since?: string | null, limit = 50, signal?: AbortSignal, runId?: string | null) {
+    const query = new URLSearchParams();
+    if (runId) query.set('run_id', runId);
+    else if (since) query.set('since', since);
+    query.set('limit', String(limit));
+    return request<ChangeImpactDto>(`/v1/change-impact?${query.toString()}`, { signal });
   },
 
   conclusionHistory(id: number, signal?: AbortSignal) {

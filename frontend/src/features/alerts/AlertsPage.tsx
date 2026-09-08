@@ -14,7 +14,7 @@ import {
   Badge, Card, ConfirmDialog, EmptyState, ErrorState, LoadingBlock,
   SectionTitle, SkeletonList, TimeText,
 } from '../../components/ui';
-import { Field, MemoryRefDrawer, SourceRefList } from '../../components/evidence';
+import { alertStatusInfo, Field, MemoryRefDrawer, SourceRefList } from '../../components/evidence';
 import type { RecheckTasksDto } from '../../api/types';
 
 type TabKind = 'current' | 'recheck' | 'stale';
@@ -161,19 +161,76 @@ function DetailPanel({ detailId, onClose, onOpenRef }: {
         {detailQuery.data && (
           <div className="space-y-3 text-sm">
             <p className="leading-relaxed">{detailQuery.data.text}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {(() => {
+                const explanation = detailQuery.data.explanation;
+                const info = alertStatusInfo(detailQuery.data.status, {
+                  evidenceAvailable: detailQuery.data.evidence_available,
+                  recheckStatus: explanation?.recheck?.status ?? null,
+                  hasSuccessor: !!explanation?.successor,
+                });
+                return <Badge tone={info.tone}>{info.label}</Badge>;
+              })()}
+            </div>
             <dl>
-              <Field label="结论状态">
-                {detailQuery.data.status === 'current' ? '当前有效' : `已失效${detailQuery.data.stale_reason ? `(${detailQuery.data.stale_reason})` : ''}`}
-              </Field>
               <Field label="生成时间"><TimeText iso={detailQuery.data.created_at} /></Field>
               <Field label="严重度">未记录(该结论没有结构化严重度字段,不从文字推断)</Field>
               <Field label="置信度">未记录</Field>
               <Field label="会话/轮次">
                 {detailQuery.data.session_id ?? '未记录'} / {detailQuery.data.turn_id ?? '未记录'}
               </Field>
+              {detailQuery.data.status === 'stale' && (
+                <Field label="失效原因">
+                  {detailQuery.data.stale_reason ?? '未记录(依据变化待重查;不等于风险解除)'}
+                </Field>
+              )}
             </dl>
+            {detailQuery.data.explanation && (
+              <div className="rounded-lg border border-border bg-surface-alt p-3">
+                <h3 className="mb-1 font-medium">解释:这条结论由什么支撑</h3>
+                <dl>
+                  <Field label="事实依据版本">
+                    {(() => {
+                      const input = detailQuery.data.explanation?.input_revision;
+                      if (!input || (input.medications == null && input.semantic == null)) return '未记录';
+                      return `用药清单 v${input.medications ?? '?'} / 语义事实 v${input.semantic ?? '?'}`;
+                    })()}
+                  </Field>
+                  <Field label="当前档案版本">
+                    {(() => {
+                      const rev = detailQuery.data.explanation?.patient_revision;
+                      return rev ? `用药清单 v${rev.medications} / 语义事实 v${rev.semantic}` : '未记录';
+                    })()}
+                  </Field>
+                  <Field label="重查状态">
+                    {(() => {
+                      const recheck = detailQuery.data.explanation?.recheck;
+                      if (!recheck) return '没有待重查任务';
+                      const labels: Record<string, string> = {
+                        open: '待重查(依据已变化;不等于风险解除)',
+                        running: '重查进行中',
+                        done: '已重查(见替代链中的新结论)',
+                        failed: '重查失败——旧结论保持待重查,不视为风险解除',
+                        cancelled: '重查已取消',
+                      };
+                      return labels[recheck.status] ?? recheck.status;
+                    })()}
+                  </Field>
+                  {detailQuery.data.explanation.successor && (
+                    <Field label="重查后继">
+                      #{detailQuery.data.explanation.successor.id}
+                      <button type="button"
+                        onClick={() => onOpenRef(detailQuery.data.explanation!.successor!.ref)}
+                        className="ml-2 rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-xs text-primary hover:bg-primary-soft">
+                        查看新结论
+                      </button>
+                    </Field>
+                  )}
+                </dl>
+              </div>
+            )}
             <div>
-              <h3 className="mb-1 font-medium">关联记录</h3>
+              <h3 className="mb-1 font-medium">关联记录(事实依据)</h3>
               {detailQuery.data.memory_refs.length === 0
                 ? <p className="text-ink-muted">没有关联 memory 引用。</p>
                 : (
@@ -188,7 +245,12 @@ function DetailPanel({ detailId, onClose, onOpenRef }: {
                 )}
             </div>
             <div>
-              <h3 className="mb-1 font-medium">来源与原文</h3>
+              <h3 className="mb-1 font-medium">来源与证据原文</h3>
+              {detailQuery.data.evidence_refs && detailQuery.data.evidence_refs.some((r) => r.status === 'unavailable') && (
+                <p className="mb-2 text-xs text-ink-muted">
+                  部分来源没有可回读的证据原文(历史记录未关联或证据已不可用)——如实展示,不虚构原文。
+                </p>
+              )}
               <SourceRefList sources={detailQuery.data.source_refs}
                 emptyHint="该结论没有结构化来源引用(原文缺失状态如实展示)。" />
             </div>

@@ -11,7 +11,7 @@
 import { ApiError, newIdempotencyKey } from './http';
 import { api } from './client';
 import type {
-  EventRequest, EventResponseDto, FailedEventDto,
+  EventRequest, EventResponseDto, FailedEventDto, RunProgressEventDto,
 } from './types';
 
 export type SubmissionStatus =
@@ -22,6 +22,8 @@ export type SubmissionStatus =
   | 'committed'
   | 'failed'
   | 'rejected';    // 422/409 等受理层拒绝
+
+export type CancelState = 'none' | 'requested' | 'cancelled' | 'already_final';
 
 export interface SubmissionTask {
   key: string;
@@ -39,6 +41,12 @@ export interface SubmissionTask {
   replay: boolean;
   startedAt: string;
   finishedAt: string | null;
+  /** Harness P2:服务端 run 标识(受理/轮询响应携带);有它才能接进度与取消。 */
+  runId: string | null;
+  /** 进度事件(游标补齐 + event_id 去重;仅粗粒度状态,无未审核内容)。 */
+  progress: RunProgressEventDto[];
+  progressSeq: number;
+  cancelState: CancelState;
 }
 
 type Listener = () => void;
@@ -56,6 +64,7 @@ const WRITE_EVENT_TYPES = new Set([
 
 class SubmissionEngine {
   private tasks = new Map<string, SubmissionTask>();
+  private cachedSnapshot: SubmissionTask[] = [];
   private listeners = new Set<Listener>();
   private pollers = new Map<string, { stop: () => void; wake?: () => void }>();
   private writeQueues = new Map<string, Promise<void>>();
@@ -79,13 +88,14 @@ class SubmissionEngine {
   }
 
   private emit(): void {
+    this.cachedSnapshot = [...this.tasks.values()].sort((a, b) =>
+      a.startedAt < b.startedAt ? 1 : -1);
     for (const listener of this.listeners) listener();
   }
 
   /** 稳定快照(React 渲染用)。 */
   snapshot(): SubmissionTask[] {
-    return [...this.tasks.values()].sort((a, b) =>
-      a.startedAt < b.startedAt ? 1 : -1);
+    return this.cachedSnapshot;
   }
 
   task(key: string): SubmissionTask | undefined {
@@ -94,7 +104,7 @@ class SubmissionEngine {
 
   /** 启动时恢复:sessionStorage 里的未完成任务继续轮询同一 key。 */
   restore(): void {
-    let stored: { key: string; sessionId: string; event: EventRequest; startedAt: string }[] = [];
+    let stored: { key: string; sessionId: string; event: EventRequest; startedAt: string; runId?: string | null }[] = [];
     try {
       stored = JSON.parse(window.sessionStorage.getItem(STORE_KEY) ?? '[]');
     } catch {
@@ -107,10 +117,12 @@ class SubmissionEngine {
         status: 'unknown', result: null, rejection: null, failure: null,
         networkError: null, slow: false, replay: false,
         startedAt: item.startedAt, finishedAt: null,
+        runId: item.runId ?? null, progress: [], progressSeq: 0, cancelState: 'none',
       };
       this.tasks.set(item.key, task);
       this.startPolling(task);
     }
+    this.emit();
     this.persist();
   }
 
@@ -120,6 +132,7 @@ class SubmissionEngine {
         .filter((t) => !['committed', 'failed', 'rejected'].includes(t.status))
         .map((t) => ({
           key: t.key, sessionId: t.sessionId, event: t.event, startedAt: t.startedAt,
+          runId: t.runId,
         }));
       window.sessionStorage.setItem(STORE_KEY, JSON.stringify(active));
     } catch {
@@ -138,6 +151,7 @@ class SubmissionEngine {
       status: 'submitting', result: null, rejection: null, failure: null,
       networkError: null, slow: false, replay: false,
       startedAt: new Date().toISOString(), finishedAt: null,
+      runId: null, progress: [], progressSeq: 0, cancelState: 'none',
     };
     this.tasks.set(key, task);
     this.emit();
@@ -165,10 +179,12 @@ class SubmissionEngine {
   private applyAcceptance(task: SubmissionTask,
                           acceptance: AcceptanceLike): void {
     task.replay = acceptance.replay ?? false;
+    if (acceptance.run_id) task.runId = acceptance.run_id;
     if (acceptance.status === 'committed' && acceptance.response) {
       // 重放 committed 的 POST 受理体或轮询结果
       task.status = 'committed';
       task.result = acceptance.response;
+      if (task.result.run_status === 'cancelled') task.cancelState = 'cancelled';
       task.finishedAt = new Date().toISOString();
       this.emit();
       this.persist();
@@ -212,10 +228,13 @@ class SubmissionEngine {
         const status = await api.eventStatus(task.key);
         task.networkError = null;
         task.slow = Date.now() - Date.parse(task.startedAt) > SLOW_THRESHOLD_MS;
+        if ('run_id' in status && status.run_id) task.runId = status.run_id;
         if (status.status === 'committed') {
           task.status = 'committed';
           task.result = (status as CommittedLike).response ?? null;
           task.finishedAt = new Date().toISOString();
+          // 终态由后端持久化结果确认:取消等状态以 run_status 为准,不靠动画推断。
+          if (task.result?.run_status === 'cancelled') task.cancelState = 'cancelled';
           this.pollers.delete(task.key);
           this.emit();
           this.persist();
@@ -233,6 +252,7 @@ class SubmissionEngine {
         }
         task.status = status.status === 'processing' ? 'processing' : 'queued';
         this.emit();
+        await this.syncProgress(task); // 失败不阻塞状态轮询
         return 'continue';
       } catch (err) {
         if (err instanceof ApiError && err.kind === 'http' && err.status === 404) {
@@ -285,6 +305,51 @@ class SubmissionEngine {
     }
   }
 
+  /**
+   * Harness P2:拉取进度事件(带游标断线续传 + event_id 客户端去重)。
+   * 进度失败不影响任务状态轮询;snapshot 响应时重置去重窗口。
+   */
+  private async syncProgress(task: SubmissionTask): Promise<void> {
+    if (!task.runId) return;
+    try {
+      const page = await api.runProgress(task.runId, task.progressSeq);
+      if (page.snapshot) task.progress = [];
+      const seen = new Set(task.progress.map((e) => e.event_id));
+      const fresh = page.events.filter((e) => {
+        if (seen.has(e.event_id)) return false;
+        seen.add(e.event_id);
+        return true;
+      });
+      task.progress = [...task.progress, ...fresh].slice(-20);
+      task.progressSeq = Math.max(task.progressSeq, page.latest_seq);
+      this.emit();
+    } catch {
+      // 进度不可用(如服务端关闭了进度事件):保持静默,状态轮询仍在。
+    }
+  }
+
+  /**
+   * Harness P2:明确且幂等的服务端取消。取消只终止尚未执行的工作;已提交
+   * 的领域记录不会回滚,终态以服务端持久化结果为准。
+   */
+  async cancelOnServer(key: string, reason?: string): Promise<void> {
+    const task = this.tasks.get(key);
+    if (!task?.runId) return;
+    try {
+      const outcome = await api.cancelRun(task.runId, reason);
+      // Polling may confirm the terminal state while this request is in
+      // flight. A late acknowledgement must not replace that confirmation.
+      task.cancelState = task.result?.run_status === 'cancelled' ? 'cancelled'
+        : outcome.cancel_state === 'unknown_run' ? 'none' : outcome.cancel_state;
+    } catch (err) {
+      // 404(无此运行)等:如实展示,不改变本地任务语义。
+      task.networkError = err instanceof ApiError ? err.displayMessage() : String(err);
+    }
+    this.emit();
+    this.persist();
+    this.startPolling(task); // 取消后继续轮询,直到服务端确认终态
+  }
+
   /** 服务端重试失败任务(保留原事件身份;需 ops 角色,本地模式具备)。 */
   async retryOnServer(key: string): Promise<void> {
     const task = this.tasks.get(key);
@@ -309,12 +374,14 @@ class SubmissionEngine {
   /** 用户明确的新提交(新 key,内容重新确认)。 */
   resubmitAsNew(key: string, event: EventRequest): string {
     this.tasks.delete(key);
+    this.emit();
     this.persist();
     return this.submit(event);
   }
 }
 
 interface AcceptanceLike {
+  run_id?: string;
   status: 'queued' | 'processing' | 'committed';
   response?: EventResponseDto;
   replay?: boolean;

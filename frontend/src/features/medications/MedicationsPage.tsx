@@ -118,7 +118,9 @@ function MedicationTable({ medications }: {
             <span className="font-medium">{medication.display_name}</span>
             <Badge tone="primary">在用</Badge>
             {medication.ingredients.length > 0 && (
-              <span className="text-xs text-ink-muted">成分:{medication.ingredients.join(' / ')}</span>
+              <span className="text-xs text-ink-muted">成分:{medication.ingredients.map((ingredient) =>
+                typeof ingredient === 'string' ? ingredient
+                  : ingredient.name_cn || ingredient.name_en || '未记录名称').join(' / ')}</span>
             )}
           </div>
           <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-sm md:grid-cols-4">

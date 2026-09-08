@@ -4,6 +4,7 @@ import type { SubmissionTask } from '../api/submissions';
 import type { EventRequest } from '../api/types';
 
 const SESSION_KEY = 'mcp.sessionId.v1';
+const EMPTY_TASKS: SubmissionTask[] = [];
 
 function loadSessionId(): string {
   try {
@@ -37,7 +38,7 @@ export function useSubmissions(): SubmissionTask[] {
   return useSyncExternalStore(
     (onChange) => submissions.subscribe(onChange),
     () => submissions.snapshot(),
-    () => [] as SubmissionTask[],
+    () => EMPTY_TASKS,
   );
 }
 

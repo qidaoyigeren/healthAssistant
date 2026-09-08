@@ -13,6 +13,8 @@ import { ExposurePage } from '../features/conflicts/ExposurePage';
 import { HistoryPage } from '../features/history/HistoryPage';
 import { AssistantPage } from '../features/assistant/AssistantPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
+import { MaterialsPage } from '../features/materials/MaterialsPage';
+import { CareTasksPage } from '../features/tasks/CareTasksPage';
 import { submissions } from '../api/submissions';
 import { INVALIDATE_AFTER_COMMIT } from '../api/queryKeys';
 
@@ -48,6 +50,8 @@ export function App(): React.ReactElement {
                   <Route path="/history/event/:eventId" element={<HistoryPage />} />
                   <Route path="/assistant" element={<AssistantPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/materials" element={<MaterialsPage />} />
+                  <Route path="/tasks" element={<CareTasksPage />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </RouteErrorBoundary>
@@ -73,6 +77,7 @@ function CommitInvalidation(): null {
       void queryClient.invalidateQueries({ queryKey: ['sessionEvents', task.event.session_id] });
       void queryClient.invalidateQueries({ queryKey: ['sessions'] });
     };
+    submissions.restore();
     return () => { submissions.onCommitted = null; };
   }, [queryClient]);
   return null;

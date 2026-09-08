@@ -9,10 +9,12 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeftRight, BookOpen, ExternalLink, FileSearch, Landmark, Link2,
+  ScrollText,
 } from 'lucide-react';
 import { api } from '../api/client';
+import { request } from '../api/http';
 import type {
-  ConflictDto, SourceRefDto, WarningDto,
+  ConflictDto, EvidenceReadDto, SourceRefDto, WarningDto,
 } from '../api/types';
 import {
   Badge, ConfidenceBadge, DetailDrawer, EmptyState, ErrorState,
@@ -185,12 +187,160 @@ function prettyValue(value: unknown): string {
   return String(value);
 }
 
+// ---- 证据原文抽屉(Product P1)-------------------------------------------------
+
+/**
+ * 受控证据原文回读:按 evidence_id 分页读取不可变证据记录(服务端复验哈希)。
+ * 高亮规则:只在原文中找到引用摘录的**精确字符串**时标记;找不到时明确降级
+ * 为"未能定位",绝不按语义相似高亮。
+ */
+export function EvidenceDrawer({ evidenceId, quote, onClose }: {
+  evidenceId: string | null; quote?: string | null; onClose: () => void;
+}): React.ReactElement {
+  return <EvidenceDrawerContent key={evidenceId ?? 'closed'}
+    evidenceId={evidenceId} quote={quote} onClose={onClose} />;
+}
+
+function EvidenceDrawerContent({ evidenceId, quote, onClose }: {
+  evidenceId: string | null; quote?: string | null; onClose: () => void;
+}): React.ReactElement {
+  const [pages, setPages] = useState<EvidenceReadDto[]>([]);
+  const PAGE = 2000;
+  const lastPage = pages.length > 0 ? pages[pages.length - 1] : undefined;
+  const nextOffset = lastPage ? lastPage.offset + lastPage.returned_chars : 0;
+  const query = useQuery({
+    queryKey: ['evidenceRead', evidenceId, nextOffset],
+    queryFn: ({ signal }) => api.evidenceRead(evidenceId!, nextOffset, PAGE, signal),
+    enabled: !!evidenceId,
+    retry: false,
+  });
+  // 关闭抽屉时清空已读页,下次打开重新按当前记录读取。
+  React.useEffect(() => { if (!evidenceId) setPages([]); }, [evidenceId]);
+  const fresh = query.data;
+  const known = pages.some((p) => p.evidence_id === fresh?.evidence_id && p.offset === fresh.offset);
+  const all: EvidenceReadDto[] = known ? [...pages] : (fresh ? [...pages, fresh] : pages);
+  const fullText = all.map((p) => p.content).join('');
+  const meta = fresh?.source;
+  const total = fresh?.total_chars;
+  const lastAll = all.length > 0 ? all[all.length - 1] : undefined;
+  const complete = lastAll !== undefined && !lastAll.truncated;
+  const located = !!quote && fullText.includes(quote);
+  const quotePos = located && quote ? fullText.indexOf(quote) : -1;
+
+  return (
+    <DetailDrawer open={!!evidenceId} onOpenChange={(open) => { if (!open) onClose(); }}
+      title={`证据原文 · ${evidenceId ?? ''}`}>
+      {query.isPending && <LoadingBlock label="读取证据原文…" />}
+      {query.isError && (
+        <ErrorState error={query.error}
+          title="证据原文不可用(可能已过期清理、权限范围不符或完整性校验失败)" />
+      )}
+      {fresh && !query.isError && (
+        <div className="space-y-3 text-sm">
+          <dl className="space-y-2 rounded-lg border border-border bg-surface-alt p-3">
+            <Field label="来源类型">{meta?.source_type ?? '未记录'}</Field>
+            <Field label="来源地址">
+              {meta?.uri
+                ? (isHttpUrl(meta.uri)
+                  ? <a href={meta.uri} target="_blank" rel="noopener noreferrer"
+                      className="break-all font-mono text-xs text-primary underline">{meta.uri}</a>
+                  : <span className="break-all font-mono text-xs">{meta.uri}</span>)
+                : '未记录'}
+            </Field>
+            <Field label="来源版本">{meta?.corpus_version ?? '未知(来源未记录版本)'}</Field>
+            <Field label="检索时间">{meta?.retrieved_at ? <TimeText iso={meta.retrieved_at} /> : '未记录'}</Field>
+            <Field label="完整性">{fresh.integrity === 'verified' ? '已通过哈希校验' : fresh.integrity}</Field>
+            <Field label="长度">{fresh.total_chars} 字符</Field>
+          </dl>
+
+          <div>
+            <h3 className="mb-1 flex items-center gap-1 font-medium">
+              <ScrollText size={14} aria-hidden /> 原文内容
+            </h3>
+            {all.length === 0 ? (
+              <LoadingBlock />
+            ) : (
+              <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-surface-alt p-3 text-sm leading-relaxed">
+                {quote && located ? (
+                  <>
+                    {fullText.slice(0, quotePos)}
+                    <mark className="rounded bg-caution-soft px-0.5 text-inherit" data-testid="evidence-highlight">
+                      {fullText.slice(quotePos, quotePos + quote.length)}
+                    </mark>
+                    {fullText.slice(quotePos + quote.length)}
+                  </>
+                ) : fullText}
+              </pre>
+            )}
+            {quote && !located && (
+              <p className="mt-1 text-xs text-ink-muted">
+                未能在已读取的原文中精确定位该引用摘录——不做语义近似高亮;可用"继续读取"查看剩余部分。
+              </p>
+            )}
+            <p className="mt-1 text-xs text-ink-muted">
+              {complete
+                ? '已读取全部原文。'
+                : `已读取 ${fullText.length}/${total ?? '?'} 字符。`}
+            </p>
+            {!complete && (
+              <button type="button"
+                onClick={() => { if (fresh && !known) setPages([...pages, fresh]); }}
+                disabled={!fresh || known}
+                className="mt-2 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-surface-alt disabled:opacity-50">
+                继续读取
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-ink-muted">
+            原文为不可变证据记录(内容寻址、读取时复验哈希);它佐证"说明书/来源写了什么",不构成医学结论。
+          </p>
+          {evidenceId && quote && <ClaimAssessment evidenceId={evidenceId} quote={quote} />}
+        </div>
+      )}
+    </DetailDrawer>
+  );
+}
+
+function ClaimAssessment({ evidenceId, quote }: { evidenceId: string; quote: string }): React.ReactElement {
+  const [entities, setEntities] = useState('');
+  const [result, setResult] = useState<{status: string; unresolved: string[]} | null>(null);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function assess() {
+    setBusy(true); setError(''); setResult(null);
+    try { setResult(await request('/v1/evidence/assess-claim', { method: 'POST', body: { evidence_id: evidenceId, quote, entities: entities.split(/[,，]/).map(s => s.trim()).filter(Boolean), conditions_known: true } })); }
+    catch (e) { setError(e instanceof Error ? e.message : '核对失败'); }
+    finally { setBusy(false); }
+  }
+  return <details className="border-t border-border pt-3"><summary className="cursor-pointer text-sm font-medium">核对摘录中的相互作用表述</summary><p className="my-2 text-xs text-ink-muted">本地文字规则仅筛查原文表述。引用真实不代表结论成立，也不能判断是否适用于患者。</p><label className="block text-sm">药名（逗号分隔）<input className="my-2 w-full rounded border border-border p-2" value={entities} onChange={e => { setEntities(e.target.value); setResult(null); }} /></label><button disabled={busy || !entities.trim()} className="rounded border border-border px-3 py-2 text-sm disabled:opacity-50" onClick={() => void assess()}>核对这段摘录</button>{error && <p role="alert">{error}</p>}{result && <p role="status" className="mt-2 text-sm">{({supported:'原文有支持相互作用的明确表述；仍需核实适用条件',contradicted:'原文包含否定相互作用的表述；不能据此认定无风险',insufficient:'依据不足：引用、实体或适用条件未满足核对要求'} as Record<string,string>)[result.status]}</p>}</details>;
+}
+
+/** 预警状态 → 用户可理解标签(Product P1 状态展示)。 */
+export function alertStatusInfo(status: string, opts: {
+  evidenceAvailable: boolean; recheckStatus?: string | null; hasSuccessor?: boolean;
+}): { label: string; tone: 'primary' | 'caution' | 'neutral' | 'danger' } {
+  if (status === 'stale') {
+    return { label: '依据变化 · 待重查(不等于风险解除)', tone: 'caution' };
+  }
+  if (status === 'current' && !opts.evidenceAvailable) {
+    return { label: '证据不足(无来源关联,需人工核对)', tone: 'neutral' };
+  }
+  if (status === 'current' && opts.recheckStatus === 'done' && opts.hasSuccessor) {
+    return { label: '当前有效(已按最新事实重查)', tone: 'primary' };
+  }
+  if (status === 'current') {
+    return { label: '当前有效', tone: 'primary' };
+  }
+  return { label: `状态:${status}`, tone: 'neutral' };
+}
+
 // ---- 来源展示 ---------------------------------------------------------------
 
 export function SourceRefList({ sources, emptyHint = '这条记录没有可核对的来源。' }: {
   sources: SourceRefDto[] | undefined; emptyHint?: string;
 }): React.ReactElement {
   const [openRef, setOpenRef] = useState<string | null>(null);
+  const [openEvidence, setOpenEvidence] = useState<{ id: string; quote: string | null } | null>(null);
   if (!sources || sources.length === 0) {
     return <p className="text-sm text-ink-muted">{emptyHint}</p>;
   }
@@ -198,16 +348,21 @@ export function SourceRefList({ sources, emptyHint = '这条记录没有可核�
     <>
       <ul className="space-y-2">
         {sources.map((source, index) => (
-          <SourceRefItem key={index} source={source} onOpenRef={setOpenRef} index={index} />
+          <SourceRefItem key={index} source={source} onOpenRef={setOpenRef}
+            onOpenEvidence={(id, quote) => setOpenEvidence({ id, quote })} index={index} />
         ))}
       </ul>
       <MemoryRefDrawer memoryRef={openRef} onClose={() => setOpenRef(null)} />
+      <EvidenceDrawer evidenceId={openEvidence?.id ?? null}
+        quote={openEvidence?.quote ?? null}
+        onClose={() => setOpenEvidence(null)} />
     </>
   );
 }
 
-function SourceRefItem({ source, onOpenRef, index }: {
-  source: SourceRefDto; onOpenRef: (ref: string) => void; index: number;
+function SourceRefItem({ source, onOpenRef, onOpenEvidence, index }: {
+  source: SourceRefDto; onOpenRef: (ref: string) => void;
+  onOpenEvidence: (evidenceId: string, quote: string | null) => void; index: number;
 }): React.ReactElement {
   const uri = source.uri ?? null;
   const quote = source.quote ?? source.text ?? null;
@@ -217,6 +372,14 @@ function SourceRefItem({ source, onOpenRef, index }: {
         <SourceTypeBadge sourceType={source.source_type} />
         {source.retrieval && (
           <span className="text-xs text-ink-muted">检索方式:{source.retrieval}</span>
+        )}
+        {source.evidence_id && (
+          <button type="button"
+            onClick={() => onOpenEvidence(source.evidence_id!, quote)}
+            data-testid={`evidence-open-${index}`}
+            className="ml-auto inline-flex items-center gap-1 rounded border border-border bg-surface px-2 py-1 text-xs text-primary hover:bg-primary-soft">
+            <ScrollText size={12} aria-hidden /> 查看证据原文
+          </button>
         )}
       </div>
       {isHttpUrl(uri) && (
@@ -241,9 +404,16 @@ function SourceRefItem({ source, onOpenRef, index }: {
       {quote ? (
         <blockquote className="mt-2 border-l-2 border-primary/40 pl-2 text-sm leading-relaxed text-ink-secondary">
           「{quote}」
+          {source.evidence_id && (
+            <span className="ml-1 align-middle text-xs text-ink-muted">(摘录;完整原文与版本见"查看证据原文")</span>
+          )}
         </blockquote>
       ) : (
-        <p className="mt-2 text-xs text-ink-muted">该来源没有保存原文摘录。</p>
+        <p className="mt-2 text-xs text-ink-muted">
+          {source.evidence_id
+            ? '该来源没有保存原文摘录,可通过"查看证据原文"读取。'
+            : '原文不可用:这条历史记录没有关联的证据原文(系统不会虚构原文)。'}
+        </p>
       )}
       {/* index 仅用于稳定 key */}
       <span hidden>{index}</span>

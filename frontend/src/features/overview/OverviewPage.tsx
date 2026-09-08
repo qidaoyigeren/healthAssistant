@@ -15,6 +15,7 @@ import {
   Badge, Card, EmptyState, ErrorState, LoadingBlock, SectionTitle, SkeletonList,
 } from '../../components/ui';
 import { TaskTray } from '../shared/submission';
+import { CareTaskLink } from '../tasks/CareTasksPage';
 
 export function OverviewPage(): React.ReactElement {
   const overviewQuery = useQuery({
@@ -39,6 +40,7 @@ export function OverviewPage(): React.ReactElement {
 
   return (
     <div className="space-y-4">
+      <CareTaskLink />
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-semibold">照护总览</h1>

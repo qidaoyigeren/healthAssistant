@@ -18,6 +18,7 @@ import {
 import { ConflictCard, WarningCard } from '../../components/evidence';
 import { SafeMarkdown } from '../../components/safeMarkdown';
 import { TaskStatusChip, TaskTray } from '../shared/submission';
+import { CareTaskLink } from '../tasks/CareTasksPage';
 
 const QUICK_PROMPTS = [
   { label: '现在吃什么药?', eventType: 'query_current_medications' as const },
@@ -64,6 +65,7 @@ export function AssistantPage(): React.ReactElement {
 
   return (
     <div className="space-y-4">
+      <CareTaskLink />
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-semibold">照护助手</h1>

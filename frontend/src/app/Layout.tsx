@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   FileClock, FileText, Home, MoreHorizontal, Pill, ScrollText,
@@ -10,16 +10,19 @@ const NAV = [
   { to: '/', label: '照护总览', icon: Home, short: '总览' },
   { to: '/profile', label: '患者档案', icon: User, short: '档案' },
   { to: '/medications', label: '用药记录', icon: Pill, short: '用药' },
+  { to: '/materials', label: '材料核对', icon: FileText, short: '材料' },
   { to: '/alerts', label: '风险与证据', icon: ShieldAlert, short: '风险' },
   { to: '/conflicts', label: '待核实', icon: FileText, short: '待核实' },
   { to: '/history', label: '照护时间线', icon: FileClock, short: '时间线' },
   { to: '/assistant', label: '照护助手', icon: ScrollText, short: '助手' },
+  { to: '/tasks', label: '照护待办', icon: FileClock, short: '待办' },
   { to: '/settings', label: '设置与数据', icon: Settings, short: '更多' },
 ] as const;
 
 /** 桌面 220px 侧栏 + 内容区;移动端单列 + 底部主导航(次要导航收进「更多」)。 */
 export function Layout({ children }: { children: React.ReactNode }): React.ReactElement {
   const [moreOpen, setMoreOpen] = useState(false);
+  const location = useLocation();
 
   return (
     <div className="flex min-h-screen">
@@ -60,7 +63,7 @@ export function Layout({ children }: { children: React.ReactNode }): React.React
           <span className="text-xs text-ink-muted">非医疗设备</span>
         </header>
 
-        <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-24 pt-5 md:px-8 md:pb-10">
+        <main className={`mx-auto w-full ${location.pathname === '/materials' ? 'max-w-7xl' : 'max-w-4xl'} flex-1 px-4 pb-24 pt-5 md:px-8 md:pb-10`}>
           {children}
         </main>
 

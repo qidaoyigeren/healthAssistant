@@ -28,7 +28,7 @@ export interface MedicationDto {
   id: number;
   medication_key: string;
   display_name: string;
-  ingredients: string[];
+  ingredients: Array<string | { name_cn?: string; name_en?: string; kegg?: string }>;
   dose: string | null;
   route: string | null;
   schedule: string | null;
@@ -107,6 +107,63 @@ export interface SourceRefDto {
   quote?: string | null;
   retrieval?: string;
   text?: string;
+  // Product P1: 结论引用与不可变证据记录的关联。历史记录没有该字段 ——
+  // 此时证据原文如实标记为不可用，不虚构。
+  evidence_id?: string | null;
+}
+
+// Product P1: 受控证据原文读取（GET /v1/evidence/{id}）
+export interface EvidenceReadDto {
+  evidence_id: string;
+  content: string;
+  offset: number;
+  returned_chars: number;
+  total_chars: number;
+  truncated: boolean;
+  integrity: 'verified' | 'hash_mismatch' | string;
+  source: {
+    source_type?: string | null;
+    uri?: string | null;
+    content_ref?: string | null;
+    corpus_version?: string | null;
+    retrieved_at?: string | null;
+    access_class?: string | null;
+  };
+}
+
+// 预警详情中每条 source_ref 的证据可读性解析结果
+export interface EvidenceRefStatusDto {
+  evidence_id: string | null;
+  status: 'available' | 'unavailable' | string;
+  reason?: 'no_evidence_link' | 'evidence_missing' | string;
+  integrity?: 'verified' | string;
+  meta?: {
+    content_chars?: number | null;
+    corpus_version?: string | null;
+    retrieved_at?: string | null;
+    uri?: string | null;
+  };
+  source_index?: number;
+  uri?: string | null;
+  quote?: string | null;
+}
+
+export interface ConclusionExplanationDto {
+  status: string;
+  stale_reason: string | null;
+  patient_revision: { medications: number; semantic: number };
+  input_revision?: { medications?: number; semantic?: number } | null;
+  fact_refs: string[];
+  recheck: {
+    id: number;
+    task_type: string;
+    target_id: number;
+    reason: string | null;
+    status: 'open' | 'running' | 'done' | 'failed' | 'cancelled' | string;
+    attempts?: number;
+    updated_at?: string;
+  } | null;
+  successor: { id: number; ref: string; kind: string; text: string; status: string; created_at: string } | null;
 }
 
 export interface WarningDto {
@@ -156,8 +213,14 @@ export interface EventResponseDto {
   };
   safety_status: string;
   operation_outcomes?: OperationOutcomeDto[];
+  // Product P1: 结构化结果包，与正文/卡片同源；可选字段保持向后兼容。
+  answer_bundle?: AnswerBundleDto | null;
   event_id?: string;
   run_id?: string;
+  // Harness P2: waiting_review / cancelled runs publish run status at the
+  // top level so clients see non-terminal/取消 states without parsing audit.
+  run_status?: string;
+  review_case?: { id: number; status: string; round?: number } | null;
 }
 
 export type FailedEventDto = {
@@ -166,6 +229,35 @@ export type FailedEventDto = {
   error_class?: string | null;
   error?: string;
 };
+
+// ---- Harness P2: run progress + cancellation --------------------------------
+
+export interface RunProgressEventDto {
+  event_id: string;
+  seq: number;
+  kind: string;
+  cycle?: number | null;
+  tool?: string | null;
+  detail?: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface RunProgressDto {
+  run_id: string;
+  run_status?: string;
+  events: RunProgressEventDto[];
+  latest_seq: number;
+  snapshot: boolean;
+  note?: string;
+}
+
+export interface CancelRunDto {
+  run_id: string;
+  cancel_state: 'requested' | 'cancelled' | 'already_final' | 'unknown_run';
+  run_status?: string | null;
+  status_url?: string;
+  note?: string;
+}
 
 // ---- read models ----------------------------------------------------------
 
@@ -194,6 +286,72 @@ export interface ConclusionDto {
   confidence: null;
   evidence_available: boolean;
   chain?: ConclusionChainDto;
+  // Product P1: 证据可读性解析 + 解释结果（详情接口返回）
+  evidence_refs?: EvidenceRefStatusDto[];
+  explanation?: ConclusionExplanationDto;
+}
+
+// Product P1: 变更影响摘要（GET /v1/change-impact）
+export interface ChangeImpactDto {
+  generated_at: string;
+  attribution?: 'run_audit' | 'audit_window';
+  run_id?: string | null;
+  affected_conclusions_total?: number;
+  truncated?: boolean;
+  patient_revision: { medications: number; semantic: number };
+  summary: {
+    changed_facts: number;
+    affected_conclusions: number;
+    pending_rechecks: number;
+    failed_rechecks: number;
+  };
+  changed_facts: {
+    id: number;
+    action: string;
+    actor: string;
+    target_type: string;
+    target_id: number | null;
+    details: Record<string, unknown> | null;
+    memory_refs: string[];
+    source: string;
+    created_at: string;
+  }[];
+  changed_facts_total: number;
+  affected_conclusions: {
+    conclusion_id: number;
+    ref: string;
+    kind: string;
+    text: string;
+    status: string;
+    stale_reason: string | null;
+    input_revision?: { medications?: number; semantic?: number } | null;
+    recheck: ConclusionExplanationDto['recheck'];
+    successor: ConclusionExplanationDto['successor'];
+  }[];
+  unaffected_conclusions: ConclusionDto[];
+  note: string;
+}
+
+// Product P1: 最小 AnswerBundle（附加在事件响应上；旧客户端可忽略）
+export interface AnswerBundleDto {
+  bundle_version: string;
+  safety_status: string;
+  claims: {
+    claim_id: string;
+    kind: 'warning' | 'conflict' | string;
+    statement: string;
+    status: string;
+    evidence_refs: string[];
+  }[];
+  fact_refs: string[];
+  evidence_refs: string[];
+  patient_revision: { medications: number; semantic: number };
+  unresolved_questions: string[];
+  coverage: {
+    consolidated?: boolean;
+    response_source?: string | null;
+    degraded_reason?: string | null;
+  };
 }
 
 export interface ConclusionChainDto {
