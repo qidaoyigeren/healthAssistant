@@ -1,0 +1,62 @@
+test_graph_runner_publishes_bundle_and_attributed_impact (stage0.test_product_closeout.CloseoutTests.test_graph_runner_publishes_bundle_and_attributed_impact) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+D:\py\HealthAssistant\stage0\server.py:702: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+D:\py\HealthAssistant\.venv\Lib\site-packages\fastapi\applications.py:4681: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  return self.router.on_event(event_type)  # ty: ignore[deprecated]
+D:\py\HealthAssistant\stage0\server.py:707: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("shutdown")
+ERROR
+
+======================================================================
+ERROR: test_graph_runner_publishes_bundle_and_attributed_impact (stage0.test_product_closeout.CloseoutTests.test_graph_runner_publishes_bundle_and_attributed_impact)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Tools\uv-python\cpython-3.13.14-windows-x86_64-none\Lib\shutil.py", line 625, in _rmtree_unsafe
+    os.unlink(fullname)
+    ~~~~~~~~~^^^^^^^^^^
+PermissionError: [WinError 32] ��һ����������ʹ�ô��ļ��������޷����ʡ�: 'C:\\Users\\37859\\AppData\\Local\\Temp\\tmpx3atp6if\\memory.db.checkpoints'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_product_closeout.py", line 17, in test_graph_runner_publishes_bundle_and_attributed_impact
+    with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'AGENT_GRAPH_RUNNER': '1'}):
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "D:\Tools\uv-python\cpython-3.13.14-windows-x86_64-none\Lib\tempfile.py", line 951, in __exit__
+    self.cleanup()
+    ~~~~~~~~~~~~^^
+  File "D:\Tools\uv-python\cpython-3.13.14-windows-x86_64-none\Lib\tempfile.py", line 955, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Tools\uv-python\cpython-3.13.14-windows-x86_64-none\Lib\tempfile.py", line 935, in _rmtree
+    _shutil.rmtree(name, onexc=onexc)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "D:\Tools\uv-python\cpython-3.13.14-windows-x86_64-none\Lib\shutil.py", line 790, in rmtree
+    return _rmtree_unsafe(path, onexc)
+  File "D:\Tools\uv-python\cpython-3.13.14-windows-x86_64-none\Lib\shutil.py", line 629, in _rmtree_unsafe
+    onexc(os.unlink, fullname, err)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Tools\uv-python\cpython-3.13.14-windows-x86_64-none\Lib\tempfile.py", line 910, in onexc
+    _os.unlink(path)
+    ~~~~~~~~~~^^^^^^
+PermissionError: [WinError 32] ��һ����������ʹ�ô��ļ��������޷����ʡ�: 'C:\\Users\\37859\\AppData\\Local\\Temp\\tmpx3atp6if\\memory.db.checkpoints'
+
+----------------------------------------------------------------------
+Ran 1 test in 1.264s
+
+FAILED (errors=1)

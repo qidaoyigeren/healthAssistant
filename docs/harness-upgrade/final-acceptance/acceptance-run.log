@@ -1,0 +1,7 @@
+{"name": "unit", "status": "pass", "exit_code": 0, "seconds": 61.519, "log": "unit.log"}
+{"name": "p1-eval", "status": "pass", "exit_code": 0, "seconds": 3.329, "log": "p1-eval.log"}
+{"name": "p2-eval", "status": "pass", "exit_code": 0, "seconds": 6.255, "log": "p2-eval.log"}
+{"name": "p3-eval", "status": "pass", "exit_code": 0, "seconds": 47.09, "log": "p3-eval.log"}
+{"name": "pip-check", "status": "pass", "exit_code": 0, "seconds": 0.606, "log": "pip-check.log"}
+{"name": "frontend-build", "status": "pass", "exit_code": 0, "seconds": 6.183, "log": "frontend-build.log"}
+Acceptance: pass (125.081s)

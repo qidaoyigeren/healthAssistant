@@ -1,0 +1,256 @@
+{
+  "dataset_version": "p3-1.1-equivalent-coverage",
+  "generated_at": "2026-09-07T09:57:44+00:00",
+  "modeled_latency": {
+    "planner_ms": 300.0,
+    "io_ms": 50.0,
+    "note": "wall_seconds 为合成延迟模型，非真实系统耗时"
+  },
+  "pre_registered_criteria": {
+    "gain": "planner 决策调用：多来源检索场景减少 >=50%，长标签一致性场景减少 >=25%；安全/引用结论与单 Agent 基线一致",
+    "context": "委派 worker 相对普通批处理的 payload 上下文优势需达到实质性水平（>=20% 削减）才采用；低于该阈值视为'未证实相对批处理的额外收益'（批处理已达成相同的规划决策削减）",
+    "cost": "tokens_charged 开销 <= +20%",
+    "simple": "简单查询零委派"
+  },
+  "results": [
+    {
+      "mode": "batch",
+      "scenario": "long_label_consistency",
+      "safety_status": "enforced",
+      "planner_decision_calls": 6,
+      "planner_payload_chars": {
+        "mean": 10507.2,
+        "max": 15270,
+        "decisions": 6
+      },
+      "rag_dispatches": 1,
+      "read_back_pages": 9,
+      "delegated_tasks": 0,
+      "tokens_charged": 43855,
+      "modeled_wall_seconds": 2.0,
+      "citation_validity": 1.0,
+      "no_medical_authority": true,
+      "open_questions": 0,
+      "planned_queries": 1,
+      "required_check_completion": 1.0,
+      "full_read_coverage": 1.0,
+      "claims_total": 3,
+      "claims_verdicts_valid": true,
+      "claims_verified": 0,
+      "modeled_wall_seconds_median": 2.0
+    },
+    {
+      "mode": "delegate",
+      "scenario": "long_label_consistency",
+      "safety_status": "enforced",
+      "planner_decision_calls": 4,
+      "planner_payload_chars": {
+        "mean": 7867.8,
+        "max": 11365,
+        "decisions": 4
+      },
+      "rag_dispatches": 1,
+      "read_back_pages": 9,
+      "delegated_tasks": 1,
+      "tokens_charged": 24233,
+      "modeled_wall_seconds": 1.352,
+      "citation_validity": 1.0,
+      "no_medical_authority": true,
+      "open_questions": 0,
+      "planned_queries": 1,
+      "required_check_completion": 1.0,
+      "full_read_coverage": 1.0,
+      "claims_total": 3,
+      "claims_verdicts_valid": true,
+      "claims_verified": 3,
+      "modeled_wall_seconds_median": 1.357
+    },
+    {
+      "mode": "single_agent",
+      "scenario": "long_label_consistency",
+      "safety_status": "enforced",
+      "planner_decision_calls": 12,
+      "planner_payload_chars": {
+        "mean": 9178.8,
+        "max": 11208,
+        "decisions": 12
+      },
+      "rag_dispatches": 1,
+      "read_back_pages": 9,
+      "delegated_tasks": 0,
+      "tokens_charged": 75884,
+      "modeled_wall_seconds": 3.908,
+      "citation_validity": 1.0,
+      "no_medical_authority": true,
+      "open_questions": 0,
+      "planned_queries": 1,
+      "required_check_completion": 1.0,
+      "full_read_coverage": 1.0,
+      "claims_total": 3,
+      "claims_verdicts_valid": true,
+      "claims_verified": 0,
+      "modeled_wall_seconds_median": 3.893
+    },
+    {
+      "mode": "batch",
+      "scenario": "multi_drug_labels",
+      "safety_status": "enforced",
+      "planner_decision_calls": 3,
+      "planner_payload_chars": {
+        "mean": 11694.3,
+        "max": 22083,
+        "decisions": 3
+      },
+      "rag_dispatches": 5,
+      "read_back_pages": 0,
+      "delegated_tasks": 0,
+      "tokens_charged": 24477,
+      "modeled_wall_seconds": 1.246,
+      "citation_validity": 1.0,
+      "no_medical_authority": true,
+      "open_questions": 0,
+      "planned_queries": 5,
+      "required_check_completion": 1.0,
+      "modeled_wall_seconds_median": 1.237
+    },
+    {
+      "mode": "delegate",
+      "scenario": "multi_drug_labels",
+      "safety_status": "enforced",
+      "planner_decision_calls": 3,
+      "planner_payload_chars": {
+        "mean": 8124.7,
+        "max": 11368,
+        "decisions": 3
+      },
+      "rag_dispatches": 5,
+      "read_back_pages": 0,
+      "delegated_tasks": 1,
+      "tokens_charged": 19321,
+      "modeled_wall_seconds": 1.245,
+      "citation_validity": 1.0,
+      "no_medical_authority": true,
+      "open_questions": 0,
+      "planned_queries": 5,
+      "required_check_completion": 1.0,
+      "modeled_wall_seconds_median": 1.245
+    },
+    {
+      "mode": "single_agent",
+      "scenario": "multi_drug_labels",
+      "safety_status": "enforced",
+      "planner_decision_calls": 7,
+      "planner_payload_chars": {
+        "mean": 9715,
+        "max": 11549,
+        "decisions": 7
+      },
+      "rag_dispatches": 5,
+      "read_back_pages": 0,
+      "delegated_tasks": 0,
+      "tokens_charged": 46757,
+      "modeled_wall_seconds": 2.496,
+      "citation_validity": 1.0,
+      "no_medical_authority": true,
+      "open_questions": 0,
+      "planned_queries": 5,
+      "required_check_completion": 1.0,
+      "modeled_wall_seconds_median": 2.496
+    },
+    {
+      "mode": "batch",
+      "scenario": "simple_current_meds",
+      "safety_status": "enforced",
+      "planner_decision_calls": 3,
+      "planner_payload_chars": {
+        "mean": 5595.3,
+        "max": 7324,
+        "decisions": 3
+      },
+      "rag_dispatches": 0,
+      "read_back_pages": 0,
+      "delegated_tasks": 0,
+      "tokens_charged": 11918,
+      "modeled_wall_seconds": 0.969,
+      "citation_validity": 1.0,
+      "no_medical_authority": true,
+      "open_questions": 0,
+      "planned_queries": 0,
+      "required_check_completion": 1.0,
+      "modeled_wall_seconds_median": 0.969
+    },
+    {
+      "mode": "delegate",
+      "scenario": "simple_current_meds",
+      "safety_status": "enforced",
+      "planner_decision_calls": 3,
+      "planner_payload_chars": {
+        "mean": 5597.3,
+        "max": 7327,
+        "decisions": 3
+      },
+      "rag_dispatches": 0,
+      "read_back_pages": 0,
+      "delegated_tasks": 0,
+      "tokens_charged": 11922,
+      "modeled_wall_seconds": 0.964,
+      "citation_validity": 1.0,
+      "no_medical_authority": true,
+      "open_questions": 0,
+      "planned_queries": 0,
+      "required_check_completion": 1.0,
+      "modeled_wall_seconds_median": 0.954
+    },
+    {
+      "mode": "single_agent",
+      "scenario": "simple_current_meds",
+      "safety_status": "enforced",
+      "planner_decision_calls": 3,
+      "planner_payload_chars": {
+        "mean": 5600,
+        "max": 7331,
+        "decisions": 3
+      },
+      "rag_dispatches": 0,
+      "read_back_pages": 0,
+      "delegated_tasks": 0,
+      "tokens_charged": 11927,
+      "modeled_wall_seconds": 0.963,
+      "citation_validity": 1.0,
+      "no_medical_authority": true,
+      "open_questions": 0,
+      "planned_queries": 0,
+      "required_check_completion": 1.0,
+      "modeled_wall_seconds_median": 0.963
+    }
+  ],
+  "adoption": {
+    "gain_planner_reduction_met": true,
+    "planner_reduction": {
+      "multi_drug_labels": {
+        "batch": 0.5714,
+        "delegate": 0.5714
+      },
+      "long_label_consistency": {
+        "batch": 0.5,
+        "delegate": 0.6667
+      }
+    },
+    "context_isolation_met_strict": true,
+    "context_isolation_material_20pct": true,
+    "payload_mean_chars_long": {
+      "single_agent": 9178.8,
+      "batch": 10507.2,
+      "delegate": 7867.8
+    },
+    "safety_citation_identical": true,
+    "required_checks_complete": true,
+    "cost_overhead_within_20pct": true,
+    "simple_scenario_no_delegation": true,
+    "adopt_delegation": true,
+    "adopt_batching": true,
+    "delegation_conclusion": "在等量完整证据回读的合成工作负载中达到离线候选门槛；不构成生产启用结论，STAGE0_DELEGATED_WORKERS 仍默认关闭，待真实模型与独立验证集验收。",
+    "batching_conclusion": "普通只读批处理满足收益标准（1 次规划决策完成多来源检索/回读），作为候选推荐（STAGE0_READ_BATCH 默认关闭，待 live 验证后灰度）；真实模型收益仍待 live 验证"
+  },
+  "provider_note": "全部 provider 为脚本化假 provider，worker 为确定性只读流水线（worker_model=None）；仅证明流程与资源行为，不代表真实模型质量。"
+}

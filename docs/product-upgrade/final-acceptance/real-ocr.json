@@ -1,0 +1,79 @@
+{
+  "status": "pass",
+  "track": "synthetic_development_only",
+  "dataset_version": "printed-table-v1",
+  "rows": [
+    {
+      "file": "clear-table.png",
+      "group": "synthetic-printed-table-v1",
+      "fields_total": 12,
+      "fields_correct": 12,
+      "critical_field_errors": 0,
+      "rows_requiring_human_review": 2,
+      "elapsed_ms": 4041.9401000035577,
+      "parser_version": "discharge-table-v1/rapidocr-3.9.2",
+      "models": [
+        "PP-OCRv6_det_small",
+        "ch_ppocr_mobile_v2.0_cls_mobile",
+        "PP-OCRv6_rec_small"
+      ]
+    },
+    {
+      "file": "tilted-blurred.png",
+      "group": "synthetic-printed-table-v1",
+      "fields_total": 12,
+      "fields_correct": 11,
+      "critical_field_errors": 1,
+      "rows_requiring_human_review": 3,
+      "elapsed_ms": 2775.2047999965725,
+      "parser_version": "discharge-table-v1/rapidocr-3.9.2",
+      "models": [
+        "PP-OCRv6_det_small",
+        "ch_ppocr_mobile_v2.0_cls_mobile",
+        "PP-OCRv6_rec_small"
+      ]
+    },
+    {
+      "file": "scanned-table.pdf",
+      "group": "synthetic-printed-table-v1",
+      "fields_total": 12,
+      "fields_correct": 12,
+      "critical_field_errors": 0,
+      "rows_requiring_human_review": 2,
+      "elapsed_ms": 2220.553099999961,
+      "parser_version": "discharge-table-v1/rapidocr-3.9.2",
+      "models": [
+        "PP-OCRv6_det_small",
+        "ch_ppocr_mobile_v2.0_cls_mobile",
+        "PP-OCRv6_rec_small"
+      ]
+    },
+    {
+      "file": "two-pages.pdf",
+      "group": "synthetic-printed-table-v1",
+      "fields_total": 24,
+      "fields_correct": 24,
+      "critical_field_errors": 0,
+      "rows_requiring_human_review": 4,
+      "elapsed_ms": 4634.553399999277,
+      "parser_version": "discharge-table-v1/rapidocr-3.9.2",
+      "models": [
+        "PP-OCRv6_det_small",
+        "ch_ppocr_mobile_v2.0_cls_mobile",
+        "PP-OCRv6_rec_small"
+      ]
+    }
+  ],
+  "parser_comparison": {
+    "pymupdf_native_text_chars_on_scan": 0,
+    "rapidocr_fields_correct_on_clear_image": 12
+  },
+  "selection": "RapidOCR CPU for scans; PyMuPDF for bounded rendering",
+  "held_out": "unavailable",
+  "unsupported": [
+    "handwriting",
+    "medicine_boxes",
+    "complex_reports"
+  ],
+  "note": "Blur/rotation/multipage share a generated template, so no independent accuracy claim."
+}

@@ -1,0 +1,168 @@
+test_all_semantic_changes_block_restore (stage0.test_harness_acceptance.AcceptanceGateTests.test_all_semantic_changes_block_restore) ... 
+  test_all_semantic_changes_block_restore (stage0.test_harness_acceptance.AcceptanceGateTests.test_all_semantic_changes_block_restore) (section='models') ... FAIL
+  test_all_semantic_changes_block_restore (stage0.test_harness_acceptance.AcceptanceGateTests.test_all_semantic_changes_block_restore) (section='prompts') ... FAIL
+  test_all_semantic_changes_block_restore (stage0.test_harness_acceptance.AcceptanceGateTests.test_all_semantic_changes_block_restore) (section='corpus') ... FAIL
+test_dataset_restores_logger_on_failure (stage0.test_harness_acceptance.AcceptanceGateTests.test_dataset_restores_logger_on_failure) ... FAIL
+test_graph_scenario_removes_logging_handler (stage0.test_harness_acceptance.AcceptanceGateTests.test_graph_scenario_removes_logging_handler) ... FAIL
+test_required_checks_trajectory_and_error_logs_are_gates (stage0.test_harness_acceptance.AcceptanceGateTests.test_required_checks_trajectory_and_error_logs_are_gates) ... 
+  test_required_checks_trajectory_and_error_logs_are_gates (stage0.test_harness_acceptance.AcceptanceGateTests.test_required_checks_trajectory_and_error_logs_are_gates) (checks={'read': False}, expected=None, errors=0) ... FAIL
+  test_required_checks_trajectory_and_error_logs_are_gates (stage0.test_harness_acceptance.AcceptanceGateTests.test_required_checks_trajectory_and_error_logs_are_gates) (checks={'read': True}, expected=['rag_search'], errors=0) ... FAIL
+  test_required_checks_trajectory_and_error_logs_are_gates (stage0.test_harness_acceptance.AcceptanceGateTests.test_required_checks_trajectory_and_error_logs_are_gates) (checks={'read': True}, expected=None, errors=1) ... FAIL
+test_real_otlp_http_delivery_and_payload_redaction (stage0.test_harness_acceptance.OTelTransportAcceptanceTests.test_real_otlp_http_delivery_and_payload_redaction) ... ERROR
+test_explicit_attempt_identity_prevents_false_replay (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_explicit_attempt_identity_prevents_false_replay) ... FAIL
+test_run_and_resume_enforce_manifest_before_graph_execution (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_run_and_resume_enforce_manifest_before_graph_execution) ... FAIL
+test_same_arguments_retry_after_failure_is_retained (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_same_arguments_retry_after_failure_is_retained) ... FAIL
+
+======================================================================
+ERROR: test_real_otlp_http_delivery_and_payload_redaction (stage0.test_harness_acceptance.OTelTransportAcceptanceTests.test_real_otlp_http_delivery_and_payload_redaction)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_harness_acceptance.py", line 132, in test_real_otlp_http_delivery_and_payload_redaction
+    self.assertTrue(exporter.flush(timeout_millis=3000))
+                    ^^^^^^^^^^^^^^
+AttributeError: 'OTelExporter' object has no attribute 'flush'
+
+======================================================================
+FAIL: test_all_semantic_changes_block_restore (stage0.test_harness_acceptance.AcceptanceGateTests.test_all_semantic_changes_block_restore) (section='models')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_harness_acceptance.py", line 54, in test_all_semantic_changes_block_restore
+    self.assertFalse(check_restore_compatibility(
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        {section: {"version": "old"}}, {section: {"version": "new"}})["compatible"])
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_all_semantic_changes_block_restore (stage0.test_harness_acceptance.AcceptanceGateTests.test_all_semantic_changes_block_restore) (section='prompts')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_harness_acceptance.py", line 54, in test_all_semantic_changes_block_restore
+    self.assertFalse(check_restore_compatibility(
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        {section: {"version": "old"}}, {section: {"version": "new"}})["compatible"])
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_all_semantic_changes_block_restore (stage0.test_harness_acceptance.AcceptanceGateTests.test_all_semantic_changes_block_restore) (section='corpus')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_harness_acceptance.py", line 54, in test_all_semantic_changes_block_restore
+    self.assertFalse(check_restore_compatibility(
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        {section: {"version": "old"}}, {section: {"version": "new"}})["compatible"])
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_dataset_restores_logger_on_failure (stage0.test_harness_acceptance.AcceptanceGateTests.test_dataset_restores_logger_on_failure)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_harness_acceptance.py", line 43, in test_dataset_restores_logger_on_failure
+    self.assertTrue(logger.propagate)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_graph_scenario_removes_logging_handler (stage0.test_harness_acceptance.AcceptanceGateTests.test_graph_scenario_removes_logging_handler)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_harness_acceptance.py", line 49, in test_graph_scenario_removes_logging_handler
+    self.assertEqual(logger.handlers, before)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: [<Recorder (ERROR)>] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+<Recorder (ERROR)>
+
+- [<Recorder (ERROR)>]
++ []
+
+======================================================================
+FAIL: test_required_checks_trajectory_and_error_logs_are_gates (stage0.test_harness_acceptance.AcceptanceGateTests.test_required_checks_trajectory_and_error_logs_are_gates) (checks={'read': False}, expected=None, errors=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_harness_acceptance.py", line 35, in test_required_checks_trajectory_and_error_logs_are_gates
+    self.assertEqual(actual["status"], "fail")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'pass' != 'fail'
+- pass
++ fail
+
+
+======================================================================
+FAIL: test_required_checks_trajectory_and_error_logs_are_gates (stage0.test_harness_acceptance.AcceptanceGateTests.test_required_checks_trajectory_and_error_logs_are_gates) (checks={'read': True}, expected=['rag_search'], errors=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_harness_acceptance.py", line 35, in test_required_checks_trajectory_and_error_logs_are_gates
+    self.assertEqual(actual["status"], "fail")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'pass' != 'fail'
+- pass
++ fail
+
+
+======================================================================
+FAIL: test_required_checks_trajectory_and_error_logs_are_gates (stage0.test_harness_acceptance.AcceptanceGateTests.test_required_checks_trajectory_and_error_logs_are_gates) (checks={'read': True}, expected=None, errors=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_harness_acceptance.py", line 35, in test_required_checks_trajectory_and_error_logs_are_gates
+    self.assertEqual(actual["status"], "fail")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'pass' != 'fail'
+- pass
++ fail
+
+
+======================================================================
+FAIL: test_explicit_attempt_identity_prevents_false_replay (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_explicit_attempt_identity_prevents_false_replay)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_harness_acceptance.py", line 81, in test_explicit_attempt_identity_prevents_false_replay
+    self.assertEqual(spans.dedup_report("r"),
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+                     {"stored_spans": 2, "replays_folded": 1, "raw_events": 3})
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {'stored_spans': 1, 'replays_folded': 2, 'raw_events': 3} != {'stored_spans': 2, 'replays_folded': 1, 'raw_events': 3}
+- {'raw_events': 3, 'replays_folded': 2, 'stored_spans': 1}
+?                                     ^                  ^
+
++ {'raw_events': 3, 'replays_folded': 1, 'stored_spans': 2}
+?                                     ^                  ^
+
+
+======================================================================
+FAIL: test_run_and_resume_enforce_manifest_before_graph_execution (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_run_and_resume_enforce_manifest_before_graph_execution)
+----------------------------------------------------------------------
+RuntimeError: graph run failed: <MagicMock name='_invoke_budgeted().__getitem__()' id='2875580406416'>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_harness_acceptance.py", line 93, in test_run_and_resume_enforce_manifest_before_graph_execution
+    with self.assertRaisesRegex(RuntimeError, "manifest"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "manifest" does not match "graph run failed: <MagicMock name='_invoke_budgeted().__getitem__()' id='2875580406416'>"
+
+======================================================================
+FAIL: test_same_arguments_retry_after_failure_is_retained (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_same_arguments_retry_after_failure_is_retained)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_harness_acceptance.py", line 74, in test_same_arguments_retry_after_failure_is_retained
+    self.assertEqual([r["attempt_no"] for r in rows], [1, 2])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: [1] != [1, 2]
+
+Second list contains 1 additional elements.
+First extra element 1:
+2
+
+- [1]
++ [1, 2]
+
+----------------------------------------------------------------------
+Ran 8 tests in 2.253s
+
+FAILED (failures=11, errors=1)

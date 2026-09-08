@@ -1,0 +1,11 @@
+Harness P2 优化对比（同工作负载，假 provider，中位数）
+============================================================
+  ddi_check_dispatches: baseline=3  optimized=2
+  rag_search_dispatches: baseline=0  optimized=0
+  repeated_identical_reads: baseline=8  optimized=8
+  tokens_charged_total: baseline=6391  optimized=6455
+  wall_seconds: baseline=0.7  optimized=0.692
+  safety_conclusions_identical: True
+  reuse_stats(optimized): {'same_run_hits': 0, 'cross_run_hits': 3, 'misses': 7, 'stores': 7, 'refreshes': 0}
+  no_progress_stopped_runs(optimized): 0
+  repeated_reads executed_reads: baseline=16  optimized=3

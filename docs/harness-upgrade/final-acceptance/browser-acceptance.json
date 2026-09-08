@@ -1,0 +1,39 @@
+{
+  "status": "pass",
+  "checks": {
+    "isolated_synthetic_database": true,
+    "stable_external_store_snapshot": true,
+    "pending_task_restored_after_reload": true,
+    "progress_replayed_without_duplicate_ids": true,
+    "network_loss_is_unknown": true,
+    "reconnect_preserves_event_and_run_identity": true,
+    "server_confirms_cancelled": true,
+    "refresh_and_reconnect_do_not_resubmit": true,
+    "cancel_before_write_has_no_medication_effect": true,
+    "successful_graph_returns_operation_outcomes": true,
+    "one_new_submission_one_medication_effect": true,
+    "structured_ingredient_has_readable_name": true,
+    "no_react_runtime_errors": true,
+    "no_http_server_errors": true
+  },
+  "counts": {
+    "runs": [
+      {
+        "run_id": "2ef155dfdf4c4372ab07b37c876a6c49",
+        "status": "cancelled"
+      },
+      {
+        "run_id": "8365c1a2f6484f43a1fb8e28abc0609d",
+        "status": "succeeded"
+      }
+    ],
+    "medication_effects": 1
+  },
+  "final": {
+    "key": "462590f1-8f98-446f-9418-7bf9ab78f9fb",
+    "runId": "2ef155dfdf4c4372ab07b37c876a6c49",
+    "status": "committed",
+    "cancelState": "cancelled",
+    "run_status": "cancelled"
+  }
+}

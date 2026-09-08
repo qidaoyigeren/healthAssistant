@@ -1,0 +1,14 @@
+test_crash_matrix_graph_checkpoint (stage0.test_harness_p0.ReviewRecoveryTests.test_crash_matrix_graph_checkpoint) ... ok
+test_crash_matrix_stale_transitions_and_ack (stage0.test_harness_p0.ReviewRecoveryTests.test_crash_matrix_stale_transitions_and_ack) ... ok
+test_effect_and_receipt_atomic_on_failure_and_replayed_after_commit (stage0.test_harness_p0.ReviewRecoveryTests.test_effect_and_receipt_atomic_on_failure_and_replayed_after_commit) ... ok
+test_incomplete_new_evidence_cannot_confirm_fact (stage0.test_harness_p0.ReviewRecoveryTests.test_incomplete_new_evidence_cannot_confirm_fact) ... ok
+test_permanent_resume_failure_does_not_starve_other_runs (stage0.test_harness_p0.ReviewRecoveryTests.test_permanent_resume_failure_does_not_starve_other_runs) ... ok
+test_retryable_backoff_cap_and_effect_unknown (stage0.test_harness_p0.ReviewRecoveryTests.test_retryable_backoff_cap_and_effect_unknown) ... ok
+test_review_safety_failure_is_classified_and_effect_receipt_survives (stage0.test_harness_p0.ReviewRecoveryTests.test_review_safety_failure_is_classified_and_effect_receipt_survives) ... ok
+test_run_internal_error_never_restarts_from_start (stage0.test_harness_p0.ReviewRecoveryTests.test_run_internal_error_never_restarts_from_start) ... ok
+test_stale_round_and_human_wait_preserve_budget (stage0.test_harness_p0.ReviewRecoveryTests.test_stale_round_and_human_wait_preserve_budget) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 13.421s
+
+OK

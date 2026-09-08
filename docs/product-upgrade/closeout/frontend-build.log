@@ -1,0 +1,13 @@
+
+> medication-coordinator-frontend@0.1.0 build
+> tsc -b && vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 1714 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.45 kB │ gzip:   0.31 kB
+dist/assets/index-DRqt8tQ1.css   22.46 kB │ gzip:   5.29 kB
+dist/assets/index-CJrgWE_F.js   487.71 kB │ gzip: 144.18 kB
+✓ built in 1.85s

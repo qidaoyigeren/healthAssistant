@@ -1,0 +1,38 @@
+Harness P3 三方案对比实验（dataset p3-1.1-equivalent-coverage，2026-09-07T09:57:44+00:00）
+============================================================================
+模式：single_agent=单主 Agent；batch=共享执行层只读批处理；delegate=只读专项 worker
+
+[场景] multi_drug_labels
+  模式              决策调用   payload均值   rag派发   回读页  tokens     建模耗时s   委派数        安全
+  batch              3     11694.3       5     0   24477     1.246     0  enforced
+  delegate           3      8124.7       5     0   19321     1.245     1  enforced
+  single_agent       7      9715.0       5     0   46757     2.496     0  enforced
+
+[场景] long_label_consistency
+  模式              决策调用   payload均值   rag派发   回读页  tokens     建模耗时s   委派数        安全
+  batch              6     10507.2       1     9   43855     2.000     0  enforced
+  delegate           4      7867.8       1     9   24233     1.352     1  enforced
+  single_agent      12      9178.8       1     9   75884     3.908     0  enforced
+
+[场景] simple_current_meds
+  模式              决策调用   payload均值   rag派发   回读页  tokens     建模耗时s   委派数        安全
+  batch              3      5595.3       0     0   11918     0.969     0  enforced
+  delegate           3      5597.3       0     0   11922     0.964     0  enforced
+  single_agent       3      5600.0       0     0   11927     0.963     0  enforced
+
+[预注册标准判定]
+  planner 决策削减: {"multi_drug_labels": {"batch": 0.5714, "delegate": 0.5714}, "long_label_consistency": {"batch": 0.5, "delegate": 0.6667}}
+  长标签场景 payload 均值: {'single_agent': 9178.8, 'batch': 10507.2, 'delegate': 7867.8}
+  gain_planner_reduction_met: True
+  context_isolation_met_strict: True
+  context_isolation_material_20pct: True
+  safety_citation_identical: True
+  cost_overhead_within_20pct: True
+  required_checks_complete: True
+  simple_scenario_no_delegation: True
+  adopt_delegation: True
+  adopt_batching: True
+  结论: 在等量完整证据回读的合成工作负载中达到离线候选门槛；不构成生产启用结论，STAGE0_DELEGATED_WORKERS 仍默认关闭，待真实模型与独立验证集验收。
+  结论: 普通只读批处理满足收益标准（1 次规划决策完成多来源检索/回读），作为候选推荐（STAGE0_READ_BATCH 默认关闭，待 live 验证后灰度）；真实模型收益仍待 live 验证
+
+说明：假 provider + 确定性 worker，仅验证流程行为；耗时为合成延迟模型。

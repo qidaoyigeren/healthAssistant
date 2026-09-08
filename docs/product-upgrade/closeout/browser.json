@@ -1,0 +1,28 @@
+{
+  "checks": {
+    "isolated_synthetic_fixture": true,
+    "alert_detail_explanation_visible": true,
+    "evidence_original_rendered_with_exact_highlight": true,
+    "unknown_source_version_not_detector_name": true,
+    "fact_detail_visible": true,
+    "amlodipine_listed_for_selection": true,
+    "dose_change_committed": true,
+    "impact_is_run_attributed": true,
+    "impact_has_real_invalidations": true,
+    "impact_count_matches_details": true,
+    "change_impact_card_renders": true,
+    "impact_survives_reload": true,
+    "no_react_pageerrors": true,
+    "no_http_500": true
+  },
+  "errors": [],
+  "serverErrors": [],
+  "origin": "http://127.0.0.1:5181",
+  "run_id": "fc3312719b67420e8bd3ea5b1264ebfe",
+  "generated_at": "2026-09-07T15:12:40.775Z",
+  "screenshots": {
+    "output/playwright/product-p1-evidence-drawer.png": "2f96fa933e737bf226a6395420408c71fb0448f35942c60bfd882e0522d0adcc",
+    "output/playwright/product-p1-fact-detail.png": "527661157f88a4e56d36d9bdeb84aceb37d24a805600ba7ee311fda3a6cc7673",
+    "output/playwright/product-p1-change-impact.png": "3213f93a817b131e51d7fae40ffcb9b504ad377f95c6fd3a2746041fb79f796d"
+  }
+}

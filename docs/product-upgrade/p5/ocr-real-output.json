@@ -1,0 +1,1020 @@
+{
+  "parser_version": "discharge-table-v1/rapidocr-3.9.2",
+  "models": [
+    "PP-OCRv6_det_small",
+    "ch_ppocr_mobile_v2.0_cls_mobile",
+    "PP-OCRv6_rec_small"
+  ],
+  "blocks": [
+    {
+      "text": "合成示例：出院用药表（仅用于软件测试）",
+      "score": 0.97047,
+      "bbox": [
+        62.0,
+        50.0,
+        839.0,
+        99.0
+      ],
+      "polygon": [
+        [
+          62.0,
+          50.0
+        ],
+        [
+          839.0,
+          50.0
+        ],
+        [
+          839.0,
+          99.0
+        ],
+        [
+          62.0,
+          99.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "患者：local-demo日期：2026-09-08",
+      "score": 0.99878,
+      "bbox": [
+        61.0,
+        123.0,
+        617.0,
+        159.0
+      ],
+      "polygon": [
+        [
+          61.0,
+          123.0
+        ],
+        [
+          617.0,
+          123.0
+        ],
+        [
+          617.0,
+          159.0
+        ],
+        [
+          61.0,
+          159.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "药名",
+      "score": 0.99986,
+      "bbox": [
+        70.0,
+        238.0,
+        147.0,
+        287.0
+      ],
+      "polygon": [
+        [
+          71.0,
+          238.0
+        ],
+        [
+          147.0,
+          240.0
+        ],
+        [
+          146.0,
+          287.0
+        ],
+        [
+          70.0,
+          285.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "剂量",
+      "score": 0.99986,
+      "bbox": [
+        430.0,
+        239.0,
+        510.0,
+        287.0
+      ],
+      "polygon": [
+        [
+          430.0,
+          239.0
+        ],
+        [
+          510.0,
+          239.0
+        ],
+        [
+          510.0,
+          287.0
+        ],
+        [
+          430.0,
+          287.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "单位",
+      "score": 0.99432,
+      "bbox": [
+        662.0,
+        240.0,
+        739.0,
+        286.0
+      ],
+      "polygon": [
+        [
+          662.0,
+          240.0
+        ],
+        [
+          739.0,
+          240.0
+        ],
+        [
+          739.0,
+          286.0
+        ],
+        [
+          662.0,
+          286.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "频次",
+      "score": 0.99984,
+      "bbox": [
+        861.0,
+        240.0,
+        938.0,
+        286.0
+      ],
+      "polygon": [
+        [
+          861.0,
+          240.0
+        ],
+        [
+          938.0,
+          240.0
+        ],
+        [
+          938.0,
+          286.0
+        ],
+        [
+          861.0,
+          286.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "途径",
+      "score": 0.9998,
+      "bbox": [
+        1260.0,
+        239.0,
+        1340.0,
+        287.0
+      ],
+      "polygon": [
+        [
+          1260.0,
+          239.0
+        ],
+        [
+          1340.0,
+          239.0
+        ],
+        [
+          1340.0,
+          287.0
+        ],
+        [
+          1260.0,
+          287.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "氨氯地平",
+      "score": 0.9991,
+      "bbox": [
+        74.0,
+        333.0,
+        206.0,
+        374.0
+      ],
+      "polygon": [
+        [
+          74.0,
+          333.0
+        ],
+        [
+          206.0,
+          333.0
+        ],
+        [
+          206.0,
+          374.0
+        ],
+        [
+          74.0,
+          374.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "5",
+      "score": 0.99997,
+      "bbox": [
+        434.0,
+        334.0,
+        463.0,
+        371.0
+      ],
+      "polygon": [
+        [
+          434.0,
+          334.0
+        ],
+        [
+          463.0,
+          334.0
+        ],
+        [
+          463.0,
+          371.0
+        ],
+        [
+          434.0,
+          371.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "mg",
+      "score": 0.99976,
+      "bbox": [
+        662.0,
+        336.0,
+        723.0,
+        380.0
+      ],
+      "polygon": [
+        [
+          662.0,
+          336.0
+        ],
+        [
+          723.0,
+          336.0
+        ],
+        [
+          723.0,
+          380.0
+        ],
+        [
+          662.0,
+          380.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "每日一次",
+      "score": 0.99654,
+      "bbox": [
+        864.0,
+        332.0,
+        996.0,
+        374.0
+      ],
+      "polygon": [
+        [
+          864.0,
+          332.0
+        ],
+        [
+          996.0,
+          332.0
+        ],
+        [
+          996.0,
+          374.0
+        ],
+        [
+          864.0,
+          374.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "口服",
+      "score": 0.99874,
+      "bbox": [
+        1263.0,
+        332.0,
+        1338.0,
+        377.0
+      ],
+      "polygon": [
+        [
+          1263.0,
+          332.0
+        ],
+        [
+          1338.0,
+          332.0
+        ],
+        [
+          1338.0,
+          377.0
+        ],
+        [
+          1263.0,
+          377.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "阿司匹林",
+      "score": 0.99955,
+      "bbox": [
+        74.0,
+        443.0,
+        206.0,
+        484.0
+      ],
+      "polygon": [
+        [
+          74.0,
+          443.0
+        ],
+        [
+          206.0,
+          443.0
+        ],
+        [
+          206.0,
+          484.0
+        ],
+        [
+          74.0,
+          484.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "100",
+      "score": 0.99999,
+      "bbox": [
+        434.0,
+        441.0,
+        500.0,
+        483.0
+      ],
+      "polygon": [
+        [
+          434.0,
+          441.0
+        ],
+        [
+          500.0,
+          441.0
+        ],
+        [
+          500.0,
+          483.0
+        ],
+        [
+          434.0,
+          483.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "mg",
+      "score": 0.99984,
+      "bbox": [
+        662.0,
+        446.0,
+        724.0,
+        489.0
+      ],
+      "polygon": [
+        [
+          662.0,
+          446.0
+        ],
+        [
+          724.0,
+          446.0
+        ],
+        [
+          724.0,
+          489.0
+        ],
+        [
+          662.0,
+          489.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "每日一次",
+      "score": 0.99968,
+      "bbox": [
+        864.0,
+        442.0,
+        996.0,
+        484.0
+      ],
+      "polygon": [
+        [
+          864.0,
+          442.0
+        ],
+        [
+          996.0,
+          442.0
+        ],
+        [
+          996.0,
+          484.0
+        ],
+        [
+          864.0,
+          484.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "口服",
+      "score": 0.99874,
+      "bbox": [
+        1263.0,
+        442.0,
+        1338.0,
+        487.0
+      ],
+      "polygon": [
+        [
+          1263.0,
+          442.0
+        ],
+        [
+          1338.0,
+          442.0
+        ],
+        [
+          1338.0,
+          487.0
+        ],
+        [
+          1263.0,
+          487.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    },
+    {
+      "text": "此材料为合成测试数据，不构成用药建议。",
+      "score": 0.99994,
+      "bbox": [
+        62.0,
+        623.0,
+        618.0,
+        659.0
+      ],
+      "polygon": [
+        [
+          62.0,
+          623.0
+        ],
+        [
+          618.0,
+          623.0
+        ],
+        [
+          618.0,
+          659.0
+        ],
+        [
+          62.0,
+          659.0
+        ]
+      ],
+      "page": 1,
+      "coordinate_system": "rendered_pixels_top_left"
+    }
+  ],
+  "candidates": [
+    {
+      "fields": {
+        "name": "氨氯地平",
+        "dose": "5",
+        "unit": "mg",
+        "schedule": "每日一次",
+        "date": "2026-09-08",
+        "subject": "local-demo",
+        "route": "口服",
+        "form": null,
+        "strength": null
+      },
+      "original_fields": {
+        "name": "氨氯地平",
+        "dose": "5",
+        "unit": "mg",
+        "schedule": "每日一次",
+        "date": "2026-09-08",
+        "subject": "local-demo",
+        "route": "口服",
+        "form": null,
+        "strength": null
+      },
+      "locations": {
+        "name": {
+          "page": 1,
+          "bbox": [
+            74.0,
+            333.0,
+            206.0,
+            374.0
+          ],
+          "polygon": [
+            [
+              74.0,
+              333.0
+            ],
+            [
+              206.0,
+              333.0
+            ],
+            [
+              206.0,
+              374.0
+            ],
+            [
+              74.0,
+              374.0
+            ]
+          ],
+          "coordinate_system": "rendered_pixels_top_left"
+        },
+        "dose": {
+          "page": 1,
+          "bbox": [
+            434.0,
+            334.0,
+            463.0,
+            371.0
+          ],
+          "polygon": [
+            [
+              434.0,
+              334.0
+            ],
+            [
+              463.0,
+              334.0
+            ],
+            [
+              463.0,
+              371.0
+            ],
+            [
+              434.0,
+              371.0
+            ]
+          ],
+          "coordinate_system": "rendered_pixels_top_left"
+        },
+        "unit": {
+          "page": 1,
+          "bbox": [
+            662.0,
+            336.0,
+            723.0,
+            380.0
+          ],
+          "polygon": [
+            [
+              662.0,
+              336.0
+            ],
+            [
+              723.0,
+              336.0
+            ],
+            [
+              723.0,
+              380.0
+            ],
+            [
+              662.0,
+              380.0
+            ]
+          ],
+          "coordinate_system": "rendered_pixels_top_left"
+        },
+        "schedule": {
+          "page": 1,
+          "bbox": [
+            864.0,
+            332.0,
+            996.0,
+            374.0
+          ],
+          "polygon": [
+            [
+              864.0,
+              332.0
+            ],
+            [
+              996.0,
+              332.0
+            ],
+            [
+              996.0,
+              374.0
+            ],
+            [
+              864.0,
+              374.0
+            ]
+          ],
+          "coordinate_system": "rendered_pixels_top_left"
+        },
+        "route": {
+          "page": 1,
+          "bbox": [
+            1263.0,
+            332.0,
+            1338.0,
+            377.0
+          ],
+          "polygon": [
+            [
+              1263.0,
+              332.0
+            ],
+            [
+              1338.0,
+              332.0
+            ],
+            [
+              1338.0,
+              377.0
+            ],
+            [
+              1263.0,
+              377.0
+            ]
+          ],
+          "coordinate_system": "rendered_pixels_top_left"
+        },
+        "subject": {
+          "page": 1,
+          "bbox": [
+            61.0,
+            123.0,
+            617.0,
+            159.0
+          ],
+          "polygon": [
+            [
+              61.0,
+              123.0
+            ],
+            [
+              617.0,
+              123.0
+            ],
+            [
+              617.0,
+              159.0
+            ],
+            [
+              61.0,
+              159.0
+            ]
+          ],
+          "coordinate_system": "rendered_pixels_top_left",
+          "granularity": "text_block"
+        },
+        "date": {
+          "page": 1,
+          "bbox": [
+            61.0,
+            123.0,
+            617.0,
+            159.0
+          ],
+          "polygon": [
+            [
+              61.0,
+              123.0
+            ],
+            [
+              617.0,
+              123.0
+            ],
+            [
+              617.0,
+              159.0
+            ],
+            [
+              61.0,
+              159.0
+            ]
+          ],
+          "coordinate_system": "rendered_pixels_top_left",
+          "granularity": "text_block"
+        }
+      },
+      "ocr_scores": {
+        "name": 0.9991,
+        "dose": 0.99997,
+        "unit": 0.99976,
+        "schedule": 0.99654,
+        "route": 0.99874
+      },
+      "ocr_reviewed": false,
+      "corrections": []
+    },
+    {
+      "fields": {
+        "name": "阿司匹林",
+        "dose": "100",
+        "unit": "mg",
+        "schedule": "每日一次",
+        "date": "2026-09-08",
+        "subject": "local-demo",
+        "route": "口服",
+        "form": null,
+        "strength": null
+      },
+      "original_fields": {
+        "name": "阿司匹林",
+        "dose": "100",
+        "unit": "mg",
+        "schedule": "每日一次",
+        "date": "2026-09-08",
+        "subject": "local-demo",
+        "route": "口服",
+        "form": null,
+        "strength": null
+      },
+      "locations": {
+        "name": {
+          "page": 1,
+          "bbox": [
+            74.0,
+            443.0,
+            206.0,
+            484.0
+          ],
+          "polygon": [
+            [
+              74.0,
+              443.0
+            ],
+            [
+              206.0,
+              443.0
+            ],
+            [
+              206.0,
+              484.0
+            ],
+            [
+              74.0,
+              484.0
+            ]
+          ],
+          "coordinate_system": "rendered_pixels_top_left"
+        },
+        "dose": {
+          "page": 1,
+          "bbox": [
+            434.0,
+            441.0,
+            500.0,
+            483.0
+          ],
+          "polygon": [
+            [
+              434.0,
+              441.0
+            ],
+            [
+              500.0,
+              441.0
+            ],
+            [
+              500.0,
+              483.0
+            ],
+            [
+              434.0,
+              483.0
+            ]
+          ],
+          "coordinate_system": "rendered_pixels_top_left"
+        },
+        "unit": {
+          "page": 1,
+          "bbox": [
+            662.0,
+            446.0,
+            724.0,
+            489.0
+          ],
+          "polygon": [
+            [
+              662.0,
+              446.0
+            ],
+            [
+              724.0,
+              446.0
+            ],
+            [
+              724.0,
+              489.0
+            ],
+            [
+              662.0,
+              489.0
+            ]
+          ],
+          "coordinate_system": "rendered_pixels_top_left"
+        },
+        "schedule": {
+          "page": 1,
+          "bbox": [
+            864.0,
+            442.0,
+            996.0,
+            484.0
+          ],
+          "polygon": [
+            [
+              864.0,
+              442.0
+            ],
+            [
+              996.0,
+              442.0
+            ],
+            [
+              996.0,
+              484.0
+            ],
+            [
+              864.0,
+              484.0
+            ]
+          ],
+          "coordinate_system": "rendered_pixels_top_left"
+        },
+        "route": {
+          "page": 1,
+          "bbox": [
+            1263.0,
+            442.0,
+            1338.0,
+            487.0
+          ],
+          "polygon": [
+            [
+              1263.0,
+              442.0
+            ],
+            [
+              1338.0,
+              442.0
+            ],
+            [
+              1338.0,
+              487.0
+            ],
+            [
+              1263.0,
+              487.0
+            ]
+          ],
+          "coordinate_system": "rendered_pixels_top_left"
+        },
+        "subject": {
+          "page": 1,
+          "bbox": [
+            61.0,
+            123.0,
+            617.0,
+            159.0
+          ],
+          "polygon": [
+            [
+              61.0,
+              123.0
+            ],
+            [
+              617.0,
+              123.0
+            ],
+            [
+              617.0,
+              159.0
+            ],
+            [
+              61.0,
+              159.0
+            ]
+          ],
+          "coordinate_system": "rendered_pixels_top_left",
+          "granularity": "text_block"
+        },
+        "date": {
+          "page": 1,
+          "bbox": [
+            61.0,
+            123.0,
+            617.0,
+            159.0
+          ],
+          "polygon": [
+            [
+              61.0,
+              123.0
+            ],
+            [
+              617.0,
+              123.0
+            ],
+            [
+              617.0,
+              159.0
+            ],
+            [
+              61.0,
+              159.0
+            ]
+          ],
+          "coordinate_system": "rendered_pixels_top_left",
+          "granularity": "text_block"
+        }
+      },
+      "ocr_scores": {
+        "name": 0.99955,
+        "dose": 0.99999,
+        "unit": 0.99984,
+        "schedule": 0.99968,
+        "route": 0.99874
+      },
+      "ocr_reviewed": false,
+      "corrections": []
+    }
+  ],
+  "elapsed_ms": 3194.1112999993493,
+  "score_meaning": "OCR recognition score, not probability of medical correctness"
+}

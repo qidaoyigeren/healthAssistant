@@ -1,0 +1,19 @@
+{
+  "suite": "held_out",
+  "dataset_version": "dev-1",
+  "ran_at": "2026-09-08T06:18:32+00:00",
+  "phases": "all",
+  "environment": {
+    "provider": "scripted",
+    "note": "合成评测,无真实模型调用;临时合成库"
+  },
+  "summary": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0,
+    "unavailable": 0
+  },
+  "failures": [],
+  "tasks": [],
+  "overall": "unavailable"
+}

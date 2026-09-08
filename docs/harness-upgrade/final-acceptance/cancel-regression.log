@@ -1,0 +1,28 @@
+test_mid_turn_cancel_is_exposed_by_event_polling (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_mid_turn_cancel_is_exposed_by_event_polling) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+D:\py\HealthAssistant\stage0\server.py:699: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+D:\py\HealthAssistant\.venv\Lib\site-packages\fastapi\applications.py:4681: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  return self.router.on_event(event_type)  # ty: ignore[deprecated]
+D:\py\HealthAssistant\stage0\server.py:704: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("shutdown")
+ok
+
+----------------------------------------------------------------------
+Ran 1 test in 1.317s
+
+OK

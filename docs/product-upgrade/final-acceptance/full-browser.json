@@ -1,0 +1,36 @@
+{
+  "status": "pass",
+  "checks": {
+    "isolated_fixture": true,
+    "real_ocr_import": true,
+    "real_bbox": true,
+    "unreviewed_ocr_blocked": true,
+    "partial_confirmation_survives_reload": true,
+    "original_and_correction_preserved": true,
+    "domain_receipt_and_safety_run": true,
+    "not_listed_keeps_authority": true,
+    "missing_name_waits": true,
+    "task_survives_new_session": true,
+    "supplement_resumes_same_case": true,
+    "background_safety_check_committed": true,
+    "task_code_verified_completion": true,
+    "cumulative_task_budget": true,
+    "html_summary_download": true,
+    "summary_has_patient_sources": true,
+    "mobile_no_horizontal_overflow": true,
+    "no_react_errors": true,
+    "no_server_errors": true
+  },
+  "errors": [],
+  "serverErrors": [],
+  "case_id": "case:4739a6b0ebeb402f86028238e092320c",
+  "task_id": "task:0b07c33414b64649b19cd554ba3d912b",
+  "generated_at": "2026-09-08T06:15:38.357Z",
+  "artifact_sha256": {
+    "output/playwright/product-p5-ocr-source.png": "8680d965136c54518a03613e9298a3c3bddcac22a453164a453334a8dfd2e361",
+    "output/playwright/product-p3-waiting-task.png": "5b8338d7de7fa5f4cf64545e5c83b970a125af58652f4890b0e958e7f9a08037",
+    "output/playwright/product-p3-visit-summary.png": "ebd392df4cbb871d5363d4ecda1c1c20ad88b29c7e27f7a83d717da8d6762373",
+    "output/playwright/product-p6-mobile.png": "8414885bfe5fe011deda136a9f881b9c73f1ecf2613f27dccb4f93767a598703",
+    "output/playwright/product-visit-summary.html": "84e5068e7913b7232195edc2c714e59fb0876d0d649e4a293f5412ec879e5d40"
+  }
+}

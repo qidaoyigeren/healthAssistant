@@ -1,0 +1,87 @@
+{
+  "code": {
+    "diff_hash": "301a5cfc97dd6cc8",
+    "dirty": true,
+    "note": "dirty 表示工作区存在未提交修改",
+    "revision": "5434835de74ab631d1b319ed38284204a55e94ff"
+  },
+  "corpus": {
+    "ddi_pair_index": "adc2a95aa69964cb",
+    "rag_index_dir": "D:\\py\\HealthAssistant\\stage0\\data\\structured\\rag_index",
+    "rag_index_override_env": null
+  },
+  "created_at": "2026-09-06T09:01:24+00:00",
+  "dependencies": {
+    "langchain-core": "1.6.2",
+    "langgraph": "1.2.11",
+    "langgraph-checkpoint-sqlite": "3.1.1",
+    "openai": "3.3.1",
+    "pydantic": "2.13.4"
+  },
+  "feature_flags": {
+    "AGENT_GRAPH_RUNNER": "",
+    "STAGE0_OTEL_EXPORT": "",
+    "STAGE0_REVIEW_ENABLED": ""
+  },
+  "graph": {
+    "graph_version": "1",
+    "state_schema_version": "2"
+  },
+  "limits": {
+    "call_budget": 32,
+    "max_cycles": 16,
+    "token_budget": 150000,
+    "wall_clock_seconds": 120.0
+  },
+  "models": {
+    "composer_enabled": false,
+    "composer_model": null,
+    "planner_mode": "deterministic",
+    "planner_model": null,
+    "verifier_enabled": false,
+    "verifier_model": null
+  },
+  "policy": {
+    "permission_roles": {
+      "clarify": [
+        "caregiver",
+        "ops"
+      ],
+      "ddi:detect": [
+        "caregiver",
+        "ops",
+        "reviewer"
+      ],
+      "evidence:read": [
+        "caregiver",
+        "ops",
+        "reviewer"
+      ],
+      "memory:read": [
+        "caregiver",
+        "ops",
+        "reviewer"
+      ],
+      "memory:write": [
+        "caregiver",
+        "ops"
+      ],
+      "rag:search": [
+        "caregiver",
+        "ops",
+        "reviewer"
+      ]
+    },
+    "review_enabled": false,
+    "safety_rejection_limit": "2"
+  },
+  "prompts": {
+    "canonical_proposal_schema": "15d124cb56b98a1a",
+    "planner_system_prompt": "ad0a3ddc8095ca91",
+    "response_system_prompt": "e45b03caac35d9ab",
+    "tool_catalog": "c8d5ae76e4739fcd",
+    "tool_executor_specs": "f4e84029aa782137",
+    "verifier_system_prompt": "b969a737be3bff65"
+  },
+  "run_id": "run-example-manifest-0001"
+}

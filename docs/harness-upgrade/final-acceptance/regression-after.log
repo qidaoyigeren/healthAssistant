@@ -1,0 +1,13 @@
+test_all_semantic_changes_block_restore (stage0.test_harness_acceptance.AcceptanceGateTests.test_all_semantic_changes_block_restore) ... ok
+test_dataset_restores_logger_on_failure (stage0.test_harness_acceptance.AcceptanceGateTests.test_dataset_restores_logger_on_failure) ... ok
+test_graph_scenario_removes_logging_handler (stage0.test_harness_acceptance.AcceptanceGateTests.test_graph_scenario_removes_logging_handler) ... ok
+test_required_checks_trajectory_and_error_logs_are_gates (stage0.test_harness_acceptance.AcceptanceGateTests.test_required_checks_trajectory_and_error_logs_are_gates) ... ok
+test_real_otlp_http_delivery_and_payload_redaction (stage0.test_harness_acceptance.OTelTransportAcceptanceTests.test_real_otlp_http_delivery_and_payload_redaction) ... ok
+test_explicit_attempt_identity_prevents_false_replay (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_explicit_attempt_identity_prevents_false_replay) ... ok
+test_run_and_resume_enforce_manifest_before_graph_execution (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_run_and_resume_enforce_manifest_before_graph_execution) ... ok
+test_same_arguments_retry_after_failure_is_retained (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_same_arguments_retry_after_failure_is_retained) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 4.780s
+
+OK

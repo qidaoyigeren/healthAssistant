@@ -1,0 +1,37 @@
+test_capture_does_not_confuse_mode_with_corpus_version (stage0.test_product_closeout.CloseoutTests.test_capture_does_not_confuse_mode_with_corpus_version) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+D:\py\HealthAssistant\stage0\server.py:702: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+D:\py\HealthAssistant\.venv\Lib\site-packages\fastapi\applications.py:4681: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  return self.router.on_event(event_type)  # ty: ignore[deprecated]
+D:\py\HealthAssistant\stage0\server.py:707: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("shutdown")
+FAIL
+
+======================================================================
+FAIL: test_capture_does_not_confuse_mode_with_corpus_version (stage0.test_product_closeout.CloseoutTests.test_capture_does_not_confuse_mode_with_corpus_version)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_product_closeout.py", line 106, in test_capture_does_not_confuse_mode_with_corpus_version
+    self.assertIsNone(evidence.get_meta(item['evidence_id'])['corpus_version'])
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'hybrid' is not None
+
+----------------------------------------------------------------------
+Ran 1 test in 0.134s
+
+FAILED (failures=1)

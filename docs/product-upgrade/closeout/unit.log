@@ -1,0 +1,405 @@
+test_list_detail_and_history (stage0.test_frontend_read_models.AlertRecordTests.test_list_detail_and_history) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_all_statuses_and_action_history (stage0.test_frontend_read_models.ConflictRecordTests.test_all_statuses_and_action_history) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_export_backup_verify_download (stage0.test_frontend_read_models.DataArtifactTests.test_export_backup_verify_download) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_cursor_pagination_covers_all_rows (stage0.test_frontend_read_models.HistoryPaginationTests.test_cursor_pagination_covers_all_rows) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_full_versions_including_dose_change (stage0.test_frontend_read_models.MedicationRecordTests.test_full_versions_including_dose_change) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_memory_item_rejects_non_memory_refs (stage0.test_frontend_read_models.MemoryItemAndFactActionTests.test_memory_item_rejects_non_memory_refs) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_memory_item_resolves_semantic_ref (stage0.test_frontend_read_models.MemoryItemAndFactActionTests.test_memory_item_resolves_semantic_ref) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_verify_retract_and_blocked_by_conflict (stage0.test_frontend_read_models.MemoryItemAndFactActionTests.test_verify_retract_and_blocked_by_conflict) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_committed_response_carries_structured_outcomes (stage0.test_frontend_read_models.OperationOutcomeTests.test_committed_response_carries_structured_outcomes) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_deduplicated_and_unresolved_outcomes (stage0.test_frontend_read_models.OperationOutcomeTests.test_deduplicated_and_unresolved_outcomes) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_counts (stage0.test_frontend_read_models.OverviewTests.test_counts) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_pending_and_history (stage0.test_frontend_read_models.RecheckTaskTests.test_pending_and_history) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_sessions_and_submissions (stage0.test_frontend_read_models.SessionRecordTests.test_sessions_and_submissions) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_all_semantic_changes_block_restore (stage0.test_harness_acceptance.AcceptanceGateTests.test_all_semantic_changes_block_restore) ... ok
+test_dataset_restores_logger_on_failure (stage0.test_harness_acceptance.AcceptanceGateTests.test_dataset_restores_logger_on_failure) ... ok
+test_graph_scenario_removes_logging_handler (stage0.test_harness_acceptance.AcceptanceGateTests.test_graph_scenario_removes_logging_handler) ... ok
+test_p2_aggregation_is_median_and_safety_checks_every_repeat (stage0.test_harness_acceptance.AcceptanceGateTests.test_p2_aggregation_is_median_and_safety_checks_every_repeat) ... ok
+test_p3_missing_work_cannot_qualify_for_adoption (stage0.test_harness_acceptance.AcceptanceGateTests.test_p3_missing_work_cannot_qualify_for_adoption) ... ok
+test_required_checks_trajectory_and_error_logs_are_gates (stage0.test_harness_acceptance.AcceptanceGateTests.test_required_checks_trajectory_and_error_logs_are_gates) ... ok
+test_exporter_failure_stays_on_background_thread (stage0.test_harness_acceptance.OTelTransportAcceptanceTests.test_exporter_failure_stays_on_background_thread) ... ok
+test_real_otlp_http_delivery_and_payload_redaction (stage0.test_harness_acceptance.OTelTransportAcceptanceTests.test_real_otlp_http_delivery_and_payload_redaction) ... ok
+test_explicit_attempt_identity_prevents_false_replay (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_explicit_attempt_identity_prevents_false_replay) ... ok
+test_mid_turn_cancel_is_exposed_by_event_polling (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_mid_turn_cancel_is_exposed_by_event_polling) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_missing_graph_manifest_requires_migration (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_missing_graph_manifest_requires_migration) ... ok
+test_run_and_resume_enforce_manifest_before_graph_execution (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_run_and_resume_enforce_manifest_before_graph_execution) ... ok
+test_same_arguments_retry_after_failure_is_retained (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_same_arguments_retry_after_failure_is_retained) ... ok
+test_graph_process_restart_keeps_attempts_after_plan_checkpoint (stage0.test_harness_p0.BudgetParityTests.test_graph_process_restart_keeps_attempts_after_plan_checkpoint) ... ok
+test_small_token_budget_same_termination_and_persistence (stage0.test_harness_p0.BudgetParityTests.test_small_token_budget_same_termination_and_persistence) ... ok
+test_zero_limits_never_dispatch_or_claim_recording (stage0.test_harness_p0.BudgetParityTests.test_zero_limits_never_dispatch_or_claim_recording) ... ok
+test_actual_detector_script_imports_share_budget_and_http_gate (stage0.test_harness_p0.ResourceLedgerTests.test_actual_detector_script_imports_share_budget_and_http_gate) ... ok
+test_checkpoint_cannot_decrease_counters_or_change_limits (stage0.test_harness_p0.ResourceLedgerTests.test_checkpoint_cannot_decrease_counters_or_change_limits) ... ok
+test_exact_token_boundary_actual_usage_and_transport_timeout (stage0.test_harness_p0.ResourceLedgerTests.test_exact_token_boundary_actual_usage_and_transport_timeout) ... ok
+test_guard_rejection_is_charged (stage0.test_harness_p0.ResourceLedgerTests.test_guard_rejection_is_charged) ... ok
+test_legacy_checkpoint_without_ledger_fails_closed_across_restarts (stage0.test_harness_p0.ResourceLedgerTests.test_legacy_checkpoint_without_ledger_fails_closed_across_restarts) ... ok
+test_lost_lease_during_extraction_rejects_projection (stage0.test_harness_p0.ResourceLedgerTests.test_lost_lease_during_extraction_rejects_projection) ... ok
+test_parse_retry_composer_verifier_and_tool_llm_accounted (stage0.test_harness_p0.ResourceLedgerTests.test_parse_retry_composer_verifier_and_tool_llm_accounted) ... ok
+test_pre_harness_unknown_usage_does_not_disappear_on_second_restart (stage0.test_harness_p0.ResourceLedgerTests.test_pre_harness_unknown_usage_does_not_disappear_on_second_restart) ... ok
+test_provider_rejection_and_composer_adaptation_count (stage0.test_harness_p0.ResourceLedgerTests.test_provider_rejection_and_composer_adaptation_count) ... ok
+test_schema_reopen_preserves_legacy_resume_rows (stage0.test_harness_p0.ResourceLedgerTests.test_schema_reopen_preserves_legacy_resume_rows) ... ok
+test_trace_does_not_export_patient_text_or_model_rationale (stage0.test_harness_p0.ResourceLedgerTests.test_trace_does_not_export_patient_text_or_model_rationale) ... ok
+test_transport_unknown_and_late_sync_response_are_not_accepted (stage0.test_harness_p0.ResourceLedgerTests.test_transport_unknown_and_late_sync_response_are_not_accepted) ... ok
+test_unsettled_attempt_survives_process_restart_without_new_budget (stage0.test_harness_p0.ResourceLedgerTests.test_unsettled_attempt_survives_process_restart_without_new_budget) ... ok
+test_crash_matrix_graph_checkpoint (stage0.test_harness_p0.ReviewRecoveryTests.test_crash_matrix_graph_checkpoint) ... ok
+test_crash_matrix_stale_transitions_and_ack (stage0.test_harness_p0.ReviewRecoveryTests.test_crash_matrix_stale_transitions_and_ack) ... ok
+test_effect_and_receipt_atomic_on_failure_and_replayed_after_commit (stage0.test_harness_p0.ReviewRecoveryTests.test_effect_and_receipt_atomic_on_failure_and_replayed_after_commit) ... ok
+test_incomplete_new_evidence_cannot_confirm_fact (stage0.test_harness_p0.ReviewRecoveryTests.test_incomplete_new_evidence_cannot_confirm_fact) ... ok
+test_permanent_resume_failure_does_not_starve_other_runs (stage0.test_harness_p0.ReviewRecoveryTests.test_permanent_resume_failure_does_not_starve_other_runs) ... ok
+test_retryable_backoff_cap_and_effect_unknown (stage0.test_harness_p0.ReviewRecoveryTests.test_retryable_backoff_cap_and_effect_unknown) ... ok
+test_review_safety_failure_is_classified_and_effect_receipt_survives (stage0.test_harness_p0.ReviewRecoveryTests.test_review_safety_failure_is_classified_and_effect_receipt_survives) ... ok
+test_run_internal_error_never_restarts_from_start (stage0.test_harness_p0.ReviewRecoveryTests.test_run_internal_error_never_restarts_from_start) ... ok
+test_stale_round_and_human_wait_preserve_budget (stage0.test_harness_p0.ReviewRecoveryTests.test_stale_round_and_human_wait_preserve_budget) ... ok
+test_failing_hook_never_breaks_a_turn (stage0.test_harness_p1_a.HookParityTests.test_failing_hook_never_breaks_a_turn) ... ok
+test_hook_sequence_identical_for_both_runners (stage0.test_harness_p1_a.HookParityTests.test_hook_sequence_identical_for_both_runners) ... ok
+test_cancelled_reflects_event_and_budget_reason (stage0.test_harness_p1_a.RunContextTests.test_cancelled_reflects_event_and_budget_reason) ... ok
+test_checkpoint_projection_is_json_safe_and_secret_free (stage0.test_harness_p1_a.RunContextTests.test_checkpoint_projection_is_json_safe_and_secret_free) ... ok
+test_new_tool_executes_on_both_runners_without_loop_changes (stage0.test_harness_p1_a.SharedExecutorParityTests.test_new_tool_executes_on_both_runners_without_loop_changes) ... ok
+test_two_runners_same_error_semantics_for_invalid_arguments (stage0.test_harness_p1_a.SharedExecutorParityTests.test_two_runners_same_error_semantics_for_invalid_arguments) ... ok
+test_budget_exhaustion_is_passthrough_never_a_tool_result (stage0.test_harness_p1_a.ToolExecutorContractTests.test_budget_exhaustion_is_passthrough_never_a_tool_result) ... ok
+test_cancellation_gates_dispatch_before_the_handler_runs (stage0.test_harness_p1_a.ToolExecutorContractTests.test_cancellation_gates_dispatch_before_the_handler_runs) ... ok
+test_default_specs_declare_no_layered_retry_and_typed_contract (stage0.test_harness_p1_a.ToolExecutorContractTests.test_default_specs_declare_no_layered_retry_and_typed_contract) ... ok
+test_error_kinds_are_distinct_and_machine_readable (stage0.test_harness_p1_a.ToolExecutorContractTests.test_error_kinds_are_distinct_and_machine_readable) ... ok
+test_fabricated_warning_body_rejected_at_executor_even_without_guard (stage0.test_harness_p1_a.ToolExecutorContractTests.test_fabricated_warning_body_rejected_at_executor_even_without_guard) ... ok
+test_metrics_record_attempts_active_seconds_and_corrections (stage0.test_harness_p1_a.ToolExecutorContractTests.test_metrics_record_attempts_active_seconds_and_corrections) ... ok
+test_observation_payload_shape_is_stable (stage0.test_harness_p1_a.ToolExecutorContractTests.test_observation_payload_shape_is_stable) ... ok
+test_policy_violation_classified_distinct_from_internal_error (stage0.test_harness_p1_a.ToolExecutorContractTests.test_policy_violation_classified_distinct_from_internal_error) ... ok
+test_write_capture_records_patient_revision (stage0.test_harness_p1_a.ToolExecutorContractTests.test_write_capture_records_patient_revision) ... ok
+test_capture_keeps_raw_results_untouched_and_stores_full_text (stage0.test_harness_p1_b.EvidenceStoreTests.test_capture_keeps_raw_results_untouched_and_stores_full_text) ... ok
+test_cross_scope_read_is_indistinguishable_from_missing (stage0.test_harness_p1_b.EvidenceStoreTests.test_cross_scope_read_is_indistinguishable_from_missing) ... ok
+test_hash_mismatch_refuses_to_serve (stage0.test_harness_p1_b.EvidenceStoreTests.test_hash_mismatch_refuses_to_serve) ... ok
+test_model_supplied_path_or_url_never_reaches_storage (stage0.test_harness_p1_b.EvidenceStoreTests.test_model_supplied_path_or_url_never_reaches_storage) ... ok
+test_pagination_bound_enforced_as_recoverable_error (stage0.test_harness_p1_b.EvidenceStoreTests.test_pagination_bound_enforced_as_recoverable_error) ... ok
+test_read_back_pagination_and_out_of_range (stage0.test_harness_p1_b.EvidenceStoreTests.test_read_back_pagination_and_out_of_range) ... ok
+test_retention_prune_protects_active_runs_and_dependent_records (stage0.test_harness_p1_b.EvidenceStoreTests.test_retention_prune_protects_active_runs_and_dependent_records) ... ok
+test_read_evidence_reachable_as_registered_tool (stage0.test_harness_p1_b.ReadEvidenceThroughExecutorTests.test_read_evidence_reachable_as_registered_tool) ... ok
+test_failed_observation_summary_carries_error_class (stage0.test_harness_p1_b.RunSummaryTests.test_failed_observation_summary_carries_error_class) ... ok
+test_old_observation_without_evidence_marks_not_recorded (stage0.test_harness_p1_b.RunSummaryTests.test_old_observation_without_evidence_marks_not_recorded) ... ok
+test_structured_summary_replaces_hash_only_digest (stage0.test_harness_p1_b.RunSummaryTests.test_structured_summary_replaces_hash_only_digest) ... ok
+test_excerpt_selects_relevant_paragraph_at_the_end (stage0.test_harness_p1_b.SemanticContextTests.test_excerpt_selects_relevant_paragraph_at_the_end) ... ok
+test_medication_list_13_items_fully_visible_no_marker (stage0.test_harness_p1_b.SemanticContextTests.test_medication_list_13_items_fully_visible_no_marker) ... ok
+test_medication_list_beyond_cap_carries_explicit_omission_marker (stage0.test_harness_p1_b.SemanticContextTests.test_medication_list_beyond_cap_carries_explicit_omission_marker) ... ok
+test_multiple_critical_allergy_and_conflict_items_not_silently_cut (stage0.test_harness_p1_b.SemanticContextTests.test_multiple_critical_allergy_and_conflict_items_not_silently_cut) ... ok
+test_planner_payload_surfaces_omissions_explicitly (stage0.test_harness_p1_b.SemanticContextTests.test_planner_payload_surfaces_omissions_explicitly) ... ok
+test_full_dataset_passes_offline (stage0.test_harness_p1_c.EvalEntryTests.test_full_dataset_passes_offline) ... ok
+test_readable_report_rendering (stage0.test_harness_p1_c.EvalEntryTests.test_readable_report_rendering) ... ok
+test_both_runners_write_manifest_at_run_start (stage0.test_harness_p1_c.RunManifestTests.test_both_runners_write_manifest_at_run_start) ... ok
+test_manifest_diff_locates_version_changes_and_unknown_fields (stage0.test_harness_p1_c.RunManifestTests.test_manifest_diff_locates_version_changes_and_unknown_fields) ... ok
+test_manifest_is_saved_immutable_and_credential_free (stage0.test_harness_p1_c.RunManifestTests.test_manifest_is_saved_immutable_and_credential_free) ... ok
+test_restore_compatibility_blocked_on_semantic_change (stage0.test_harness_p1_c.RunManifestTests.test_restore_compatibility_blocked_on_semantic_change) ... ok
+test_genuine_retry_gets_independent_attempt_row (stage0.test_harness_p1_c.SpanDedupTests.test_genuine_retry_gets_independent_attempt_row) ... ok
+test_graph_node_replay_does_not_duplicate_persisted_trace (stage0.test_harness_p1_c.SpanDedupTests.test_graph_node_replay_does_not_duplicate_persisted_trace) ... ok
+test_otel_exporter_off_by_default_and_never_load_bearing (stage0.test_harness_p1_c.SpanDedupTests.test_otel_exporter_off_by_default_and_never_load_bearing) ... ok
+test_replay_folds_into_replay_count_no_duplicate_rows (stage0.test_harness_p1_c.SpanDedupTests.test_replay_folds_into_replay_count_no_duplicate_rows) ... ok
+test_turn_trace_persistence_is_idempotent_under_replay (stage0.test_harness_p1_c.SpanDedupTests.test_turn_trace_persistence_is_idempotent_under_replay) ... ok
+test_cancel_queued_task_executes_nothing (stage0.test_harness_p2.CancelTests.test_cancel_queued_task_executes_nothing) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_cancel_survives_worker_restart (stage0.test_harness_p2.CancelTests.test_cancel_survives_worker_restart) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_cancel_terminal_run_is_already_final (stage0.test_harness_p2.CancelTests.test_cancel_terminal_run_is_already_final) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_cancel_waiting_review_blocks_late_decision (stage0.test_harness_p2.CancelTests.test_cancel_waiting_review_blocks_late_decision) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+Loading weights:   0%|          | 0/71 [00:00<?, ?it/s]Loading weights: 100%|██████████| 71/71 [00:00<00:00, 13324.19it/s]
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\37859\AppData\Local\Temp\jieba.cache
+Loading model cost 0.578 seconds.
+Prefix dict has been built successfully.
+ok
+test_mid_turn_cancel_stops_planning_keeps_committed_effects (stage0.test_harness_p2.CancelTests.test_mid_turn_cancel_stops_planning_keeps_committed_effects) ... ok
+test_fact_change_makes_same_query_progress (stage0.test_harness_p2.NoProgressTests.test_fact_change_makes_same_query_progress) ... ok
+test_happy_path_unaffected_when_enabled (stage0.test_harness_p2.NoProgressTests.test_happy_path_unaffected_when_enabled) ... ok
+test_repeat_is_not_a_safety_violation (stage0.test_harness_p2.NoProgressTests.test_repeat_is_not_a_safety_violation) ... ok
+test_repeats_stop_at_threshold_with_structured_feedback (stage0.test_harness_p2.NoProgressTests.test_repeats_stop_at_threshold_with_structured_feedback) ... ok
+test_tracker_survives_restart (stage0.test_harness_p2.NoProgressTests.test_tracker_survives_restart) ... ok
+test_emit_idempotent_and_cursor_replay (stage0.test_harness_p2.ProgressEventTests.test_emit_idempotent_and_cursor_replay) ... ok
+test_service_progress_cursor_and_auth (stage0.test_harness_p2.ProgressEventTests.test_service_progress_cursor_and_auth) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_cache_flag_sides_agree_on_safety (stage0.test_harness_p2.ReuseTests.test_cache_flag_sides_agree_on_safety) ... ok
+test_cross_run_cache_isolation_and_invalidation (stage0.test_harness_p2.ReuseTests.test_cross_run_cache_isolation_and_invalidation) ... ok
+test_same_run_reuse_refresh_and_failures_never_cached (stage0.test_harness_p2.ReuseTests.test_same_run_reuse_refresh_and_failures_never_cached) ... ok
+test_writes_are_never_reused (stage0.test_harness_p2.ReuseTests.test_writes_are_never_reused) ... ok
+test_attempt_limit_blocks_endless_restarts (stage0.test_harness_p3.BudgetAndRecoveryTests.test_attempt_limit_blocks_endless_restarts) ... ok
+test_cancelled_parent_propagates_and_marks_historical (stage0.test_harness_p3.BudgetAndRecoveryTests.test_cancelled_parent_propagates_and_marks_historical) ... ok
+test_reservation_charged_to_parent_and_visible_in_ledger (stage0.test_harness_p3.BudgetAndRecoveryTests.test_reservation_charged_to_parent_and_visible_in_ledger) ... ok
+test_retry_never_gets_new_budget (stage0.test_harness_p3.BudgetAndRecoveryTests.test_retry_never_gets_new_budget) ... ok
+test_revision_change_marks_result_historical_only (stage0.test_harness_p3.BudgetAndRecoveryTests.test_revision_change_marks_result_historical_only) ... ok
+test_claims_verified_and_not_found (stage0.test_harness_p3.CheckerProtocolTests.test_claims_verified_and_not_found) ... ok
+test_missing_evidence_yields_not_found_never_fabrication (stage0.test_harness_p3.CheckerProtocolTests.test_missing_evidence_yields_not_found_never_fabrication) ... ok
+test_flag_default_off (stage0.test_harness_p3.FlagAndRegistryTests.test_flag_default_off) ... ok
+test_flag_on_registers_two_role_catalog (stage0.test_harness_p3.FlagAndRegistryTests.test_flag_on_registers_two_role_catalog) ... ok
+test_worker_roles_never_contain_write_or_delegate_tools (stage0.test_harness_p3.FlagAndRegistryTests.test_worker_roles_never_contain_write_or_delegate_tools) ... ok
+test_manifest_records_delegation_config (stage0.test_harness_p3.ManifestDelegationTests.test_manifest_records_delegation_config) ... ok
+test_delegate_returns_structured_verbatim_evidence (stage0.test_harness_p3.RetrieverProtocolTests.test_delegate_returns_structured_verbatim_evidence) ... ok
+test_duplicate_submit_is_idempotent_receipt (stage0.test_harness_p3.RetrieverProtocolTests.test_duplicate_submit_is_idempotent_receipt) ... ok
+test_same_task_id_different_spec_is_a_new_task (stage0.test_harness_p3.RetrieverProtocolTests.test_same_task_id_different_spec_is_a_new_task) ... ok
+test_cross_scope_evidence_ref_no_oracle (stage0.test_harness_p3.SecurityBoundaryTests.test_cross_scope_evidence_ref_no_oracle) ... ok
+test_dynamic_tool_injection_refused (stage0.test_harness_p3.SecurityBoundaryTests.test_dynamic_tool_injection_refused)
+The proposal can name any role it likes; the toolset is code-derived ... ok
+test_parent_child_trace_correlation (stage0.test_harness_p3.SecurityBoundaryTests.test_parent_child_trace_correlation)
+Worker dispatches land in call_spans under the CHILD run id with the ... ok
+test_recursion_impossible_structurally (stage0.test_harness_p3.SecurityBoundaryTests.test_recursion_impossible_structurally) ... ok
+test_worker_executor_holds_only_role_tools (stage0.test_harness_p3.SecurityBoundaryTests.test_worker_executor_holds_only_role_tools) ... ok
+test_worker_result_with_injection_stays_data (stage0.test_harness_p3.SecurityBoundaryTests.test_worker_result_with_injection_stays_data)
+Injected instructions inside evidence stay DATA: the delegated ... ok
+test_worker_write_attempt_refused (stage0.test_harness_p3.SecurityBoundaryTests.test_worker_write_attempt_refused) ... ok
+test_simple_query_never_delegates (stage0.test_harness_p3.SimpleScenarioTests.test_simple_query_never_delegates)
+A direct current-medication question needs no delegation: the run ... ok
+test_bare_store_is_offline_by_default (stage0.test_memory_p0.DefaultOfflineTests.test_bare_store_is_offline_by_default) ... ok
+test_explicit_argument_wins_over_environment (stage0.test_memory_p0.DefaultOfflineTests.test_explicit_argument_wins_over_environment) ... ok
+test_same_event_id_different_payload_is_rejected (stage0.test_memory_p0.IdempotencyTests.test_same_event_id_different_payload_is_rejected) ... ok
+test_same_event_id_replays_committed_result (stage0.test_memory_p0.IdempotencyTests.test_same_event_id_replays_committed_result) ... ok
+test_turn_owned_by_other_event_id_is_rejected (stage0.test_memory_p0.IdempotencyTests.test_turn_owned_by_other_event_id_is_rejected) ... ok
+test_affirmed_reports_still_recorded (stage0.test_memory_p0.OfflineSemanticsTests.test_affirmed_reports_still_recorded) ... ok
+test_hypothetical_disease_is_not_recorded (stage0.test_memory_p0.OfflineSemanticsTests.test_hypothetical_disease_is_not_recorded) ... ok
+test_negated_disease_is_not_patient_diagnosis (stage0.test_memory_p0.OfflineSemanticsTests.test_negated_disease_is_not_patient_diagnosis) ... ok
+test_other_subject_disease_is_excluded_from_patient_state (stage0.test_memory_p0.OfflineSemanticsTests.test_other_subject_disease_is_excluded_from_patient_state) ... ok
+test_uncertain_allergy_stays_pending_verification (stage0.test_memory_p0.OfflineSemanticsTests.test_uncertain_allergy_stays_pending_verification) ... ok
+test_p0_columns_added_without_dropping_data (stage0.test_memory_p0.SchemaMigrationTests.test_p0_columns_added_without_dropping_data) ... ok
+test_critical_fact_cannot_be_updated_via_policy_parameter (stage0.test_memory_p0.StoragePolicyGuardTests.test_critical_fact_cannot_be_updated_via_policy_parameter) ... ok
+test_low_risk_fact_still_allows_update (stage0.test_memory_p0.StoragePolicyGuardTests.test_low_risk_fact_still_allows_update) ... ok
+test_conclusion_ref_resolves (stage0.test_memory_p0.StrictRefTests.test_conclusion_ref_resolves) ... ok
+test_ref_version_mismatch_is_rejected (stage0.test_memory_p0.StrictRefTests.test_ref_version_mismatch_is_rejected) ... ok
+test_failure_after_first_fact_leaves_no_partial_state (stage0.test_memory_p0.TransactionAtomicityTests.test_failure_after_first_fact_leaves_no_partial_state) ... ok
+test_bitemporal_ablation_leaks_future_records (stage0.test_memory_p1.BiTemporalTests.test_bitemporal_ablation_leaks_future_records) ... ok
+test_late_report_does_not_leak_into_earlier_known_at (stage0.test_memory_p1.BiTemporalTests.test_late_report_does_not_leak_into_earlier_known_at) ... ok
+test_out_of_order_stop_keeps_valid_interval_semantics (stage0.test_memory_p1.BiTemporalTests.test_out_of_order_stop_keeps_valid_interval_semantics) ... ok
+test_invalid_action_and_unknown_conflict_rejected (stage0.test_memory_p1.ConflictLifecycleTests.test_invalid_action_and_unknown_conflict_rejected) ... ok
+test_resolve_dismiss_reopen_and_undo (stage0.test_memory_p1.ConflictLifecycleTests.test_resolve_dismiss_reopen_and_undo) ... ok
+test_packet_includes_key_sections_and_refs (stage0.test_memory_p1.ContextBuilderTests.test_packet_includes_key_sections_and_refs) ... ok
+test_prompt_injection_text_does_not_change_policy (stage0.test_memory_p1.ContextBuilderTests.test_prompt_injection_text_does_not_change_policy) ... ok
+test_tiny_budget_marks_packet_incomplete (stage0.test_memory_p1.ContextBuilderTests.test_tiny_budget_marks_packet_incomplete) ... ok
+test_state_persists_across_reopen (stage0.test_memory_p1.CrossSessionTests.test_state_persists_across_reopen) ... ok
+test_fact_correction_invalidates_dependent_conclusion (stage0.test_memory_p1.DependencyInvalidationTests.test_fact_correction_invalidates_dependent_conclusion) ... ok
+test_new_medication_invalidates_old_ddi_warning (stage0.test_memory_p1.DependencyInvalidationTests.test_new_medication_invalidates_old_ddi_warning) ... ok
+test_recheck_without_hook_keeps_tasks_open (stage0.test_memory_p1.DependencyInvalidationTests.test_recheck_without_hook_keeps_tasks_open) ... ok
+test_retract_marks_dependents_stale_and_keeps_history (stage0.test_memory_p1.DependencyInvalidationTests.test_retract_marks_dependents_stale_and_keeps_history) ... ok
+test_search_finds_history_mention (stage0.test_memory_p1.HistorySearchTests.test_search_finds_history_mention) ... ok
+test_fold_matches_current_open_filter (stage0.test_memory_p2.AsOfConflictTests.test_fold_matches_current_open_filter)
+AS-OF 折叠在 known_at=now 时必须与 status='open' 过滤等价。 ... ok
+test_backup_and_restore_roundtrip (stage0.test_memory_p2.BackupRoundTripTests.test_backup_and_restore_roundtrip) ... ok
+test_export_and_import_roundtrip (stage0.test_memory_p2.BackupRoundTripTests.test_export_and_import_roundtrip) ... ok
+test_restore_refuses_to_overwrite (stage0.test_memory_p2.BackupRoundTripTests.test_restore_refuses_to_overwrite) ... ok
+test_dependency_index_equivalence (stage0.test_memory_p2.DependencyIndexTests.test_dependency_index_equivalence) ... ok
+test_migration_backfill_is_deterministic_and_idempotent (stage0.test_memory_p2.DependencyIndexTests.test_migration_backfill_is_deterministic_and_idempotent) ... ok
+test_record_writes_dependency_rows (stage0.test_memory_p2.DependencyIndexTests.test_record_writes_dependency_rows) ... ok
+test_selective_vs_full_invalidation_ablation (stage0.test_memory_p2.DependencyIndexTests.test_selective_vs_full_invalidation_ablation) ... ok
+test_transitive_invalidation_conclusion_to_conclusion (stage0.test_memory_p2.DependencyIndexTests.test_transitive_invalidation_conclusion_to_conclusion) ... ok
+test_open_conflict_blocks_promotion (stage0.test_memory_p2.PromotionTests.test_open_conflict_blocks_promotion) ... ok
+test_replay_never_counts_toward_promotion (stage0.test_memory_p2.PromotionTests.test_replay_never_counts_toward_promotion) ... ok
+test_batch_dedup_runs_detector_once (stage0.test_memory_p2.RecheckRobustnessTests.test_batch_dedup_runs_detector_once) ... ok
+test_effectively_once_dedup_after_manual_reopen (stage0.test_memory_p2.RecheckRobustnessTests.test_effectively_once_dedup_after_manual_reopen) ... ok
+test_lease_expiry_recovery_and_failure_cap (stage0.test_memory_p2.RecheckRobustnessTests.test_lease_expiry_recovery_and_failure_cap) ... ok
+test_recheck_pending_recovers_expired_lease_in_call (stage0.test_memory_p2.RecheckRobustnessTests.test_recheck_pending_recovers_expired_lease_in_call) ... ok
+test_alert_detail_does_not_verify_tampered_or_foreign_evidence (stage0.test_product_closeout.CloseoutTests.test_alert_detail_does_not_verify_tampered_or_foreign_evidence) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_browser_gate_rejects_empty_or_incomplete_result (stage0.test_product_closeout.CloseoutTests.test_browser_gate_rejects_empty_or_incomplete_result) ... ok
+test_capture_does_not_confuse_mode_with_corpus_version (stage0.test_product_closeout.CloseoutTests.test_capture_does_not_confuse_mode_with_corpus_version) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_empty_held_out_and_phase_filter_are_unavailable (stage0.test_product_closeout.CloseoutTests.test_empty_held_out_and_phase_filter_are_unavailable) ... ok
+test_eval_rejects_wrong_content_and_error_content_leak (stage0.test_product_closeout.CloseoutTests.test_eval_rejects_wrong_content_and_error_content_leak) ... ok
+test_evidence_metadata_preserves_content_ref (stage0.test_product_closeout.CloseoutTests.test_evidence_metadata_preserves_content_ref) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_graph_runner_publishes_bundle_and_attributed_impact (stage0.test_product_closeout.CloseoutTests.test_graph_runner_publishes_bundle_and_attributed_impact) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_legacy_run_without_attribution_is_not_zero_impact (stage0.test_product_closeout.CloseoutTests.test_legacy_run_without_attribution_is_not_zero_impact) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_run_impact_receipt_replays_without_later_changes (stage0.test_product_closeout.CloseoutTests.test_run_impact_receipt_replays_without_later_changes) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_since_excludes_old_invalidations_and_rejects_bad_time (stage0.test_product_closeout.CloseoutTests.test_since_excludes_old_invalidations_and_rejects_bad_time) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_dev_suite_runs_with_real_service (stage0.test_product_evals.DevSuiteTests.test_dev_suite_runs_with_real_service) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_forced_failure_returns_nonzero (stage0.test_product_evals.DevSuiteTests.test_forced_failure_returns_nonzero) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_missing_task_data_is_unavailable_not_pass (stage0.test_product_evals.DevSuiteTests.test_missing_task_data_is_unavailable_not_pass) ... ok
+test_bundle_present_and_same_source_as_payload (stage0.test_product_p1.AnswerBundleTests.test_bundle_present_and_same_source_as_payload) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_correction_marks_related_stale_only_and_counts_match_details (stage0.test_product_p1.ChangeImpactTests.test_correction_marks_related_stale_only_and_counts_match_details) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_no_recheck_hook_never_reads_as_all_clear (stage0.test_product_p1.ChangeImpactTests.test_no_recheck_hook_never_reads_as_all_clear) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_invalid_page_params_rejected (stage0.test_product_p1.EvidenceReadApiTests.test_invalid_page_params_rejected) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_missing_and_cross_scope_share_one_error (stage0.test_product_p1.EvidenceReadApiTests.test_missing_and_cross_scope_share_one_error) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_pagination_shape_and_meta (stage0.test_product_p1.EvidenceReadApiTests.test_pagination_shape_and_meta) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_repeat_read_is_stable_and_unknown_version_stays_null (stage0.test_product_p1.EvidenceReadApiTests.test_repeat_read_is_stable_and_unknown_version_stays_null) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_tampered_content_refused (stage0.test_product_p1.EvidenceReadApiTests.test_tampered_content_refused) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_legacy_sources_report_unavailable_not_fabricated (stage0.test_product_p1.LegacyEvidenceUnavailableTests.test_legacy_sources_report_unavailable_not_fabricated) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_recorded_warning_citation_carries_readable_evidence (stage0.test_product_p1.WarningEvidenceLinkageTests.test_recorded_warning_citation_carries_readable_evidence) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_deployment_mode_enforces_token_and_roles (stage0.test_reliability_p0.AuthorizationTests.test_deployment_mode_enforces_token_and_roles) ... deployment auth profile active; requests need the X-Stage0-Token header
+ok
+test_deployment_mode_refuses_anonymous_start (stage0.test_reliability_p0.AuthorizationTests.test_deployment_mode_refuses_anonymous_start) ... ok
+test_rate_limit_returns_429 (stage0.test_reliability_p0.AuthorizationTests.test_rate_limit_returns_429) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_permanent_failure_reopened_via_explicit_retry (stage0.test_reliability_p0.ClassifiedRetryTests.test_permanent_failure_reopened_via_explicit_retry) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_retryable_failure_backs_off_and_caps (stage0.test_reliability_p0.ClassifiedRetryTests.test_retryable_failure_backs_off_and_caps) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_worker_classifies_failures (stage0.test_reliability_p0.ClassifiedRetryTests.test_worker_classifies_failures) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+outbox task failed task_id=1 trace_id=8fc24131d0e4 error_class=safety exception_type=RuntimeError run_id=1bcaf445f03e4dee845cdad414d9c725
+ok
+test_committed_replay_post_matches_get_shape (stage0.test_reliability_p0.CommittedReplayContractTests.test_committed_replay_post_matches_get_shape) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_recovery_after_publish_crash_has_no_duplicate_effects (stage0.test_reliability_p0.CrashAfterDomainWriteTests.test_recovery_after_publish_crash_has_no_duplicate_effects) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+Loading weights:   0%|          | 0/71 [00:00<?, ?it/s]Loading weights: 100%|██████████| 71/71 [00:00<00:00, 5388.21it/s]
+ok
+test_warning_batch_replay_is_atomic (stage0.test_reliability_p0.CrashAfterDomainWriteTests.test_warning_batch_replay_is_atomic) ... ok
+test_domain_event_key_is_the_api_key (stage0.test_reliability_p0.KeyPrefixCollisionTests.test_domain_event_key_is_the_api_key) ... ok
+test_long_prefix_collision_yields_two_events (stage0.test_reliability_p0.KeyPrefixCollisionTests.test_long_prefix_collision_yields_two_events) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_worker_failure_log_carries_no_patient_text (stage0.test_reliability_p0.LogSanitizationTests.test_worker_failure_log_carries_no_patient_text) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_stale_worker_writes_rejected (stage0.test_reliability_p0.StaleLeaseFencingTests.test_stale_worker_writes_rejected) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_timeout_retry_reuses_key_and_resolves (stage0.test_reliability_p0.UiRetryKeyTests.test_timeout_retry_reuses_key_and_resolves) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_restart_does_not_reset_budget (stage0.test_reliability_p1.BudgetPersistenceTests.test_restart_does_not_reset_budget) ... ok
+test_checkpoint_state_is_json_safe (stage0.test_reliability_p1.CheckpointSafetyTests.test_checkpoint_state_is_json_safe) ... ok
+test_crash_after_domain_write_before_checkpoint (stage0.test_reliability_p1.CrashRecoveryTests.test_crash_after_domain_write_before_checkpoint) ... Loading weights:   0%|          | 0/71 [00:00<?, ?it/s]Loading weights: 100%|██████████| 71/71 [00:00<00:00, 21310.69it/s]
+ok
+test_crash_between_nodes_resumes_from_checkpoint (stage0.test_reliability_p1.CrashRecoveryTests.test_crash_between_nodes_resumes_from_checkpoint) ... ok
+test_interrupt_and_command_resume_with_sqlite_saver (stage0.test_reliability_p1.InterruptWiringSmokeTests.test_interrupt_and_command_resume_with_sqlite_saver) ... ok
+test_legacy_and_graph_produce_identical_outcomes (stage0.test_reliability_p1.ParityTests.test_legacy_and_graph_produce_identical_outcomes) ... Loading weights:   0%|          | 0/71 [00:00<?, ?it/s]Loading weights: 100%|██████████| 71/71 [00:00<00:00, 13818.18it/s]
+Loading weights:   0%|          | 0/71 [00:00<?, ?it/s]Loading weights: 100%|██████████| 71/71 [00:00<00:00, 8564.48it/s]
+ok
+test_graph_flag_routes_service_events (stage0.test_reliability_p1.ServiceLayerFlagTests.test_graph_flag_routes_service_events) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_flag_off_routes_new_runs_to_legacy (stage0.test_reliability_p1.VersionRoutingTests.test_flag_off_routes_new_runs_to_legacy) ... ok
+test_inflight_legacy_run_keeps_legacy_version (stage0.test_reliability_p1.VersionRoutingTests.test_inflight_legacy_run_keeps_legacy_version) ... manifest unavailable for legacy run; provenance unknown run_id=run-old
+ok
+test_deployment_reviewer_roles_and_object_scope (stage0.test_reliability_p2.AuthorizationTests.test_deployment_reviewer_roles_and_object_scope) ... deployment auth profile active; requests need the X-Stage0-Token header
+ok
+test_claim_cas_and_decision_idempotency (stage0.test_reliability_p2.DecisionTransactionTests.test_claim_cas_and_decision_idempotency) ... ok
+test_decision_on_open_case_refused (stage0.test_reliability_p2.DecisionTransactionTests.test_decision_on_open_case_refused) ... ok
+test_claim_decide_resume_resolves_case (stage0.test_reliability_p2.FullReviewCycleTests.test_claim_decide_resume_resolves_case) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+Loading weights:   0%|          | 0/71 [00:00<?, ?it/s]Loading weights: 100%|██████████| 71/71 [00:00<00:00, 9216.82it/s]
+ok
+test_review_stale_opens_new_round_and_keeps_run_waiting (stage0.test_reliability_p2.FullReviewCycleTests.test_review_stale_opens_new_round_and_keeps_run_waiting) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+Loading weights:   0%|          | 0/71 [00:00<?, ?it/s]Loading weights: 100%|██████████| 71/71 [00:00<00:00, 8085.68it/s]
+ok
+test_overdue_is_operational_never_approval (stage0.test_reliability_p2.OverdueTests.test_overdue_is_operational_never_approval) ... ok
+test_mild_turn_does_not_create_case (stage0.test_reliability_p2.ReviewTriggerTests.test_mild_turn_does_not_create_case) ... ok
+test_replayed_open_review_hits_logic_key (stage0.test_reliability_p2.ReviewTriggerTests.test_replayed_open_review_hits_logic_key) ... ok
+test_severe_warning_creates_exactly_one_case_and_parks_run (stage0.test_reliability_p2.ReviewTriggerTests.test_severe_warning_creates_exactly_one_case_and_parks_run) ... Loading weights:   0%|          | 0/71 [00:00<?, ?it/s]Loading weights: 100%|██████████| 71/71 [00:00<00:00, 5824.74it/s]
+ok
+test_summary_endpoint_shape (stage0.test_reliability_p2.SummaryExportTests.test_summary_endpoint_shape) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_async_submit_poll_and_commit (stage0.test_stage10_server.EventLifecycleTests.test_async_submit_poll_and_commit) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_worker_thread_smoke (stage0.test_stage10_server.EventLifecycleTests.test_worker_thread_smoke) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_concurrent_same_key_same_acceptance (stage0.test_stage10_server.IdempotencyTests.test_concurrent_same_key_same_acceptance) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_failed_key_returns_409_until_new_key (stage0.test_stage10_server.IdempotencyTests.test_failed_key_returns_409_until_new_key) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_replay_same_key_same_payload (stage0.test_stage10_server.IdempotencyTests.test_replay_same_key_same_payload) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_same_key_different_payload_rejected (stage0.test_stage10_server.IdempotencyTests.test_same_key_different_payload_rejected) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_expired_lease_recovers_and_executes_once (stage0.test_stage10_server.OutboxRecoveryTests.test_expired_lease_recovers_and_executes_once) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_conflict_action_endpoint (stage0.test_stage10_server.ReadEndpointTests.test_conflict_action_endpoint) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_invalid_idempotency_key_shape (stage0.test_stage10_server.ReadEndpointTests.test_invalid_idempotency_key_shape) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_reads_and_health (stage0.test_stage10_server.ReadEndpointTests.test_reads_and_health) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_validation_error_model (stage0.test_stage10_server.ReadEndpointTests.test_validation_error_model) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+ok
+test_proactive_warning_audit_and_cross_session_persistence (stage0.test_stage3.Stage3AgentTests.test_proactive_warning_audit_and_cross_session_persistence) ... ok
+test_safety_refuses_diagnosis (stage0.test_stage3.Stage3AgentTests.test_safety_refuses_diagnosis) ... ok
+test_dedup_conflict_and_decay (stage0.test_stage3.Stage3MemoryTests.test_dedup_conflict_and_decay) ... ok
+test_default_and_disabled_hybrid_remain_deterministic (stage0.test_stage5.Stage5BehaviorTests.test_default_and_disabled_hybrid_remain_deterministic) ... ok
+test_hybrid_and_deterministic_final_safety_results_agree (stage0.test_stage5.Stage5BehaviorTests.test_hybrid_and_deterministic_final_safety_results_agree) ... ok
+test_rejected_action_never_reaches_executor (stage0.test_stage5.Stage5BehaviorTests.test_rejected_action_never_reaches_executor) ... ok
+test_safety_boundary_still_rejects_uncited_and_escalates_low_confidence_or_conflict (stage0.test_stage5.Stage5BehaviorTests.test_safety_boundary_still_rejects_uncited_and_escalates_low_confidence_or_conflict) ... ok
+test_early_respond_is_rejected_and_replans_without_deterministic_fallback (stage0.test_stage5.Stage5ProtocolTests.test_early_respond_is_rejected_and_replans_without_deterministic_fallback) ... ok
+test_json_parse_provider_exception_and_empty_response_fallback (stage0.test_stage5.Stage5ProtocolTests.test_json_parse_provider_exception_and_empty_response_fallback) ... ok
+test_legal_llm_tool_is_accepted_without_calling_fallback (stage0.test_stage5.Stage5ProtocolTests.test_legal_llm_tool_is_accepted_without_calling_fallback) ... ok
+test_legal_respond_after_prerequisites_is_accepted (stage0.test_stage5.Stage5ProtocolTests.test_legal_respond_after_prerequisites_is_accepted) ... ok
+test_lenient_schema_ignores_extra_fields_but_still_rejects_garbage (stage0.test_stage5.Stage5ProtocolTests.test_lenient_schema_ignores_extra_fields_but_still_rejects_garbage) ... ok
+test_conflict_creation_stays_grounded_in_persisted_warnings (stage0.test_stage5.Stage5SafetyGuardTests.test_conflict_creation_stays_grounded_in_persisted_warnings) ... ok
+test_medication_change_may_skip_context_read_but_not_garbage_args (stage0.test_stage5.Stage5SafetyGuardTests.test_medication_change_may_skip_context_read_but_not_garbage_args) ... ok
+test_prescribing_diagnosis_stop_and_dose_actions_are_rejected (stage0.test_stage5.Stage5SafetyGuardTests.test_prescribing_diagnosis_stop_and_dose_actions_are_rejected) ... ok
+test_reads_may_precede_consolidation_but_respond_and_persistence_cannot (stage0.test_stage5.Stage5SafetyGuardTests.test_reads_may_precede_consolidation_but_respond_and_persistence_cannot) ... ok
+test_repeats_are_allowed_but_double_consolidation_is_not (stage0.test_stage5.Stage5SafetyGuardTests.test_repeats_are_allowed_but_double_consolidation_is_not) ... ok
+test_respond_is_decided_by_the_llm_and_feedback_is_safety_only (stage0.test_stage5.Stage5SafetyGuardTests.test_respond_is_decided_by_the_llm_and_feedback_is_safety_only) ... ok
+test_safe_but_different_action_is_accepted_and_executed (stage0.test_stage5.Stage5SafetyGuardTests.test_safe_but_different_action_is_accepted_and_executed) ... ok
+test_tool_failure_is_not_completion_but_allows_explicit_degraded_respond (stage0.test_stage5.Stage5SafetyGuardTests.test_tool_failure_is_not_completion_but_allows_explicit_degraded_respond) ... ok
+test_warning_payload_is_hydrated_exactly_and_cannot_be_forged (stage0.test_stage5.Stage5SafetyGuardTests.test_warning_payload_is_hydrated_exactly_and_cannot_be_forged) ... ok
+test_agentic_mode_matches_baseline_and_diverges_safely (stage0.test_stage6.Stage6BehaviorTests.test_agentic_mode_matches_baseline_and_diverges_safely) ... ok
+test_metrics_artifact_offline_reproduction (stage0.test_stage6.Stage6BehaviorTests.test_metrics_artifact_offline_reproduction) ... ok
+test_ddi_medication_list_is_hydrated_from_memory_ground_truth (stage0.test_stage6.Stage6GuardTests.test_ddi_medication_list_is_hydrated_from_memory_ground_truth) ... ok
+test_divergent_but_safe_orders_are_accepted (stage0.test_stage6.Stage6GuardTests.test_divergent_but_safe_orders_are_accepted) ... ok
+test_forged_warning_bodies_are_ignored_and_hydrated (stage0.test_stage6.Stage6GuardTests.test_forged_warning_bodies_are_ignored_and_hydrated) ... ok
+test_lenient_canonical_schema_accepts_extra_fields_and_free_purposes (stage0.test_stage6.Stage6GuardTests.test_lenient_canonical_schema_accepts_extra_fields_and_free_purposes) ... ok
+test_medical_authority_actions_are_rejected_as_unsafe (stage0.test_stage6.Stage6GuardTests.test_medical_authority_actions_are_rejected_as_unsafe) ... ok
+test_record_warnings_requires_observed_warnings (stage0.test_stage6.Stage6GuardTests.test_record_warnings_requires_observed_warnings) ... ok
+test_repeated_reads_are_allowed_but_double_consolidation_is_not (stage0.test_stage6.Stage6GuardTests.test_repeated_reads_are_allowed_but_double_consolidation_is_not) ... ok
+test_respond_before_consolidation_is_a_safety_rejection (stage0.test_stage6.Stage6GuardTests.test_respond_before_consolidation_is_a_safety_rejection) ... ok
+test_unknown_tool_and_missing_required_arguments_are_rejected (stage0.test_stage6.Stage6GuardTests.test_unknown_tool_and_missing_required_arguments_are_rejected) ... ok
+test_accepted_llm_action_records_corrections_and_no_fallback (stage0.test_stage6.Stage6PlannerTests.test_accepted_llm_action_records_corrections_and_no_fallback) ... ok
+test_parse_json_tolerates_fences_and_prose (stage0.test_stage6.Stage6PlannerTests.test_parse_json_tolerates_fences_and_prose) ... ok
+test_prompt_payload_carries_snapshot_catalog_and_pending_goals (stage0.test_stage6.Stage6PlannerTests.test_prompt_payload_carries_snapshot_catalog_and_pending_goals) ... ok
+test_provider_and_parse_failure_is_the_emergency_fallback (stage0.test_stage6.Stage6PlannerTests.test_provider_and_parse_failure_is_the_emergency_fallback) ... ok
+test_safety_rejection_replans_without_deterministic_fallback (stage0.test_stage6.Stage6PlannerTests.test_safety_rejection_replans_without_deterministic_fallback) ... ok
+test_adversarial_text_cannot_reach_user (stage0.test_stage6.Stage6ResponseTests.test_adversarial_text_cannot_reach_user) ... ok
+test_canonical_schema_is_shared (stage0.test_stage6.Stage6ResponseTests.test_canonical_schema_is_shared) ... ok
+test_composed_text_without_escalation_falls_back_to_template_and_is_logged (stage0.test_stage6.Stage6ResponseTests.test_composed_text_without_escalation_falls_back_to_template_and_is_logged) ... ok
+test_default_deterministic_path_is_untouched (stage0.test_stage6.Stage6ResponseTests.test_default_deterministic_path_is_untouched) ... ok
+test_feedback_returns_to_llm_and_safe_read_can_precede_write (stage0.test_stage6.Stage6ResponseTests.test_feedback_returns_to_llm_and_safe_read_can_precede_write) ... ok
+test_good_composed_text_is_used_and_carries_citations (stage0.test_stage6.Stage6ResponseTests.test_good_composed_text_is_used_and_carries_citations) ... ok
+test_missing_memory_and_extra_warning_are_rejected (stage0.test_stage6.Stage6ResponseTests.test_missing_memory_and_extra_warning_are_rejected) ... ok
+test_postcheck_rejects_uncited_escalationless_and_prescriptive_text (stage0.test_stage6.Stage6ResponseTests.test_postcheck_rejects_uncited_escalationless_and_prescriptive_text) ... ok
+test_prescriptive_composer_is_rejected_and_template_used (stage0.test_stage6.Stage6ResponseTests.test_prescriptive_composer_is_rejected_and_template_used) ... ok
+test_safety_boundary_stays_the_final_gate (stage0.test_stage6.Stage6ResponseTests.test_safety_boundary_stays_the_final_gate) ... ok
+test_consecutive_rejections_trip_the_breaker (stage0.test_stage8_agent.CircuitBreakerTests.test_consecutive_rejections_trip_the_breaker) ... ok
+test_single_rejection_still_replans_through_the_llm (stage0.test_stage8_agent.CircuitBreakerTests.test_single_rejection_still_replans_through_the_llm) ... ok
+test_compression_does_not_touch_state (stage0.test_stage8_agent.PayloadBoundingTests.test_compression_does_not_touch_state) ... ok
+test_old_observations_summarized_recent_full (stage0.test_stage8_agent.PayloadBoundingTests.test_old_observations_summarized_recent_full) ... ok
+test_payload_growth_is_bounded (stage0.test_stage8_agent.PayloadBoundingTests.test_payload_growth_is_bounded) ... ok
+test_offline_default_turn_never_degrades (stage0.test_stage8_agent.TurnBudgetTests.test_offline_default_turn_never_degrades) ... ok
+test_token_budget_degrades_explicitly (stage0.test_stage8_agent.TurnBudgetTests.test_token_budget_degrades_explicitly) ... ok
+test_wall_clock_budget_degrades_explicitly (stage0.test_stage8_agent.TurnBudgetTests.test_wall_clock_budget_degrades_explicitly) ... ok
+test_trace_persistence_failure_never_breaks_a_turn (stage0.test_stage8_agent.TurnTraceTests.test_trace_persistence_failure_never_breaks_a_turn) ... ok
+test_turn_traces_persisted_and_queryable (stage0.test_stage8_agent.TurnTraceTests.test_turn_traces_persisted_and_queryable) ... ok
+test_hard_gates_are_never_adjudicable (stage0.test_stage8_agent.VerifierTests.test_hard_gates_are_never_adjudicable) ... ok
+test_semantic_false_positive_cleared_by_verifier (stage0.test_stage8_agent.VerifierTests.test_semantic_false_positive_cleared_by_verifier) ... ok
+test_verifier_failure_falls_back_to_full_rules (stage0.test_stage8_agent.VerifierTests.test_verifier_failure_falls_back_to_full_rules) ... ok
+test_verifier_reject_appends_findings (stage0.test_stage8_agent.VerifierTests.test_verifier_reject_appends_findings) ... ok
+
+----------------------------------------------------------------------
+Ran 304 tests in 114.159s
+
+OK

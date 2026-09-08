@@ -1,0 +1,382 @@
+{
+  "dataset_version": "synthetic-claim-screen-v1",
+  "track": "local_engineering_dev",
+  "generalization_claim": false,
+  "results": [
+    {
+      "mode": "baseline",
+      "n": 10,
+      "correct": 4,
+      "false_support": 6,
+      "p50_ms": 0.000400003045797348,
+      "p95_ms": 0.0020000006770715117,
+      "model_calls": 0,
+      "tokens": 0,
+      "samples": [
+        {
+          "case_id": "positive",
+          "expected_support": true,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": true,
+          "elapsed_ms": 0.0020000006770715117
+        },
+        {
+          "case_id": "negative",
+          "expected_support": false,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": false,
+          "elapsed_ms": 0.001600004907231778
+        },
+        {
+          "case_id": "unrelated",
+          "expected_support": false,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": false,
+          "elapsed_ms": 0.0006999980541877449
+        },
+        {
+          "case_id": "wrong_entity",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "baseline_citation_gate_only",
+          "correct": true,
+          "elapsed_ms": 0.0005999972927384079
+        },
+        {
+          "case_id": "unknown_conditions",
+          "expected_support": false,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": false,
+          "elapsed_ms": 0.000400003045797348
+        },
+        {
+          "case_id": "avoid",
+          "expected_support": true,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": true,
+          "elapsed_ms": 0.000400003045797348
+        },
+        {
+          "case_id": "monitor",
+          "expected_support": true,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": true,
+          "elapsed_ms": 0.000400003045797348
+        },
+        {
+          "case_id": "no_increase",
+          "expected_support": false,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": false,
+          "elapsed_ms": 0.00039999576983973384
+        },
+        {
+          "case_id": "question",
+          "expected_support": false,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": false,
+          "elapsed_ms": 0.000400003045797348
+        },
+        {
+          "case_id": "insufficient",
+          "expected_support": false,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": false,
+          "elapsed_ms": 0.00039999576983973384
+        }
+      ]
+    },
+    {
+      "mode": "rerank_only",
+      "n": 10,
+      "correct": 4,
+      "false_support": 6,
+      "p50_ms": 0.0017999991541728377,
+      "p95_ms": 0.00689999433234334,
+      "model_calls": 0,
+      "tokens": 0,
+      "samples": [
+        {
+          "case_id": "positive",
+          "expected_support": true,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": true,
+          "elapsed_ms": 0.00689999433234334
+        },
+        {
+          "case_id": "negative",
+          "expected_support": false,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": false,
+          "elapsed_ms": 0.0040000013541430235
+        },
+        {
+          "case_id": "unrelated",
+          "expected_support": false,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": false,
+          "elapsed_ms": 0.0023000029614195228
+        },
+        {
+          "case_id": "wrong_entity",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "baseline_citation_gate_only",
+          "correct": true,
+          "elapsed_ms": 0.0018999999156221747
+        },
+        {
+          "case_id": "unknown_conditions",
+          "expected_support": false,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": false,
+          "elapsed_ms": 0.001500004145782441
+        },
+        {
+          "case_id": "avoid",
+          "expected_support": true,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": true,
+          "elapsed_ms": 0.0016999983927235007
+        },
+        {
+          "case_id": "monitor",
+          "expected_support": true,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": true,
+          "elapsed_ms": 0.0021000014385208488
+        },
+        {
+          "case_id": "no_increase",
+          "expected_support": false,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": false,
+          "elapsed_ms": 0.0015999976312741637
+        },
+        {
+          "case_id": "question",
+          "expected_support": false,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": false,
+          "elapsed_ms": 0.0015999976312741637
+        },
+        {
+          "case_id": "insufficient",
+          "expected_support": false,
+          "predicted_support": true,
+          "status": "baseline_citation_gate_only",
+          "correct": false,
+          "elapsed_ms": 0.0015999976312741637
+        }
+      ]
+    },
+    {
+      "mode": "support_only",
+      "n": 10,
+      "correct": 10,
+      "false_support": 0,
+      "p50_ms": 0.004099994839634746,
+      "p95_ms": 0.7512000011047348,
+      "model_calls": 0,
+      "tokens": 0,
+      "samples": [
+        {
+          "case_id": "positive",
+          "expected_support": true,
+          "predicted_support": true,
+          "status": "supported",
+          "correct": true,
+          "elapsed_ms": 0.7512000011047348
+        },
+        {
+          "case_id": "negative",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "contradicted",
+          "correct": true,
+          "elapsed_ms": 0.008600000001024455
+        },
+        {
+          "case_id": "unrelated",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "insufficient",
+          "correct": true,
+          "elapsed_ms": 0.005199995939619839
+        },
+        {
+          "case_id": "wrong_entity",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "insufficient",
+          "correct": true,
+          "elapsed_ms": 0.0022999956854619086
+        },
+        {
+          "case_id": "unknown_conditions",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "insufficient",
+          "correct": true,
+          "elapsed_ms": 0.0030000010156072676
+        },
+        {
+          "case_id": "avoid",
+          "expected_support": true,
+          "predicted_support": true,
+          "status": "supported",
+          "correct": true,
+          "elapsed_ms": 0.004199995601084083
+        },
+        {
+          "case_id": "monitor",
+          "expected_support": true,
+          "predicted_support": true,
+          "status": "supported",
+          "correct": true,
+          "elapsed_ms": 0.005699999746866524
+        },
+        {
+          "case_id": "no_increase",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "contradicted",
+          "correct": true,
+          "elapsed_ms": 0.0029000002541579306
+        },
+        {
+          "case_id": "question",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "insufficient",
+          "correct": true,
+          "elapsed_ms": 0.0033000032999552786
+        },
+        {
+          "case_id": "insufficient",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "insufficient",
+          "correct": true,
+          "elapsed_ms": 0.003999994078185409
+        }
+      ]
+    },
+    {
+      "mode": "combined",
+      "n": 10,
+      "correct": 10,
+      "false_support": 0,
+      "p50_ms": 0.005650003004120663,
+      "p95_ms": 0.03740000101970509,
+      "model_calls": 0,
+      "tokens": 0,
+      "samples": [
+        {
+          "case_id": "positive",
+          "expected_support": true,
+          "predicted_support": true,
+          "status": "supported",
+          "correct": true,
+          "elapsed_ms": 0.007500006176996976
+        },
+        {
+          "case_id": "negative",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "contradicted",
+          "correct": true,
+          "elapsed_ms": 0.0044000043999403715
+        },
+        {
+          "case_id": "unrelated",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "insufficient",
+          "correct": true,
+          "elapsed_ms": 0.03740000101970509
+        },
+        {
+          "case_id": "wrong_entity",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "insufficient",
+          "correct": true,
+          "elapsed_ms": 0.012500000593718141
+        },
+        {
+          "case_id": "unknown_conditions",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "insufficient",
+          "correct": true,
+          "elapsed_ms": 0.003999994078185409
+        },
+        {
+          "case_id": "avoid",
+          "expected_support": true,
+          "predicted_support": true,
+          "status": "supported",
+          "correct": true,
+          "elapsed_ms": 0.008999995770864189
+        },
+        {
+          "case_id": "monitor",
+          "expected_support": true,
+          "predicted_support": true,
+          "status": "supported",
+          "correct": true,
+          "elapsed_ms": 0.005800000508315861
+        },
+        {
+          "case_id": "no_increase",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "contradicted",
+          "correct": true,
+          "elapsed_ms": 0.00429999636253342
+        },
+        {
+          "case_id": "question",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "insufficient",
+          "correct": true,
+          "elapsed_ms": 0.0042000028770416975
+        },
+        {
+          "case_id": "insufficient",
+          "expected_support": false,
+          "predicted_support": false,
+          "status": "insufficient",
+          "correct": true,
+          "elapsed_ms": 0.005500005499925464
+        }
+      ]
+    }
+  ],
+  "reranker_adoption": "default_off_no_ranking_gain_demonstrated",
+  "limitations": [
+    "single-candidate replay does not establish retrieval ranking gains",
+    "lexical screening is not semantic or clinical validation",
+    "no independent held-out material"
+  ],
+  "status": "pass"
+}

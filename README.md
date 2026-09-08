@@ -12,6 +12,14 @@ It is **not a medical device, diagnostic system, prescriber, or clinical decisio
 
 ## Architecture
 
+### Product upgrade P0–P6: material reconciliation and durable care tasks
+
+The React frontend supports **open an alert → read and highlight its original evidence → inspect recorded facts → correct a medication record → inspect that operation's impact**. Evidence reads enforce scope and verify the stored content hash; unknown source versions remain unknown. New operations persist their `run_id` on mutation audit entries, so impact comes from the actual operation's invalidations. Historical operations without attribution explicitly report that their impact cannot be reconstructed.
+
+The React app now also imports CSV or printed Chinese discharge tables, shows original document regions beside candidate fields, records each confirmed difference with an atomic receipt, queues risk checks, resumes durable care tasks, and downloads immutable visit summaries. Versioned evidence caches, conservative citation-support checks and explicit source replacement preserve evidence history.
+
+See [P0–P6 delivery and reproducible acceptance](docs/product-upgrade/final-acceptance/README.md). The [earlier P0–P1 closeout](docs/product-upgrade/closeout/README.md) is retained as historical evidence. Engineering/synthetic regression, actual local OCR, real-model quality and independent domain review are reported separately. New pages: `/materials` and `/tasks`. Optional OCR dependencies: `requirements-product-ocr.txt`.
+
 ```mermaid
 flowchart LR
     A["MNBVC 中文药品说明书"] --> B["parse<br/>结构化章节与引用"]
@@ -21,9 +29,9 @@ flowchart LR
     C --> F["RAG / LLM fallback<br/>精确中文摘录门槛"]
     F --> D
     D --> M["Three-layer memory<br/>SQLite: semantic / episodic / working"]
-    M --> AG["Agentic loop (Stage 6)<br/>LLM decides every cycle · code enforces safety only"]
+    M --> AG["Agent loop<br/>Typed queries: deterministic · Open questions: planner"]
     AG --> S["Safety boundary<br/>拒绝诊断/处方 · 强制升级"]
-    S --> UI["Streamlit UI<br/>单照护者 / 单患者"]
+    S --> UI["React + legacy Streamlit UI<br/>单照护者 / 单患者"]
     UI -->|care event| AG
     E["Evaluation loop<br/>regression replay + held-out baseline"] -. "回归保护与缺口反馈" .-> D
     E -. "记忆/代理行为检查" .-> AG

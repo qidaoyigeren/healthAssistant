@@ -1,0 +1,70 @@
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+{
+  "suite": "dev",
+  "dataset_version": "dev-1",
+  "ran_at": "2026-09-07T15:18:06+00:00",
+  "phases": [
+    "P1"
+  ],
+  "environment": {
+    "provider": "scripted",
+    "note": "合成评测,无真实模型调用;临时合成库"
+  },
+  "summary": {
+    "total": 8,
+    "passed": 8,
+    "failed": 0,
+    "unavailable": 0
+  },
+  "failures": [],
+  "tasks": [
+    {
+      "task_id": "dev-p1-ev-001",
+      "duration_ms": 128.0,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p1-ev-002",
+      "duration_ms": 72.4,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p1-ev-003",
+      "duration_ms": 67.9,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p1-ev-004",
+      "duration_ms": 76.4,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p1-ev-005",
+      "duration_ms": 86.7,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p1-ev-006",
+      "duration_ms": 92.2,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p1-imp-007",
+      "duration_ms": 772.7,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p1-imp-008",
+      "duration_ms": 563.8,
+      "result": "passed"
+    }
+  ],
+  "overall": "pass"
+}

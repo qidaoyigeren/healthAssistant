@@ -1,0 +1,12 @@
+### Result
+{"download_reopened":true,"title":"就诊准备摘要"}
+### Ran Playwright code
+```js
+await (async (page) => { await page.goto('http://127.0.0.1:5182/product-visit-summary.html'); await page.setViewportSize({width:1200,height:1000}); const text = await page.locator('body').innerText(); if (!text.includes('二甲双胍') || !text.includes('来源')) throw new Error('Downloaded summary missing contents'); await page.screenshot({path:'output/playwright/product-downloaded-summary.png',fullPage:true}); return {download_reopened:true,title:await page.title()}; })(page);
+```
+### Page
+- Page URL: http://127.0.0.1:5182/product-visit-summary.html
+- Page Title: 就诊准备摘要
+- Console: 1 errors, 0 warnings
+### Events
+- New console entries: .playwright-cli\console-2026-09-08T06-15-05-941Z.log#L32

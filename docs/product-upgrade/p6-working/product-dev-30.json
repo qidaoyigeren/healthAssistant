@@ -1,0 +1,170 @@
+{
+  "suite": "dev",
+  "dataset_version": "dev-1",
+  "ran_at": "2026-09-08T00:42:22+00:00",
+  "phases": "all",
+  "environment": {
+    "provider": "scripted",
+    "note": "合成评测,无真实模型调用;临时合成库"
+  },
+  "summary": {
+    "total": 30,
+    "passed": 30,
+    "failed": 0,
+    "unavailable": 0
+  },
+  "failures": [],
+  "tasks": [
+    {
+      "task_id": "dev-p0-inv-009",
+      "duration_ms": 172.5,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p0-inv-010",
+      "duration_ms": 304.8,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p0-inv-011",
+      "duration_ms": 385.9,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p0-inv-012",
+      "duration_ms": 290.6,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p1-ev-001",
+      "duration_ms": 74.0,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p1-ev-002",
+      "duration_ms": 83.5,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p1-ev-003",
+      "duration_ms": 77.8,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p1-ev-004",
+      "duration_ms": 84.3,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p1-ev-005",
+      "duration_ms": 98.5,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p1-ev-006",
+      "duration_ms": 111.6,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p1-imp-007",
+      "duration_ms": 753.7,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-p1-imp-008",
+      "duration_ms": 580.7,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-013",
+      "duration_ms": 72.2,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-014",
+      "duration_ms": 76.5,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-015",
+      "duration_ms": 78.6,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-016",
+      "duration_ms": 101.7,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-017",
+      "duration_ms": 102.9,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-018",
+      "duration_ms": 75.2,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-019",
+      "duration_ms": 74.3,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-020",
+      "duration_ms": 71.6,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-021",
+      "duration_ms": 85.7,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-022",
+      "duration_ms": 74.9,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-023",
+      "duration_ms": 79.5,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-024",
+      "duration_ms": 69.5,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-025",
+      "duration_ms": 78.4,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-026",
+      "duration_ms": 75.4,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-027",
+      "duration_ms": 76.7,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-028",
+      "duration_ms": 97.8,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-029",
+      "duration_ms": 70.0,
+      "result": "passed"
+    },
+    {
+      "task_id": "dev-product-030",
+      "duration_ms": 74.9,
+      "result": "passed"
+    }
+  ],
+  "overall": "pass"
+}

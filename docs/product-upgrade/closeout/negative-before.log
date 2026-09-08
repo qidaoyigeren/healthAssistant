@@ -1,0 +1,168 @@
+test_alert_detail_does_not_verify_tampered_or_foreign_evidence (stage0.test_product_closeout.CloseoutTests.test_alert_detail_does_not_verify_tampered_or_foreign_evidence) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+D:\py\HealthAssistant\stage0\server.py:702: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+D:\py\HealthAssistant\.venv\Lib\site-packages\fastapi\applications.py:4681: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  return self.router.on_event(event_type)  # ty: ignore[deprecated]
+D:\py\HealthAssistant\stage0\server.py:707: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("shutdown")
+FAIL
+test_empty_held_out_and_phase_filter_are_unavailable (stage0.test_product_closeout.CloseoutTests.test_empty_held_out_and_phase_filter_are_unavailable) ... FAIL
+test_eval_rejects_wrong_content_and_error_content_leak (stage0.test_product_closeout.CloseoutTests.test_eval_rejects_wrong_content_and_error_content_leak) ... FAIL
+test_evidence_metadata_preserves_content_ref (stage0.test_product_closeout.CloseoutTests.test_evidence_metadata_preserves_content_ref) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+D:\py\HealthAssistant\stage0\server.py:702: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+D:\py\HealthAssistant\.venv\Lib\site-packages\fastapi\applications.py:4681: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  return self.router.on_event(event_type)  # ty: ignore[deprecated]
+D:\py\HealthAssistant\stage0\server.py:707: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("shutdown")
+FAIL
+test_run_impact_receipt_replays_without_later_changes (stage0.test_product_closeout.CloseoutTests.test_run_impact_receipt_replays_without_later_changes) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+D:\py\HealthAssistant\stage0\server.py:702: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+D:\py\HealthAssistant\.venv\Lib\site-packages\fastapi\applications.py:4681: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  return self.router.on_event(event_type)  # ty: ignore[deprecated]
+D:\py\HealthAssistant\stage0\server.py:707: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("shutdown")
+ERROR
+test_since_excludes_old_invalidations_and_rejects_bad_time (stage0.test_product_closeout.CloseoutTests.test_since_excludes_old_invalidations_and_rejects_bad_time) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+D:\py\HealthAssistant\stage0\server.py:702: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+D:\py\HealthAssistant\.venv\Lib\site-packages\fastapi\applications.py:4681: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  return self.router.on_event(event_type)  # ty: ignore[deprecated]
+D:\py\HealthAssistant\stage0\server.py:707: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("shutdown")
+FAIL
+
+======================================================================
+ERROR: test_run_impact_receipt_replays_without_later_changes (stage0.test_product_closeout.CloseoutTests.test_run_impact_receipt_replays_without_later_changes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_product_closeout.py", line 67, in test_run_impact_receipt_replays_without_later_changes
+    self.assertEqual(body['attribution'], 'operation_receipt')
+                     ~~~~^^^^^^^^^^^^^^^
+KeyError: 'attribution'
+
+======================================================================
+FAIL: test_alert_detail_does_not_verify_tampered_or_foreign_evidence (stage0.test_product_closeout.CloseoutTests.test_alert_detail_does_not_verify_tampered_or_foreign_evidence)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_product_closeout.py", line 29, in test_alert_detail_does_not_verify_tampered_or_foreign_evidence
+    self.assertEqual(detail['evidence_refs'][0]['status'], 'unavailable')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'available' != 'unavailable'
+- available
++ unavailable
+? ++
+
+
+======================================================================
+FAIL: test_empty_held_out_and_phase_filter_are_unavailable (stage0.test_product_closeout.CloseoutTests.test_empty_held_out_and_phase_filter_are_unavailable)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_product_closeout.py", line 88, in test_empty_held_out_and_phase_filter_are_unavailable
+    self.assertEqual(report['overall'], 'unavailable')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'pass' != 'unavailable'
+- pass
++ unavailable
+
+
+======================================================================
+FAIL: test_eval_rejects_wrong_content_and_error_content_leak (stage0.test_product_closeout.CloseoutTests.test_eval_rejects_wrong_content_and_error_content_leak)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_product_closeout.py", line 100, in test_eval_rejects_wrong_content_and_error_content_leak
+    with self.assertRaises(AssertionError):
+         ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+AssertionError: AssertionError not raised
+
+======================================================================
+FAIL: test_evidence_metadata_preserves_content_ref (stage0.test_product_closeout.CloseoutTests.test_evidence_metadata_preserves_content_ref)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_product_closeout.py", line 43, in test_evidence_metadata_preserves_content_ref
+    self.assertEqual(body['source']['content_ref'], 'rag:chunk-7')
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: '' != 'rag:chunk-7'
++ rag:chunk-7
+
+
+======================================================================
+FAIL: test_since_excludes_old_invalidations_and_rejects_bad_time (stage0.test_product_closeout.CloseoutTests.test_since_excludes_old_invalidations_and_rejects_bad_time)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_product_closeout.py", line 54, in test_since_excludes_old_invalidations_and_rejects_bad_time
+    self.assertEqual(body['affected_conclusions'], [])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: [{'conclusion_id': 1, 'ref': 'memory:concl[754 chars]1'}}] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+{'conclusion_id': 1, 'ref': 'memory:conclusion:1@v1', 'kind': 'warning', 'text': '���ȵ�ƽ������ù�أ���ѹ������ǿ��moderate / medium��', 'status': 'stale', 'stale_reason': "medication list changed via '���ȵ�ƽ' (selective; set hash 24080c92892fd87d)", 'input_revision': {'medications': 2, 'semantic': 0}, 'recheck': {'id': 1, 'task_type': 'recheck_conclusion', 'target_id': 1, 'reason': "medication list changed via '���ȵ�ƽ' (selective; set hash 24080c92892fd87d)", 'status': 'done', 'attempts': 0, 'updated_at': '2026-09-07T12:59:17+00:00'}, 'successor': {'id': 3, 'kind': 'warning', 'text': '�ز���ɣ�����ǰ�Ѽ�¼ҩ��������ù�ء����ȵ�ƽ�����¼�飬�Լ�� 1 ����ԭ������ص��໥������ʾ��\n- ���ȵ�ƽ �� ����ù�أ�moderate������ѹ������ǿ\n����Ϊ����ǰ��¼���¼��Ľ����δ������������ղ�����ų�����ҩ��������ѯҽ��/ҩʦ��', 'status': 'current', 'created_at': '2026-09-07T12:59:17+00:00', 'ref': 'memory:conclusion:3@v1'}}
+
+Diff is 1137 characters long. Set self.maxDiff to None to see it.
+
+----------------------------------------------------------------------
+Ran 6 tests in 2.594s
+
+FAILED (failures=5, errors=1)

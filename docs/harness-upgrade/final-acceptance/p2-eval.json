@@ -1,0 +1,198 @@
+{
+  "dataset_version": "p2-1.0",
+  "generated_at": "2026-09-07T09:56:57+00:00",
+  "workload": [
+    "register",
+    "med_change_1",
+    "med_change_1_repeat",
+    "med_change_2"
+  ],
+  "flags": {
+    "baseline": "(all P2 flags off)",
+    "optimized": {
+      "STAGE0_RUN_REUSE": "1",
+      "STAGE0_READ_CACHE": "1",
+      "AGENT_NO_PROGRESS_LIMIT": "2"
+    }
+  },
+  "provider_note": "全部使用合成病例与假 provider/检测器；重复次数为中位数（--repeat）。假 provider 的耗时极小，wall_seconds 不作为本评测的收益口径；仅证明流程与资源行为，不代表真实模型质量或实际费用。",
+  "baseline_runs": [
+    {
+      "tool_dispatches": {
+        "ddi_check": 3,
+        "rag_search": 0
+      },
+      "repeated_identical_reads": 8,
+      "reuse_stats": {
+        "same_run_hits": 0,
+        "cross_run_hits": 0,
+        "misses": 10,
+        "stores": 10,
+        "refreshes": 0
+      },
+      "tokens_charged_total": 6391,
+      "wall_seconds": 1.608,
+      "safety": {
+        "all_enforced": true,
+        "total_warnings": 2,
+        "citation_valid": true
+      },
+      "no_progress_stopped_runs": 0
+    },
+    {
+      "tool_dispatches": {
+        "ddi_check": 3,
+        "rag_search": 0
+      },
+      "repeated_identical_reads": 8,
+      "reuse_stats": {
+        "same_run_hits": 0,
+        "cross_run_hits": 0,
+        "misses": 10,
+        "stores": 10,
+        "refreshes": 0
+      },
+      "tokens_charged_total": 6391,
+      "wall_seconds": 0.7,
+      "safety": {
+        "all_enforced": true,
+        "total_warnings": 2,
+        "citation_valid": true
+      },
+      "no_progress_stopped_runs": 0
+    },
+    {
+      "tool_dispatches": {
+        "ddi_check": 3,
+        "rag_search": 0
+      },
+      "repeated_identical_reads": 8,
+      "reuse_stats": {
+        "same_run_hits": 0,
+        "cross_run_hits": 0,
+        "misses": 10,
+        "stores": 10,
+        "refreshes": 0
+      },
+      "tokens_charged_total": 6391,
+      "wall_seconds": 0.687,
+      "safety": {
+        "all_enforced": true,
+        "total_warnings": 2,
+        "citation_valid": true
+      },
+      "no_progress_stopped_runs": 0
+    }
+  ],
+  "optimized_runs": [
+    {
+      "tool_dispatches": {
+        "ddi_check": 2,
+        "rag_search": 0
+      },
+      "repeated_identical_reads": 8,
+      "reuse_stats": {
+        "same_run_hits": 0,
+        "cross_run_hits": 3,
+        "misses": 7,
+        "stores": 7,
+        "refreshes": 0
+      },
+      "tokens_charged_total": 6455,
+      "wall_seconds": 0.684,
+      "safety": {
+        "all_enforced": true,
+        "total_warnings": 2,
+        "citation_valid": true
+      },
+      "no_progress_stopped_runs": 0
+    },
+    {
+      "tool_dispatches": {
+        "ddi_check": 2,
+        "rag_search": 0
+      },
+      "repeated_identical_reads": 8,
+      "reuse_stats": {
+        "same_run_hits": 0,
+        "cross_run_hits": 3,
+        "misses": 7,
+        "stores": 7,
+        "refreshes": 0
+      },
+      "tokens_charged_total": 6455,
+      "wall_seconds": 0.692,
+      "safety": {
+        "all_enforced": true,
+        "total_warnings": 2,
+        "citation_valid": true
+      },
+      "no_progress_stopped_runs": 0
+    },
+    {
+      "tool_dispatches": {
+        "ddi_check": 2,
+        "rag_search": 0
+      },
+      "repeated_identical_reads": 8,
+      "reuse_stats": {
+        "same_run_hits": 0,
+        "cross_run_hits": 3,
+        "misses": 7,
+        "stores": 7,
+        "refreshes": 0
+      },
+      "tokens_charged_total": 6455,
+      "wall_seconds": 0.709,
+      "safety": {
+        "all_enforced": true,
+        "total_warnings": 2,
+        "citation_valid": true
+      },
+      "no_progress_stopped_runs": 0
+    }
+  ],
+  "comparison": {
+    "ddi_check_dispatches": {
+      "baseline": 3,
+      "optimized": 2
+    },
+    "rag_search_dispatches": {
+      "baseline": 0,
+      "optimized": 0
+    },
+    "repeated_identical_reads": {
+      "baseline": 8,
+      "optimized": 8
+    },
+    "tokens_charged_total": {
+      "baseline": 6391,
+      "optimized": 6455
+    },
+    "wall_seconds": {
+      "baseline": 0.7,
+      "optimized": 0.692
+    },
+    "safety_conclusions_identical": true
+  },
+  "repeated_reads_scenario": {
+    "baseline": {
+      "executed_reads": 16,
+      "safety_status": "enforced",
+      "honest_incomplete": true
+    },
+    "optimized": {
+      "executed_reads": 3,
+      "safety_status": "enforced",
+      "honest_incomplete": true
+    },
+    "comparison": {
+      "executed_reads": {
+        "baseline": 16,
+        "optimized": 3
+      },
+      "safety_status_identical": true,
+      "honest_incomplete_response_both": true
+    }
+  }
+}

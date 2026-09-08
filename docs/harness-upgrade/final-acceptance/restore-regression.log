@@ -1,0 +1,61 @@
+test_all_semantic_changes_block_restore (stage0.test_harness_acceptance.AcceptanceGateTests.test_all_semantic_changes_block_restore) ... ok
+test_dataset_restores_logger_on_failure (stage0.test_harness_acceptance.AcceptanceGateTests.test_dataset_restores_logger_on_failure) ... ok
+test_graph_scenario_removes_logging_handler (stage0.test_harness_acceptance.AcceptanceGateTests.test_graph_scenario_removes_logging_handler) ... ok
+test_p2_aggregation_is_median_and_safety_checks_every_repeat (stage0.test_harness_acceptance.AcceptanceGateTests.test_p2_aggregation_is_median_and_safety_checks_every_repeat) ... ok
+test_p3_missing_work_cannot_qualify_for_adoption (stage0.test_harness_acceptance.AcceptanceGateTests.test_p3_missing_work_cannot_qualify_for_adoption) ... ok
+test_required_checks_trajectory_and_error_logs_are_gates (stage0.test_harness_acceptance.AcceptanceGateTests.test_required_checks_trajectory_and_error_logs_are_gates) ... ok
+test_exporter_failure_stays_on_background_thread (stage0.test_harness_acceptance.OTelTransportAcceptanceTests.test_exporter_failure_stays_on_background_thread) ... ok
+test_real_otlp_http_delivery_and_payload_redaction (stage0.test_harness_acceptance.OTelTransportAcceptanceTests.test_real_otlp_http_delivery_and_payload_redaction) ... ok
+test_explicit_attempt_identity_prevents_false_replay (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_explicit_attempt_identity_prevents_false_replay) ... ok
+test_run_and_resume_enforce_manifest_before_graph_execution (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_run_and_resume_enforce_manifest_before_graph_execution) ... ok
+test_same_arguments_retry_after_failure_is_retained (stage0.test_harness_acceptance.PersistedAcceptanceTests.test_same_arguments_retry_after_failure_is_retained) ... ok
+test_restart_does_not_reset_budget (stage0.test_reliability_p1.BudgetPersistenceTests.test_restart_does_not_reset_budget) ... ok
+test_checkpoint_state_is_json_safe (stage0.test_reliability_p1.CheckpointSafetyTests.test_checkpoint_state_is_json_safe) ... ok
+test_crash_after_domain_write_before_checkpoint (stage0.test_reliability_p1.CrashRecoveryTests.test_crash_after_domain_write_before_checkpoint) ... 
+Loading weights:   0%|          | 0/71 [00:00<?, ?it/s]
+Loading weights: 100%|��������������������| 71/71 [00:00<00:00, 22049.13it/s]
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\37859\AppData\Local\Temp\jieba.cache
+Loading model cost 0.825 seconds.
+Prefix dict has been built successfully.
+ok
+test_crash_between_nodes_resumes_from_checkpoint (stage0.test_reliability_p1.CrashRecoveryTests.test_crash_between_nodes_resumes_from_checkpoint) ... ok
+test_interrupt_and_command_resume_with_sqlite_saver (stage0.test_reliability_p1.InterruptWiringSmokeTests.test_interrupt_and_command_resume_with_sqlite_saver) ... ok
+test_legacy_and_graph_produce_identical_outcomes (stage0.test_reliability_p1.ParityTests.test_legacy_and_graph_produce_identical_outcomes) ... 
+Loading weights:   0%|          | 0/71 [00:00<?, ?it/s]
+Loading weights: 100%|��������������������| 71/71 [00:00<00:00, 4801.92it/s]
+
+Loading weights:   0%|          | 0/71 [00:00<?, ?it/s]
+Loading weights: 100%|��������������������| 71/71 [00:00<00:00, 5689.64it/s]
+ok
+test_graph_flag_routes_service_events (stage0.test_reliability_p1.ServiceLayerFlagTests.test_graph_flag_routes_service_events) ... local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+D:\py\HealthAssistant\stage0\server.py:697: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+D:\py\HealthAssistant\.venv\Lib\site-packages\fastapi\applications.py:4681: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  return self.router.on_event(event_type)  # ty: ignore[deprecated]
+D:\py\HealthAssistant\stage0\server.py:702: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("shutdown")
+ok
+test_flag_off_routes_new_runs_to_legacy (stage0.test_reliability_p1.VersionRoutingTests.test_flag_off_routes_new_runs_to_legacy) ... ok
+test_inflight_legacy_run_keeps_legacy_version (stage0.test_reliability_p1.VersionRoutingTests.test_inflight_legacy_run_keeps_legacy_version) ... manifest unavailable for legacy run; provenance unknown run_id=run-old
+ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 26.832s
+
+OK
