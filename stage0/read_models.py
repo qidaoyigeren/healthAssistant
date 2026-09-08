@@ -32,6 +32,11 @@ from fastapi import Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+try:
+    from .harness.errors import ToolErrorKind, ToolExecutionError
+except ImportError:  # pragma: no cover - script-style import
+    from harness.errors import ToolErrorKind, ToolExecutionError  # type: ignore
+
 
 class FactActionIn(BaseModel):
     """POST /v1/memory/fact-actions 请求体(事实核实/撤回)。"""
@@ -60,11 +65,14 @@ except ImportError:  # pragma: no cover - script-style import
 class ReadModelError(Exception):
     """Carries HTTP status + error code; converted to ApiError by server.py."""
 
-    def __init__(self, status_code: int, code: str, message: str):
+    def __init__(self, status_code: int, code: str, message: str,
+                 details: dict[str, Any] | None = None):
         super().__init__(message)
         self.status_code = status_code
         self.code = code
         self.message = message
+        self.details = details or {}
+        self.category = "validation"
 
 
 PAGE_LIMIT_DEFAULT = 50
@@ -169,7 +177,122 @@ def alert_records(store: MemoryStore, *, status: str | None = None,
     return _page_envelope(items, total, next_cursor)
 
 
-def alert_record_detail(store: MemoryStore, alert_id: int) -> dict[str, Any]:
+def conclusion_history(store: MemoryStore, conclusion_id: int) -> dict[str, Any]:
+    chain = store.conclusion_chain(conclusion_id)
+    return {
+        "versions": [_conclusion_row(v) for v in chain["versions"]],
+        "current_head": chain["current_head"],
+        "status": chain["status"],
+        "stale_reason": chain["stale_reason"],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Product P1: controlled evidence read-back, alert explanation, change impact
+# ---------------------------------------------------------------------------
+
+EVIDENCE_MAX_LIMIT = 2000  # mirrors harness.evidence.MAX_READ_LIMIT
+
+
+def evidence_read(store: MemoryStore, evidence_store: Any, evidence_id: str, *,
+                  scope_id: str, offset: int, limit: int) -> dict[str, Any]:
+    """受控证据原文读取:scope 来自已认证 Principal,分页有界,读取时复验哈希。
+
+    缺失 / 跨 scope / 篡改统一映射为 404 evidence_unavailable(无存在性预言机);
+    哈希不匹配在 details.integrity 中标注 hash_mismatch。绝不按用户提供的
+    路径读取,只接受内容寻址的 evidence_id。
+    """
+    try:
+        page = evidence_store.read(evidence_id, scope_id=scope_id,
+                                   offset=offset, limit=limit)
+    except ToolExecutionError as exc:
+        if exc.kind == ToolErrorKind.INVALID_ARGUMENTS:
+            raise ReadModelError(422, "invalid_arguments", str(exc)) from exc
+        integrity = "hash_mismatch" if "hash mismatch" in str(exc) else None
+        raise ReadModelError(404, "evidence_unavailable", str(exc),
+                             {"integrity": integrity} if integrity else None) from exc
+    meta = evidence_store.get_meta(evidence_id) or {}
+    content_ref = str(meta.get("content_ref") or "")
+    if content_ref.startswith("ddi:") or content_ref.startswith("rag:"):
+        source_type = "drug_label_or_kegg"
+    elif meta.get("access_class") == "patient_specific":
+        source_type = "patient_specific"
+    else:
+        source_type = meta.get("access_class") or "general_label"
+    return {
+        "evidence_id": page["evidence_id"],
+        "content": page["content"],
+        "offset": page["offset"],
+        "returned_chars": page["returned_chars"],
+        "total_chars": page["total_chars"],
+        "truncated": page["truncated"],
+        "integrity": "verified",
+        "source": {
+            "source_type": source_type,
+            "uri": meta.get("source_uri"),
+            "content_ref": content_ref,
+            "corpus_version": meta.get("corpus_version"),
+            "retrieved_at": meta.get("retrieved_at"),
+            "access_class": meta.get("access_class"),
+        },
+    }
+
+
+def resolve_evidence_refs(store: MemoryStore, evidence_store: Any,
+                          source_refs: list[dict[str, Any]], *,
+                          scope_id: str = "local-demo") -> list[dict[str, Any]]:
+    """把结论的 source_refs 解析为可读性状态:available(元数据已验证)或
+    unavailable(no_evidence_link / evidence_missing)。历史记录无法恢复原文时
+    如实返回 unavailable,不虚构 evidence_id、版本或原文。"""
+    out: list[dict[str, Any]] = []
+    for index, ref in enumerate(source_refs or []):
+        if not isinstance(ref, dict):
+            continue
+        evidence_id = ref.get("evidence_id")
+        if not evidence_id:
+            out.append({
+                "evidence_id": None, "status": "unavailable",
+                "reason": "no_evidence_link", "source_index": index,
+                "uri": ref.get("uri"), "quote": ref.get("quote"),
+            })
+            continue
+        meta = None
+        if evidence_store is not None:
+            try:
+                # Do not advertise verified integrity or foreign metadata
+                # merely because a metadata row exists.
+                evidence_store.read(evidence_id, scope_id=scope_id, offset=0, limit=1)
+                meta = evidence_store.get_meta(evidence_id)
+            except ToolExecutionError:
+                pass
+        if meta is None:
+            out.append({
+                "evidence_id": evidence_id, "status": "unavailable",
+                "reason": "evidence_missing", "source_index": index,
+                "uri": ref.get("uri"), "quote": ref.get("quote"),
+            })
+            continue
+        out.append({
+            "evidence_id": evidence_id, "status": "available", "integrity": "verified",
+            "meta": {"content_chars": meta.get("content_chars"),
+                     "corpus_version": meta.get("corpus_version"),
+                     "retrieved_at": meta.get("retrieved_at"),
+                     "uri": meta.get("source_uri")},
+            "source_index": index, "uri": ref.get("uri"), "quote": ref.get("quote"),
+        })
+    return out
+
+
+def _conclusion_recheck_status(store: MemoryStore, conclusion_id: int) -> dict[str, Any] | None:
+    row = store.connection.execute(
+        "SELECT id,task_type,target_id,reason,status,attempts,updated_at FROM dependency_tasks "
+        "WHERE task_type='recheck_conclusion' AND target_id=? ORDER BY id DESC LIMIT 1",
+        (conclusion_id,)).fetchone()
+    return dict(row) if row is not None else None
+
+
+def alert_record_detail(store: MemoryStore, alert_id: int, *,
+                        evidence_store: Any = None, scope_id: str = "local-demo") -> dict[str, Any]:
     row = store.connection.execute(
         "SELECT * FROM conclusions WHERE id = ?", (alert_id,)).fetchone()
     if row is None:
@@ -182,17 +305,169 @@ def alert_record_detail(store: MemoryStore, alert_id: int) -> dict[str, Any]:
         "status": chain["status"],
         "stale_reason": chain["stale_reason"],
     }
+    # Product P1: 解释结果 —— 事实依据、证据可读性、当前 revision、未决条件。
+    # 全部来自真实依赖查询,不让模型猜影响范围。
+    item["evidence_refs"] = resolve_evidence_refs(store, evidence_store,
+                                                  item.get("source_refs") or [], scope_id=scope_id)
+    item["evidence_available"] = any(ref["status"] == "available" for ref in item["evidence_refs"])
+    item["explanation"] = {
+        "status": item.get("status"),
+        "stale_reason": item.get("stale_reason"),
+        "patient_revision": {
+            "medications": store.scope_revision("medications"),
+            "semantic": store.scope_revision("semantic"),
+        },
+        "input_revision": item.get("input_revision"),
+        "fact_refs": list(item.get("memory_refs") or []),
+        "recheck": _conclusion_recheck_status(store, alert_id),
+        "successor": _conclusion_successor(store, alert_id),
+    }
     return item
 
 
-def conclusion_history(store: MemoryStore, conclusion_id: int) -> dict[str, Any]:
-    chain = store.conclusion_chain(conclusion_id)
-    return {
-        "versions": [_conclusion_row(v) for v in chain["versions"]],
-        "current_head": chain["current_head"],
-        "status": chain["status"],
-        "stale_reason": chain["stale_reason"],
+def _conclusion_successor(store: MemoryStore, conclusion_id: int) -> dict[str, Any] | None:
+    row = store.connection.execute(
+        "SELECT id,kind,text,status,created_at FROM conclusions "
+        "WHERE predecessor_id=? ORDER BY id DESC LIMIT 1",
+        (conclusion_id,)).fetchone()
+    if row is None:
+        return None
+    out = dict(row)
+    out["ref"] = memory_ref("conclusion", out["id"], 1)
+    return out
+
+
+def change_impact(store: MemoryStore, *, since: str | None = None,
+                  limit: int = 50, run_id: str | None = None) -> dict[str, Any]:
+    """变更影响摘要:统计与明细来自同一口径。
+
+    * run_id 通过受控操作的持久审计归属关联变更;历史无归属不能推断为零;
+    * changed_facts 仅含患者事实审计,结论失效另查 invalidate 审计;
+    * affected_conclusions 包含实际失效过的结论和重查后继,不混入其他轮次;
+    * since 为兼容性审计时间窗口,不用于证明一次操作的因果影响;
+    * summary 计数 = 同一响应中明细列表长度(同一查询产物)。
+
+    结论为 stale ≠ 风险解除;pending_recheck 仅表示"依据变化待重查"。
+    """
+    limit = _parse_limit(limit)
+    conn = store.connection
+    window_where: list[str] = []
+    window_params: list[Any] = []
+    attribution = "audit_window"
+    if run_id:
+        receipt = conn.execute(
+            "SELECT result_json FROM operation_receipts WHERE scope_id='local-demo' "
+            "AND run_id=? AND operation_type='consolidate_event' AND status='succeeded'",
+            (run_id,)).fetchone()
+        if receipt is None:
+            raise ReadModelError(404, "impact_unavailable", "本次操作的影响依据不可用")
+        if (_safe_json(receipt[0]) or {}).get("audit_attribution_version") != 1:
+            raise ReadModelError(409, "impact_unavailable", "历史操作未记录精确影响归属，不能推断为零影响")
+        window_where.append("json_extract(details_json,'$.run_id')=?")
+        window_params.append(run_id)
+        attribution = "run_audit"
+    elif since:
+        from datetime import datetime, timezone
+        try:
+            timestamp = datetime.fromisoformat(since.replace("Z", "+00:00"))
+            if timestamp.tzinfo is None:
+                raise ValueError("timezone required")
+            normalized = timestamp.astimezone(timezone.utc).isoformat()
+        except ValueError as exc:
+            raise ReadModelError(422, "invalid_arguments", "since 必须是含时区的 ISO 时间") from exc
+        window_where.append("julianday(created_at) >= julianday(?)")
+        window_params.append(normalized)
+    window_sql = " AND ".join(window_where) or "1=1"
+    changed_where = ["target_type IN ('medication', 'semantic')",
+                     "action != 'dependency_backfill'"]
+    changed_params: list[Any] = list(window_params)
+    changed_where.append(window_sql)
+    changed_where_sql = " AND ".join(changed_where)
+    changed_total = conn.execute(
+        f"SELECT COUNT(*) FROM audit_log WHERE {changed_where_sql}", changed_params).fetchone()[0]
+    changed_rows = conn.execute(
+        f"SELECT id,action,actor,target_type,target_id,details_json,source,created_at "
+        f"FROM audit_log WHERE {changed_where_sql} ORDER BY id DESC LIMIT ?",
+        [*changed_params, limit]).fetchall()
+    changed_facts = []
+    for row in changed_rows:
+        entry = dict(row)
+        entry["details"] = _safe_json(entry.pop("details_json")) or {}
+        # 可追溯的事实引用:事实变更的 details.ref(semantic/medication)或
+        # 失效事件指向的结论 ref。
+        ref = entry["details"].get("ref")
+        if not ref and entry.get("target_type") == "conclusion" and entry.get("target_id"):
+            ref = memory_ref("conclusion", entry["target_id"], 1)
+        entry["memory_refs"] = [ref] if ref else []
+        changed_facts.append(entry)
+
+    affected_sql = ("SELECT DISTINCT target_id FROM audit_log WHERE target_type='conclusion' "
+                    "AND action='invalidate' AND " + window_sql)
+    affected_total = conn.execute("SELECT COUNT(*) FROM conclusions WHERE id IN (" + affected_sql + ")",
+                                  window_params).fetchone()[0]
+    stale_rows = conn.execute(
+        "SELECT * FROM conclusions WHERE id IN (" + affected_sql + ") ORDER BY id DESC LIMIT ?",
+        [*window_params, limit]).fetchall()
+    affected: list[dict[str, Any]] = []
+    for row in stale_rows:
+        item = _conclusion_row(row)
+        affected.append({
+            "conclusion_id": item["id"],
+            "ref": item["ref"],
+            "kind": item["kind"],
+            "text": item["text"],
+            "status": item["status"],
+            "stale_reason": item.get("stale_reason"),
+            "input_revision": item.get("input_revision"),
+            "recheck": _conclusion_recheck_status(store, item["id"]),
+            "successor": _conclusion_successor(store, item["id"]),
+        })
+    current_rows = conn.execute(
+        "SELECT * FROM conclusions WHERE status='current' ORDER BY id DESC LIMIT ?",
+        (limit,)).fetchall()
+
+    def _recheck_pending(entry: dict[str, Any]) -> bool:
+        recheck = entry.get("recheck")
+        return bool(recheck) and recheck.get("status") in {"open", "running"}
+
+    summary = {
+        "changed_facts": len(changed_facts),
+        "affected_conclusions": len(affected),
+        "pending_rechecks": sum(1 for entry in affected if _recheck_pending(entry)),
+        "failed_rechecks": sum(1 for entry in affected
+                               if (entry.get("recheck") or {}).get("status") == "failed"),
     }
+    return {
+        "generated_at": _utc_now_iso(),
+        "attribution": attribution,
+        "run_id": run_id,
+        "affected_conclusions_total": affected_total,
+        "truncated": changed_total > len(changed_facts) or affected_total > len(affected),
+        "patient_revision": {
+            "medications": store.scope_revision("medications"),
+            "semantic": store.scope_revision("semantic"),
+        },
+        "summary": summary,
+        "changed_facts": changed_facts,
+        "changed_facts_total": changed_total,
+        "affected_conclusions": affected,
+        "unaffected_conclusions": [_conclusion_row(row) for row in current_rows],
+        "note": "依据变化后的旧结论保留为历史记录；查看重查状态和后继结论了解最新检查。重查失败或未完成不表示风险解除。",
+    }
+
+
+def _safe_json(raw: str | None) -> Any:
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _utc_now_iso() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 # ---------------------------------------------------------------------------
@@ -701,7 +976,8 @@ def register_read_model_routes(app: Any, store: MemoryStore, *,
                                principal: Callable[[Any], Any],
                                authorize_scope: Callable[[Any], None],
                                require_role: Callable[..., None],
-                               api_error: type[Exception]) -> None:
+                               api_error: type[Exception],
+                               evidence_store: Any = None) -> None:
     """把读模型端点挂到 FastAPI app 上。错误统一转 ApiError。"""
 
     def _guard(request: Any, *, roles: tuple[str, ...] = ()) -> Any:
@@ -716,7 +992,8 @@ def register_read_model_routes(app: Any, store: MemoryStore, *,
             try:
                 return fn(*args, **kwargs)
             except ReadModelError as exc:
-                raise api_error(exc.status_code, exc.code, "validation", exc.message) from exc
+                raise api_error(exc.status_code, exc.code, exc.category,
+                                exc.message, exc.details or None) from exc
         inner.__name__ = fn.__name__
         inner.__doc__ = fn.__doc__
         return inner
@@ -740,8 +1017,27 @@ def register_read_model_routes(app: Any, store: MemoryStore, *,
 
     @app.get("/v1/alert-records/{alert_id}")
     def read_alert_record(alert_id: int, request: Request) -> dict[str, Any]:
+        p = _guard(request)
+        with store._lock:
+            return _wrap(alert_record_detail)(store, alert_id,
+                                              evidence_store=evidence_store, scope_id=p.scope_id)
+
+    @app.get("/v1/evidence/{evidence_id}")
+    def read_evidence(evidence_id: str, request: Request,
+                      offset: int = 0, limit: int = EVIDENCE_MAX_LIMIT) -> dict[str, Any]:
+        # Product P1: 受控证据原文读取。scope 由已认证 Principal 决定,
+        # 请求参数不能扩大可访问范围;分页上限与 EvidenceStore 一致。
+        p = _guard(request)
+        return _wrap(evidence_read)(store, evidence_store, evidence_id,
+                                    scope_id=p.scope_id,
+                                    offset=offset, limit=limit)
+
+    @app.get("/v1/change-impact")
+    def read_change_impact(request: Request, since: str | None = None,
+                           limit: int | None = None, run_id: str | None = None) -> dict[str, Any]:
         _guard(request)
-        return _wrap(alert_record_detail)(store, alert_id)
+        with store._lock:
+            return _wrap(change_impact)(store, since=since, limit=limit, run_id=run_id)
 
     @app.get("/v1/conclusions/{conclusion_id}/history")
     def read_conclusion_history(conclusion_id: int, request: Request) -> dict[str, Any]:

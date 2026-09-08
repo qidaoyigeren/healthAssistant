@@ -18,7 +18,7 @@ Operational severity rubric (detector policy, not clinical validation):
 
 KEGG CI/P is an anchor signal rather than the sole evidence source: CI fixes the
 final level at ``contraindicated``; P is disambiguated by grounded label text or
-the hardened extractor, and otherwise defaults conservatively to ``moderate``.
+the hardened extractor, and otherwise remains ``unknown`` with escalation.
 This module is detector infrastructure only. It is not a clinical decision
 support system and its evaluation is not clinical validation.
 
@@ -42,6 +42,7 @@ import json
 import os
 import re
 import sys
+import threading
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -60,6 +61,38 @@ import extract_ddi
 import normalize as normalizer
 import ontology
 import rag
+try:
+    from .evidence_quality import FallbackPolicy, file_fingerprint, ExactCoverageReranker, bounded_research
+except ImportError:
+    from evidence_quality import FallbackPolicy, file_fingerprint, ExactCoverageReranker, bounded_research
+from contextvars import ContextVar
+
+EVIDENCE_TRACE = ContextVar('ddi_evidence_trace', default=None)
+_FALLBACK_CACHE_LOCK = threading.RLock()
+
+
+def _save_fallback_entry(key, entry):
+    # Merge under the local process lock; retain expired/replaced entries as
+    # historical evidence instead of deleting their bodies on refresh.
+    with _FALLBACK_CACHE_LOCK:
+        cache = _load_fallback_cache()
+        previous = cache['pairs'].get(key)
+        if previous:
+            cache.setdefault('history', []).append({'key': key, 'entry': previous})
+        cache['pairs'][key] = entry
+        cache['schema_version'] = 2
+        _write_json(_fallback_cache_path(), cache)
+
+
+def _cache_versions():
+    index = Path(os.getenv('DDI_ENGINE_RAG_INDEX_DIR', str(rag.INDEX_DIR)))
+    index_parts = [(str(p.relative_to(index)), file_fingerprint(p)) for p in sorted(index.rglob('*')) if p.is_file()] if index.exists() else []
+    import hashlib
+    config = extract_ddi.resolve_llm_config(require_key=False)
+    return {'corpus': file_fingerprint(rag.CORPUS_PATH), 'index': hashlib.sha256(json.dumps(index_parts).encode()).hexdigest(),
+            'extractor': file_fingerprint(Path(extract_ddi.__file__)), 'prompt': hashlib.sha256(extract_ddi.PROMPT.encode()).hexdigest(),
+            'model': config['model'], 'provider': config['provider'], 'endpoint_hash': hashlib.sha256(config['base_url'].encode()).hexdigest(),
+            'policy': 'ddi-cache-v2', 'reranker': os.getenv('DDI_RERANKER', 'baseline')}
 
 DATA = ROOT / "data"
 STRUCTURED = DATA / "structured"
@@ -530,23 +563,25 @@ def _rag_candidates(a: dict, b: dict) -> list[tuple[dict, dict, dict]]:
         return []
     try:
         retriever = _get_retriever()
-        results = []
         # Searching in both orientations helps when only one drug is used as
         # the label title in the curated corpus.  The final mention checks are
         # still deterministic and prevent a merely semantically similar chunk
         # from being sent to the extractor.
-        for query in (
+        queries = (
             f"{a['name_cn']} {b['name_cn']} 药物相互作用 禁忌 注意事项",
             f"{b['name_cn']} {a['name_cn']} 药物相互作用 禁忌 注意事项",
-        ):
-            results.extend(retriever.search(query, mode="hybrid", top_k=12))
-    except Exception:
+        )
+        research = bounded_research(lambda q: retriever.search(q, mode='hybrid', top_k=12), queries, max_queries=2, max_chunks=24)
+        EVIDENCE_TRACE.set(research)
+        results = research['chunks']
+    except Exception as exc:
+        EVIDENCE_TRACE.set({'termination_reason': 'retrieval_error', 'error_type': type(exc).__name__, 'coverage': 'unavailable'})
         # Optional local model/index failures must not disable structured hits.
         return []
     candidates: list[tuple[dict, dict, dict]] = []
     seen: set[str] = set()
     for result in results:
-        chunk = result.chunk
+        chunk = result
         if chunk["chunk_id"] in seen:
             continue
         seen.add(chunk["chunk_id"])
@@ -559,6 +594,8 @@ def _rag_candidates(a: dict, b: dict) -> list[tuple[dict, dict, dict]]:
     # Two independently retrieved exact-mention chunks balance evidence
     # redundancy against live-provider cost. Additional chunks were dominated
     # by duplicate label versions in the held-out pilot.
+    if os.getenv('DDI_RERANKER') == 'exact_coverage':
+        candidates = ExactCoverageReranker().rank(candidates, [a['name_cn'], b['name_cn']])
     return candidates[:2]
 
 
@@ -585,13 +622,16 @@ def _partner_claim_supported(source_text: str, partner: dict) -> bool:
 
 
 def _live_fallback(a: dict, b: dict) -> list[dict]:
-    key = " | ".join(_pair_name_key(a, b))
+    legacy_key = " | ".join(_pair_name_key(a, b))
+    policy = FallbackPolicy(_cache_versions())
+    key = policy.key(_pair_name_key(a, b))
     cache = _load_fallback_cache()
-    cached = cache["pairs"].get(key)
-    if isinstance(cached, dict) and cached:
+    cached, reason = policy.read(cache['pairs'].get(key) or cache['pairs'].get(legacy_key))
+    EVIDENCE_TRACE.set({'cache': reason, 'key': key, 'coverage': 'cached_evidence_only' if cached else 'not_checked'})
+    if cached:
         if cached.get("status") == "matched":
             return cached.get("evidence", [])
-        if cached.get("status") in {"not_found", "error"}:
+        if cached.get("status") in {"not_found", "provider_error", "parse_error"}:
             return []
     candidates = _rag_candidates(a, b)
     if not candidates or not _enabled("DDI_ENGINE_ENABLE_LLM", True):
@@ -599,14 +639,17 @@ def _live_fallback(a: dict, b: dict) -> list[dict]:
     try:
         config = extract_ddi.resolve_llm_config()
     except RuntimeError:
+        EVIDENCE_TRACE.set({**(EVIDENCE_TRACE.get() or {}), 'termination_reason': 'provider_unavailable', 'coverage': 'unavailable'})
         return []
     try:
         client = extract_ddi.create_llm_client(config)
-    except Exception:
+    except Exception as exc:
+        _save_fallback_entry(key, policy.entry('provider_error', evidence=[], errors=[type(exc).__name__]))
         return []
     evidence: list[dict] = []
     attempted_chunks: list[str] = []
     errors: list[str] = []
+    parse_errors = []
     for chunk, source, partner in candidates:
         attempted_chunks.append(chunk["chunk_id"])
         try:
@@ -615,10 +658,14 @@ def _live_fallback(a: dict, b: dict) -> list[dict]:
                 chunk["drug_name"], chunk["text"], delay=1.0,
             )
         except Exception as exc:
-            errors.append(f"{type(exc).__name__}: {exc}")
+            (parse_errors if isinstance(exc, (ValueError, json.JSONDecodeError)) else errors).append(f"{type(exc).__name__}: {exc}")
+            continue
+        if not isinstance(triples, list):
+            parse_errors.append('extractor_output_not_list')
             continue
         for triple in triples:
             if not isinstance(triple, dict):
+                parse_errors.append('invalid_triple')
                 continue
             quote = triple.get("source_text") or ""
             if not isinstance(quote, str):
@@ -627,15 +674,15 @@ def _live_fallback(a: dict, b: dict) -> list[dict]:
                 continue
             source_row = {**triple, "source_url": chunk.get("source_url")}
             evidence.append(_evidence_record(source_row, source, partner, "rag+llm"))
-    cache["pairs"][key] = {
-        "status": "matched" if evidence else ("error" if errors else "not_found"),
+    status = 'matched' if evidence else ('provider_error' if errors else ('parse_error' if parse_errors else 'not_found'))
+    entry = policy.entry(status, **{
         "evidence": evidence,
         "attempted_chunk_ids": attempted_chunks,
-        "errors": errors,
+        "errors": errors, 'parse_errors': parse_errors, 'entities': list(_pair_name_key(a, b)),
         "cached_at": datetime.now(timezone.utc).isoformat(),
         "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)",
-    }
-    _write_json(_fallback_cache_path(), cache)
+    })
+    _save_fallback_entry(key, entry)
     return evidence
 
 
@@ -678,7 +725,7 @@ def _merge_warning(a: dict, b: dict, kegg: dict | None, evidence_rows: list[dict
         severity = "contraindicated"
         conflict = conflict or bool(evidence and evidence_severity != "contraindicated")
     elif "P" in levels:
-        severity = evidence_severity if evidence_severity in {"contraindicated", "major", "moderate"} else "moderate"
+        severity = evidence_severity if evidence_severity in {"contraindicated", "major", "moderate"} else "unknown"
         conflict = conflict or evidence_severity == "minor"
     else:
         severity = evidence_severity
@@ -716,10 +763,13 @@ def detect(medication_list: list[str]) -> list[dict]:
     """Return ranked, cited warnings for normalized active-ingredient pairs."""
     ingredients = normalize_medications(medication_list)
     warnings: list[dict] = []
+    research_pairs = []
     for a, b in itertools.combinations(ingredients, 2):
         if _ingredient_key(a) == _ingredient_key(b):
             continue
+        EVIDENCE_TRACE.set(None)
         warning = _merge_warning(a, b, _kegg_lookup(a, b), _fallback_lookup(a, b))
+        research_pairs.append({'entities': [a['name_cn'], b['name_cn']], **{k: v for k, v in (EVIDENCE_TRACE.get() or {'coverage': 'warm_evidence'}).items() if k != 'chunks'}})
         if warning:
             warnings.append(warning)
     warnings.sort(
@@ -729,6 +779,8 @@ def detect(medication_list: list[str]) -> list[dict]:
             item["drug_a"], item["drug_b"],
         )
     )
+    EVIDENCE_TRACE.set({'pairs': research_pairs, 'coverage': 'bounded_evidence_check',
+        'uncovered_pairs': [p['entities'] for p in research_pairs if p.get('termination_reason') in ('retrieval_error', 'budget_exhausted', 'no_progress') or p.get('coverage') == 'not_checked']})
     return warnings
 
 

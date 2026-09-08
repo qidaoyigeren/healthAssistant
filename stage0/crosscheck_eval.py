@@ -60,12 +60,24 @@ def save_cache(cache: dict, path: Path = CACHE) -> None:
     path.write_text(json.dumps(cache, ensure_ascii=False, indent=2), "utf-8")
 
 
+try:
+    from .turn_budget import network_call
+except ImportError:
+    from turn_budget import network_call
+
+
+def _read_url(request):
+    def read(timeout):
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.read().decode("utf-8")
+    return network_call("kegg_http", read, timeout=30.)
+
+
 def kegg_find_drug(name: str) -> str | None:
     url = "https://rest.kegg.jp/find/drug/" + quote(name)
     request = urllib.request.Request(url, headers={"User-Agent": "HealthAssistant-stage1/0.1"})
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            text = response.read().decode("utf-8")
+        text = _read_url(request)
     finally:
         time.sleep(1.0)
     for line in text.splitlines():
@@ -82,8 +94,7 @@ def kegg_ddi(kegg_a: str, kegg_b: str, cache: dict, cache_path: Path = CACHE) ->
     request = urllib.request.Request(url, headers={"User-Agent": "HealthAssistant-stage1/0.1"})
     try:
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
-                text = response.read().decode("utf-8")
+            text = _read_url(request)
             rows = []
             for line in text.splitlines():
                 fields = line.split("\t")

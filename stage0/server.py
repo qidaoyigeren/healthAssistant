@@ -63,6 +63,20 @@ try:
         MemoryStore,
         memory_ref,
     )
+    from .harness.progress import (
+        EVENT_ACCEPTED,
+        EVENT_CANCELLED,
+        EVENT_CANCEL_REQUESTED,
+        EVENT_COMPLETED,
+        EVENT_FAILED,
+        EVENT_WAITING_REVIEW,
+        ProgressEventStore,
+        cancel_state,
+        is_cancel_requested,
+        mark_cancelled,
+        release_cancel_event,
+        request_cancel,
+    )
 except ImportError:  # Support ``python stage0/server.py``.
     from agent import CareEvent, MedicationCoordinatorAgent  # type: ignore
     from graph_runner import make_runner  # type: ignore
@@ -73,9 +87,35 @@ except ImportError:  # Support ``python stage0/server.py``.
         MemoryStore,
         memory_ref,
     )
+    from harness.progress import (  # type: ignore
+        EVENT_ACCEPTED,
+        EVENT_CANCELLED,
+        EVENT_CANCEL_REQUESTED,
+        EVENT_COMPLETED,
+        EVENT_FAILED,
+        EVENT_WAITING_REVIEW,
+        ProgressEventStore,
+        cancel_state,
+        is_cancel_requested,
+        mark_cancelled,
+        release_cancel_event,
+        request_cancel,
+    )
 
 
 logger = logging.getLogger("stage0.server")
+
+
+def _progress_events_enabled() -> bool:
+    """Harness P2 progress events default ON (additive observability; no
+    business semantics).  ``STAGE0_RUN_PROGRESS=0`` disables ALL emission."""
+    return os.getenv("STAGE0_RUN_PROGRESS", "1").strip().lower() in {"1", "true", "yes", "on"}
+
+
+# The fixed cancellation notice: constant code-owned text — no model output,
+# no unreviewed clinical content, honest about what did and did not run.
+CANCELLED_RESULT_TEXT = ("该任务已按请求取消。已完成并提交的记录保留不变，"
+                         "取消后未执行的检查不再执行；建议咨询医生/药师。")
 
 IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 AUTH_HEADER = "X-Stage0-Token"
@@ -156,9 +196,12 @@ def classify_error(exc: BaseException) -> str:
     if name in {"TimeoutError", "ConnectionError", "APITimeoutError",
                 "APIConnectionError", "SocketTimeoutError"}:
         return "retryable"
-    # Unknown failures are retried within the attempt cap — the store keeps
-    # the original event identity, so a retry cannot create a second event.
-    return "retryable"
+    if name == 'EffectUnknownError':
+        return 'effect_unknown'
+    if name == 'ReviewFactsMovedError':
+        return 'retryable'
+    # Programming errors do not heal by replaying a whole turn.
+    return "permanent"
 
 
 # MemoryPolicyError is imported lazily to keep the try/except import block
@@ -250,6 +293,7 @@ class OutboxWorker:
         self.poll_interval = poll_interval
         self.lease_ttl_seconds = lease_ttl_seconds
         self._runner: Any | None = None
+        self._progress: ProgressEventStore | None = None
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -264,6 +308,21 @@ class OutboxWorker:
         # Rechecks and agent-level integrations keep working through the
         # routed runner's underlying agent.
         return self.runner.agent
+
+    @property
+    def progress(self) -> ProgressEventStore:
+        """Harness P2: run progress ledger over the same SQLite file."""
+        if self._progress is None:
+            self._progress = ProgressEventStore(self.store.connection, self.store._lock)
+        return self._progress
+
+    def _emit_progress(self, run_id: str | None, kind: str, *, detail: dict[str, Any] | None = None) -> None:
+        if run_id is None or not _progress_events_enabled():
+            return
+        try:
+            self.progress.emit(run_id, kind, detail=detail)
+        except Exception:
+            logger.debug("progress emit failed", exc_info=True)
 
     def drain_once(self, *, max_tasks: int = 5) -> list[dict[str, Any]]:
         receipts: list[dict[str, Any]] = []
@@ -292,56 +351,90 @@ class OutboxWorker:
         return receipts
 
     def drain_resume_tasks(self, *, limit: int = 10) -> list[dict[str, Any]]:
-        """Consume pending resume tasks: re-verify, resume the parked run via
-        ``Command(resume=...)``, then converge case/run status.  The run-side
-        apply_review node re-validates everything (authoritative)."""
-        receipts: list[dict[str, Any]] = []
+        try:
+            from .turn_budget import lease_scope
+        except ImportError:
+            from turn_budget import lease_scope
+        receipts = []
         for task in self.store.pending_resume_tasks(limit=limit):
-            decision_id = task["decision_id"]
-            record = self.store.review_decision(decision_id)
-            if record is None or record.get("outcome") == "applied":
-                self.store.consume_resume_task(task["id"], operation_id=task["operation_id"])
+            token = self.store.claim_resume_task(task['id'])
+            if token is None:
                 continue
-            run = self.store.workflow_run_get(task["run_id"])
-            if run is None or run["status"] != "waiting_review":
-                # The run can no longer accept this decision (terminal or
-                # cancelled): consume without applying, keep the audit trail.
-                logger.warning("resume task for run %s skipped: status=%s",
-                               task["run_id"], run["status"] if run else "missing")
-                self.store.set_review_decision_outcome(decision_id, outcome="unapplicable")
-                self.store.consume_resume_task(task["id"], operation_id=task["operation_id"])
-                continue
-            decision_payload = {
-                "decision_id": decision_id,
-                "case_id": record["case_id"],
-                "case_revision": record["case_revision"],
-                "action": record["action"],
-                "payload": record.get("payload") or {},
-                "actor_id": record.get("actor_id"),
-            }
-            final = self.runner.resume(task["run_id"], decision_payload)
-            self.store.consume_resume_task(task["id"], operation_id=task["operation_id"])
-            if "__interrupt__" in final:
-                # Re-parked (review_stale round opened): still waiting.
-                self.store.workflow_run_update(task["run_id"], status="waiting_review")
-            else:
-                case = self.store.review_case(record["case_id"])
-                if case is not None and case["status"] == "in_review":
-                    self.store.close_review_case(
-                        record["case_id"], status="resolved",
-                        reason=f"review applied: {record['action']}",
-                        actor=record.get("actor_id") or "reviewer")
-            logger.info("resume task consumed task_id=%s decision_id=%s run_id=%s",
-                        task["id"], decision_id, task["run_id"])
-            receipts.append({"task_id": task["id"], "status": "resumed",
-                             "decision_id": decision_id})
+            try:
+                with lease_scope(lambda: self.store.assert_resume_lease(task['id'], token)):
+                    receipt = self._resume_one(task)
+                self.store.assert_resume_lease(task['id'], token)
+                self.store.consume_resume_task(task['id'], operation_id=task['operation_id'])
+                receipts.append(receipt)
+            except Exception as exc:
+                error_class = classify_error(exc)
+                if isinstance(exc, LeaseRejected):
+                    receipts.append({'task_id': task['id'], 'status': 'lease_lost'})
+                    continue
+                state = self.store.fail_resume_task(task['id'], error_class, type(exc).__name__)
+                logger.error('resume task failed task_id=%s error_class=%s exception_type=%s',
+                             task['id'], error_class, type(exc).__name__)
+                receipts.append({'task_id': task['id'], 'status': 'error',
+                                 'error_class': error_class, 'execution_state': state})
         return receipts
+
+    def _resume_one(self, task):
+        record = self.store.review_decision(task['decision_id'])
+        run = self.store.workflow_run_get(task['run_id'])
+        if record is None or run is None:
+            raise RuntimeError('resume decision or run missing')
+        # Harness P2: a cancelled run is NEVER revived by a late reviewer
+        # decision — the case was closed and pending resume tasks cancelled
+        # at cancel time; this is the second line of defence for a task that
+        # was already claimed when the cancel landed.
+        if run['status'] == 'cancelled':
+            raise MemoryPolicyError('run is cancelled; a late review decision cannot revive it')
+        # Even an applied receipt needs graph/checkpoint/publication convergence.
+        # Do not consume early just because a domain effect was committed.
+        if run['status'] not in {'waiting_review', 'running', 'succeeded', 'degraded'}:
+            raise RuntimeError('run cannot accept review recovery')
+        payload = {'decision_id': record['decision_id'], 'case_id': record['case_id'],
+            'case_revision': record['case_revision'], 'action': record['action'],
+            'payload': record.get('payload') or {}, 'actor_id': record['actor_id']}
+        final = self.runner.resume(task['run_id'], payload)
+        if '__interrupt__' in final:
+            self.store.workflow_run_update(task['run_id'], status='waiting_review',
+                result=final.get('result'), budget=final.get('budget'))
+        return {'task_id': task['id'], 'status': 'resumed', 'decision_id': record['decision_id']}
 
     def _run_claimed(self, task: dict[str, Any]) -> dict[str, Any]:
         payload = task["payload"] or {}
         trace_id = payload.get("trace_id") or "unknown"
+        run_id = payload.get("run_id") or payload.get("turn_id")
+        # Harness P2: a queued task whose run was cancelled is cancelled at
+        # claim time — nothing executes, the idempotency key commits a
+        # persisted cancelled result (the terminal state stays authoritative).
+        if is_cancel_requested(self.store, run_id):
+            mark_cancelled(self.store, run_id)
+            release_cancel_event(run_id)
+            self._emit_progress(run_id, EVENT_CANCELLED, detail={"phase": "queued"})
+            result = {
+                "text": CANCELLED_RESULT_TEXT,
+                "warnings": [], "conflicts": [], "audit_trail": {},
+                "safety_status": "enforced", "operation_outcomes": [],
+                "event_id": payload.get("event_id"), "run_id": run_id,
+                "run_status": "cancelled",
+            }
+            self.store.publish_event_result(
+                task["id"], lease_token=task["lease_token"],
+                idempotency_key=payload.get("idempotency_key"),
+                event_key=payload.get("event_key"), result=result)
+            logger.info("outbox task cancelled before execution task_id=%s run_id=%s",
+                        task["id"], run_id)
+            return {"task_id": task["id"], "status": "cancelled"}
+        self._emit_progress(run_id, EVENT_ACCEPTED, detail={"task_id": task["id"]})
         try:
-            with _Heartbeat(self.store, task["id"], task["lease_token"], self.lease_ttl_seconds):
+            try:
+                from .turn_budget import lease_scope
+            except ImportError:
+                from turn_budget import lease_scope
+            with _Heartbeat(self.store, task["id"], task["lease_token"], self.lease_ttl_seconds), lease_scope(
+                    lambda: self.store.assert_outbox_lease(task['id'], task['lease_token'])):
                 result = self._execute(task)
         except LeaseRejected:
             # Our lease expired and another worker took over; their result
@@ -354,6 +447,8 @@ class OutboxWorker:
             return self._fail_claimed(task, exc, trace_id)
         key = payload.get("idempotency_key")
         event_key = payload.get("event_key")
+        if is_cancel_requested(self.store, run_id):
+            result["run_status"] = "cancelled"
         # ONE transaction: task done + key committed + stored response.
         self.store.publish_event_result(
             task["id"], lease_token=task["lease_token"],
@@ -363,6 +458,17 @@ class OutboxWorker:
         # wait never occupies the lease, the thread or a transaction.
         if result.get("run_status") == "waiting_review" and payload.get("run_id"):
             self.store.workflow_run_update(payload["run_id"], status="waiting_review")
+            self._emit_progress(run_id, EVENT_WAITING_REVIEW,
+                                detail={"review_case": (result.get("review_case") or {}).get("id")})
+        elif is_cancel_requested(self.store, run_id):
+            # A cancel request landed mid-turn: the runner recorded it; the
+            # progress ledger records 取消完成 and the handle is released.
+            mark_cancelled(self.store, run_id)
+            self._emit_progress(run_id, EVENT_CANCELLED, detail={"phase": "mid_turn"})
+        else:
+            self._emit_progress(run_id, EVENT_COMPLETED,
+                                detail={"run_status": result.get("run_status")})
+        release_cancel_event(run_id)
         logger.info("outbox task done task_id=%s trace_id=%s event_id=%s run_id=%s",
                     task["id"], trace_id, payload.get("event_id"), payload.get("run_id"))
         return {"task_id": task["id"], "status": "done"}
@@ -386,6 +492,9 @@ class OutboxWorker:
                      "exception_type=%s run_id=%s",
                      task["id"], trace_id, error_class, type(exc).__name__,
                      payload.get("run_id"))
+        self._emit_progress(payload.get("run_id") or payload.get("turn_id"), EVENT_FAILED,
+                            detail={"error_class": error_class})
+        release_cancel_event(payload.get("run_id") or payload.get("turn_id"))
         if status == "failed":
             key = payload.get("idempotency_key")
             if key:
@@ -412,6 +521,8 @@ class OutboxWorker:
             client_event_id=payload.get("event_key"),
             event_id=payload.get("event_id"),
             run_id=payload.get("run_id") or payload["turn_id"])
+        self.store.record_workflow_queue_wait(payload.get('run_id') or payload['turn_id'],
+            task['created_at'], task.get('heartbeat_at') or task['updated_at'])
         audit = response.audit_trail or {}
         return {
             "text": response.text,
@@ -422,6 +533,9 @@ class OutboxWorker:
             # Structured per-operation outcomes (frontend round): what the
             # store actually did — never a blanket "operation succeeded".
             "operation_outcomes": list(getattr(response, "operation_outcomes", []) or []),
+            # Product P1: versioned structured bundle derived from the same
+            # data as text/warnings; additive and ignorable by old clients.
+            "answer_bundle": getattr(response, "answer_bundle", None),
             "event_id": payload.get("event_id"),
             "run_id": payload.get("run_id"),
             # Reliability P2: waiting-for-review turns publish run status +
@@ -577,6 +691,14 @@ def create_app(*, db_path: str | Path | None = None,
 
     # ---- lifecycle ------------------------------------------------------
 
+    # Harness P2: the progress/cancel tables must exist before the first
+    # cancel request or progress poll — the runner (and its agent-owned
+    # stores) may still be lazy at that point.
+    try:
+        worker.progress  # noqa: B018 - eager DDL initialization
+    except Exception:
+        logger.warning("progress store initialization failed", exc_info=True)
+
     @app.on_event("startup")
     def _startup() -> None:
         if worker_thread:
@@ -666,6 +788,10 @@ def create_app(*, db_path: str | Path | None = None,
                 "error_class": task.get("last_error_class"), "error": task["error"]})
         return JSONResponse(status_code=202, content={
             "event_key": event_key,
+            # Harness P2: ids surface on the polling path too, so a client
+            # restored after a refresh can still attach to the run's progress
+            # cursor and cancellation.  Additive; old clients ignore them.
+            "event_id": payload.get("event_id"), "run_id": payload.get("run_id"),
             "status": "processing" if task["status"] == "running" else "queued"})
 
     def _current_result(task: dict[str, Any]) -> dict[str, Any]:
@@ -680,9 +806,9 @@ def create_app(*, db_path: str | Path | None = None,
         if run_id:
             run = store.workflow_run_get(run_id)
             if run is not None and run.get("result"):
-                if run["status"] in {"succeeded", "degraded", "failed"}:
+                if run["status"] in {"succeeded", "degraded", "failed", "cancelled"}:
                     final = dict(run["result"])
-                    final.setdefault("run_status", run["status"])
+                    final["run_status"] = run["status"]
                     final.setdefault("review_case", result.get("review_case"))
                     final.setdefault("event_id", result.get("event_id"))
                     final.setdefault("run_id", result.get("run_id"))
@@ -704,6 +830,74 @@ def create_app(*, db_path: str | Path | None = None,
         return JSONResponse(status_code=202, content={
             "event_key": f"api:{idempotency_key}", "status": "queued",
             "status_url": f"/v1/events/{idempotency_key}"})
+
+    # ---- Harness P2: run progress + cancellation -------------------------
+
+    @app.get("/v1/runs/{run_id}/progress")
+    def run_progress(run_id: str, request: Request, after: int = 0) -> JSONResponse:
+        """Cursor-based progress polling (the streaming contract's compatible
+        polling form — see docs/harness-upgrade/P2/api_contract.md for why
+        polling rather than browser EventSource: custom auth headers).
+
+        ``after`` is the last seq the client saw.  Reconnects resume from the
+        cursor; a cursor older than retained history returns the current page
+        with ``snapshot: true`` so the client resets its dedup window.  Events
+        carry NO unreviewed clinical text."""
+        principal = _principal(request)
+        _authorize_scope(principal, "local-demo")
+        run = store.workflow_run_get(run_id)
+        if run is None:
+            raise ApiError(404, "unknown_run", "validation", "no run for this id")
+        if not _progress_events_enabled():
+            return JSONResponse(status_code=200, content={
+                "run_id": run_id, "run_status": run["status"],
+                "events": [], "latest_seq": 0, "snapshot": True,
+                "note": "progress events are disabled on this server"})
+        page = worker.progress.events_since(run_id, max(0, after))
+        return JSONResponse(status_code=200, content={
+            **page, "run_status": run["status"]})
+
+    @app.post("/v1/runs/{run_id}/cancel")
+    def cancel_run(run_id: str, request: Request,
+                   body: dict[str, Any] | None = None) -> JSONResponse:
+        """Idempotent, explicit cancellation.  ``cancel_requested`` and
+        ``cancelled`` are distinct; the durable result of an already-committed
+        event is never rewritten — cancellation only stops NOT-yet-executed
+        work.  Role + scope + run existence verified here."""
+        principal = _principal(request)
+        _require_role(principal, "caregiver", "ops")
+        _authorize_scope(principal, "local-demo")
+        run = store.workflow_run_get(run_id)
+        if run is None:
+            raise ApiError(404, "unknown_run", "validation", "no run for this id")
+        prior = cancel_state(store, run_id)
+        reason = str((body or {}).get("reason", ""))[:200]
+        outcome = request_cancel(store, run_id, actor=principal.user_id, reason=reason)
+        if outcome["state"] == "unknown_run":
+            raise ApiError(404, "unknown_run", "validation", "no run for this id")
+        if prior is None and outcome["state"] in {"cancelled", "requested"}:
+            _emit_run_progress(run_id, EVENT_CANCEL_REQUESTED,
+                               detail={"actor": principal.user_id})
+            if outcome["state"] == "cancelled" and run["status"] == "waiting_review":
+                # Nothing is executing: cancellation is immediately complete.
+                _emit_run_progress(run_id, EVENT_CANCELLED, detail={"phase": "waiting_review"})
+                release_cancel_event(run_id)
+        return JSONResponse(status_code=200, content={
+            "run_id": run_id,
+            "cancel_state": outcome["state"],
+            "run_status": outcome.get("run_status"),
+            "status_url": f"/v1/runs/{run_id}/progress",
+            "note": ("取消请求已受理；已提交的领域记录不会回滚，未执行的工作不再执行。"
+                     if outcome["state"] in {"cancelled", "requested"} else
+                     "运行已处于终态，取消不改变既有结果。")})
+
+    def _emit_run_progress(run_id: str, kind: str, *, detail: dict[str, Any] | None = None) -> None:
+        if not _progress_events_enabled():
+            return
+        try:
+            worker.progress.emit(run_id, kind, detail=detail)
+        except Exception:
+            logger.debug("progress emit failed (api thread)", exc_info=True)
 
     # ---- memory reads (object-scope checked; opaque ids are not authz) ---
 
@@ -887,15 +1081,28 @@ def create_app(*, db_path: str | Path | None = None,
     # are untouched.
     try:
         from .read_models import register_read_model_routes
+        from .harness.evidence import EvidenceStore
     except ImportError:  # Support ``python stage0/server.py``.
         from read_models import register_read_model_routes  # type: ignore
+        from harness.evidence import EvidenceStore  # type: ignore
+    # Product P1: the service-side EvidenceStore shares the MemoryStore's
+    # connection and single-writer lock (same pattern as the agent's own
+    # store); DDL is additive and idempotent.
+    evidence_store = EvidenceStore(store.connection, store._lock)
     register_read_model_routes(
         app, store,
         principal=_principal,
         authorize_scope=lambda p, scope: _authorize_scope(p, scope),
         require_role=_require_role,
         api_error=ApiError,
+        evidence_store=evidence_store,
     )
+
+    try:
+        from .product import register_product_routes
+    except ImportError:
+        from stage0.product import register_product_routes
+    register_product_routes(app, store, _principal, _authorize_scope, _require_role, ApiError)
 
     return app
 

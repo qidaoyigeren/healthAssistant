@@ -66,7 +66,7 @@ class ReviewTriggerTests(unittest.TestCase):
                 self.assertIn("建议咨询医生/药师", response.text)
                 self.assertEqual(response.audit_trail.get("run_status"), "waiting_review")
                 # Run is non-terminal, worker-free (lease released upstream).
-                self.assertEqual(store.workflow_run_get("run-2")["status"], "running")
+                self.assertEqual(store.workflow_run_get("run-2")["status"], "waiting_review")
                 # Facts snapshot recorded for the staleness check.
                 self.assertIsNotNone(cases[0]["fact_medication_set_hash"])
             finally:
@@ -278,7 +278,10 @@ class FullReviewCycleTests(unittest.TestCase):
                                                             "medication": "氨氯地平"},
                                                 "session_id": "s1"},
                             headers={"Idempotency-Key": "k3"})
-                worker.drain_once()  # this also consumes the stale resume task
+                with self.assertNoLogs('stage0.server', level='ERROR'):
+                    receipts = worker.drain_once()  # also consumes the stale resume task
+                self.assertFalse(any(r.get('status') == 'error' for r in receipts))
+                self.assertEqual(store.pending_resume_tasks(), [])
                 old_case = store.review_case(case["id"])
                 self.assertEqual(old_case["status"], "cancelled")
                 decisions = store.review_decisions_for(case["id"])
@@ -289,6 +292,22 @@ class FullReviewCycleTests(unittest.TestCase):
                 rounds = [c for c in store.review_cases() if c["round"] == 2]
                 self.assertEqual(len(rounds), 1)
                 self.assertIn("review_stale", rounds[0]["reason_codes"])
+                checkpoint = worker.runner.graph._ensure_graph().get_state(
+                    {"configurable": {"thread_id": run_id}})
+                self.assertEqual(checkpoint.values['review_case']['id'], rounds[0]['id'])
+                self.assertEqual(checkpoint.next, ('await_review',))
+                claimed2 = client.post(f"/v1/review-cases/{rounds[0]['id']}/claim",
+                    json={'expected_revision': rounds[0]['revision']}).json()
+                decision2 = client.post(f"/v1/review-cases/{rounds[0]['id']}/decisions",
+                    json={'action': 'close_with_safe_guidance', 'payload': {},
+                          'expected_revision': claimed2['revision']},
+                    headers={'Idempotency-Key': 'rv-stale-2'})
+                self.assertEqual(decision2.status_code, 202)
+                with self.assertNoLogs('stage0.server', level='ERROR'):
+                    worker.drain_resume_tasks()
+                self.assertEqual(store.workflow_run_get(run_id)['status'], 'succeeded')
+                self.assertEqual(store.pending_resume_tasks(), [])
+                self.assertEqual(store.review_case(rounds[0]['id'])['status'], 'resolved')
                 # The old decision never took effect.
                 names = [m["display_name"] for m in store.current_medications()]
                 self.assertEqual(names.count("克拉霉素"), 1)

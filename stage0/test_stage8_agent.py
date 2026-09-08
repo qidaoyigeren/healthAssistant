@@ -67,7 +67,7 @@ class TurnBudgetTests(unittest.TestCase):
                 agent = self._agent(store, slow_provider)
                 with mock.patch.dict(os.environ, {"AGENT_TURN_BUDGET_SECONDS": "0.15"}):
                     response = agent.handle(
-                        CareEvent("query_current_medications", "现在吃什么药"),
+                        CareEvent("user_message", "请核对我目前的用药记录"),
                         session_id="s", turn_id="t1")
                 trace = response.tool_trace
                 self.assertTrue(any(entry.get("phase") == "budget" for entry in trace))
@@ -82,7 +82,7 @@ class TurnBudgetTests(unittest.TestCase):
                 agent = self._agent(store, _repeat_read_provider)
                 with mock.patch.dict(os.environ, {"AGENT_TURN_TOKEN_BUDGET": "200"}):
                     response = agent.handle(
-                        CareEvent("query_current_medications", "现在吃什么药"),
+                        CareEvent("user_message", "请核对我目前的用药记录"),
                         session_id="s", turn_id="t1")
                 budget_entry = next(e for e in response.tool_trace if e.get("phase") == "budget")
                 self.assertEqual(budget_entry["exhausted"], "tokens")
@@ -114,7 +114,7 @@ class CircuitBreakerTests(unittest.TestCase):
                     llm_planner_enabled=True, proposal_provider=rejecting_provider,
                     response_provider=_composer_unavailable)
                 response = agent.handle(
-                    CareEvent("query_current_medications", "现在吃什么药"),
+                    CareEvent("user_message", "请核对我目前的用药记录"),
                     session_id="s", turn_id="t1")
                 # The breaker tripped after the 2nd consecutive safety
                 # rejection and the turn finished deterministically.
@@ -147,7 +147,7 @@ class CircuitBreakerTests(unittest.TestCase):
                     llm_planner_enabled=True, proposal_provider=once_rejecting_provider,
                     response_provider=_composer_unavailable)
                 response = agent.handle(
-                    CareEvent("query_current_medications", "现在吃什么药"),
+                    CareEvent("user_message", "请核对我目前的用药记录"),
                     session_id="s", turn_id="t1")
                 self.assertGreaterEqual(calls["n"], 3)  # rejected once, then LLM finished the turn
                 decisions = [entry.get("decision", {}).get("tool")
@@ -172,8 +172,12 @@ class PayloadBoundingTests(unittest.TestCase):
         planner = LLMPlanner()
         state = self._state_with_rag_observations(6)
         payload = planner.prompt_payload(state)
-        summarized = [item for item in payload["observations"] if "result_digest" in item]
-        full = [item for item in payload["observations"] if "result_digest" not in item]
+        # Harness P1-B: old-observation summaries are structured (tool/purpose/
+        # counts/explicit evidence marker), replacing the hash-only digest.
+        summarized = [item for item in payload["observations"]
+                      if item.get("evidence") == "not_recorded"]
+        full = [item for item in payload["observations"]
+                if item.get("evidence") != "not_recorded"]
         # Current cycle plus the two before it stay full (3); earlier cycles
         # are summarized (3).
         self.assertEqual(len(summarized), 3)
@@ -181,6 +185,7 @@ class PayloadBoundingTests(unittest.TestCase):
         for item in summarized:
             self.assertNotIn("result", item)
             self.assertIn("tool", item)
+            self.assertIn("result_count", item)
         for item in full:
             self.assertIn("result", item)
             for chunk in item["result"]["results"]:

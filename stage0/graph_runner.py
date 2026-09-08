@@ -23,15 +23,14 @@ Identity and recovery contract:
 
 Retry ownership (ADR-004): the graph sets NO RetryPolicy.  Task-level
 recovery belongs to the outbox lease cycle (P0); per-call retries stay with
-their single owner (planner SDK max_retries=0).  Human-in-the-loop interrupts
-are P2: ``resume()`` is the wiring for ``Command(resume=...)``, and no node
-raises ``interrupt()`` yet.
+their single owner (SDK max_retries=0). Human waiting uses interrupt().
+Harness P0 shares durable attempt accounting with the legacy runner, resumes
+failed nodes without restarting START, and applies review effects atomically.
 """
 from __future__ import annotations
 
 import logging
 import os
-import re
 import sqlite3
 import time
 from dataclasses import asdict
@@ -41,28 +40,34 @@ from typing import Any, Callable, Protocol, TypedDict
 
 try:
     from .agent import (
-        PLANNER_RESERVE_SECONDS,
         AgentState,
         CareEvent,
         MedicationCoordinatorAgent,
         Observation,
         PlanningRejected,
         ToolAction,
-        TurnBudget,
     )
     from .memory import EpisodicFact, MemoryPolicyError, MemoryStore
 except ImportError:  # Support ``python stage0/graph_runner.py`` imports.
     from agent import (  # type: ignore
-        PLANNER_RESERVE_SECONDS,
         AgentState,
         CareEvent,
         MedicationCoordinatorAgent,
         Observation,
         PlanningRejected,
         ToolAction,
-        TurnBudget,
     )
     from memory import EpisodicFact, MemoryPolicyError, MemoryStore  # type: ignore
+
+
+try:
+    from .turn_budget import CURRENT, BudgetExceeded, budget_scope, initial_budget
+    from .harness.runtime import RunContext
+    from .harness.progress import is_cancel_requested, mark_cancelled
+except ImportError:
+    from turn_budget import CURRENT, BudgetExceeded, budget_scope, initial_budget  # type: ignore
+    from harness.runtime import RunContext  # type: ignore
+    from harness.progress import is_cancel_requested, mark_cancelled  # type: ignore
 
 
 logger = logging.getLogger("stage0.graph_runner")
@@ -72,7 +77,7 @@ def _as_utc_now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 GRAPH_VERSION = "1"
-STATE_SCHEMA_VERSION = "1"
+STATE_SCHEMA_VERSION = "2"
 GRAPH_RUNNER_FLAG = "AGENT_GRAPH_RUNNER"
 REVIEW_ENABLED_FLAG = "STAGE0_REVIEW_ENABLED"
 
@@ -80,7 +85,7 @@ REVIEW_ENABLED_FLAG = "STAGE0_REVIEW_ENABLED"
 # inject arbitrary delivered text (no state patches, no free-form strings) —
 # their basis is recorded in the audit trail only.
 WAITING_REVIEW_NOTICE = (
-    "已记录本次报告并完成初步风险提示；该情形按流程提交专业审核。"
+    "该情形按流程提交专业审核；尚未完成的检查请以正文说明为准。"
     "（当前为本地演示环境，尚未接入真实人工服务；可导出咨询摘要咨询医生/药师。）"
 )
 REVIEW_RESOLVED_NOTICE = "\n专业审核已完成核对，相关矛盾记录已按审核结论处理；用药调整请咨询医生/药师。"
@@ -109,6 +114,10 @@ class WorkflowState(TypedDict, total=False):
     event: dict[str, Any]
     observations: list[dict[str, Any]]
     trace: list[dict[str, Any]]
+    # Harness P1-C: carried across checkpoints so node replays never
+    # re-persist already-flushed trace entries (stable-id dedup is the second
+    # line of defence in record_turn_trace).
+    trace_flushed: int
     reflection_notes: list[str]
     cycle: int
     degraded_reason: str | None
@@ -135,6 +144,10 @@ def _observation_to_dict(observation: Observation) -> dict[str, Any]:
         "result": observation.result,
         "ok": observation.ok,
         "cycle": observation.cycle,
+        "error_kind": observation.error_kind,
+        "recoverable": observation.recoverable,
+        "evidence_refs": observation.evidence_refs,
+        "no_progress": observation.no_progress,
     }
 
 
@@ -142,6 +155,9 @@ def _observation_from_dict(item: dict[str, Any]) -> Observation:
     return Observation(
         tool=item["tool"], purpose=item["purpose"], arguments=item.get("arguments") or {},
         result=item.get("result"), ok=bool(item.get("ok", True)), cycle=int(item.get("cycle") or 0),
+        error_kind=item.get("error_kind"), recoverable=item.get("recoverable"),
+        evidence_refs=list(item.get("evidence_refs") or []),
+        no_progress=bool(item.get("no_progress")),
     )
 
 
@@ -161,6 +177,17 @@ class LegacyAgentRunner:
 
     graph_version = "legacy"
 
+    def _save_manifest(self, run_id: str) -> None:
+        """Harness P1-C: one immutable RunManifest per run (best-effort)."""
+        try:
+            from .harness.manifest import ManifestStore, build_manifest
+            store = ManifestStore(self.agent.memory.connection, self.agent.memory._lock)
+            store.save(build_manifest(run_id=run_id, agent=self.agent,
+                                      graph_version=self.graph_version,
+                                      max_cycles=self.agent.max_cycles))
+        except Exception:
+            logger.debug("manifest save failed", exc_info=True)
+
     def __init__(self, agent: MedicationCoordinatorAgent):
         self.agent = agent
 
@@ -168,12 +195,20 @@ class LegacyAgentRunner:
             client_event_id: str | None = None,
             event_id: str | None = None, run_id: str | None = None) -> Any:
         run_id = run_id or turn_id
+        existing = self.agent.memory.workflow_run_get(run_id)
+        if existing and existing.get("graph_version") != "accepted":
+            from .harness.manifest import enforce_restore
+            enforce_restore(memory=self.agent.memory, agent=self.agent, run_id=run_id,
+                            graph_version=self.graph_version)
         self.agent.memory.workflow_run_start(
             run_id=run_id, event_id=event_id, idempotency_key=client_event_id,
             thread_id=run_id, graph_version=self.graph_version)
+        if not existing or existing.get("graph_version") == "accepted":
+            self._save_manifest(run_id)
         try:
-            response = self.agent.handle(event, session_id=session_id,
-                                         turn_id=turn_id, client_event_id=client_event_id)
+            with budget_scope(self.agent.memory, run_id, self.agent.max_cycles):
+                response = self.agent.handle(event, session_id=session_id,
+                                             turn_id=turn_id, client_event_id=client_event_id)
         except Exception as exc:
             self.agent.memory.workflow_run_update(run_id, status="failed",
                                                   error=f"{type(exc).__name__}")
@@ -181,10 +216,19 @@ class LegacyAgentRunner:
         degraded = any(entry.get("phase") in {"budget", "plan"}
                        and (entry.get("exhausted") or entry.get("decision", {}).get("tool") == "circuit_break")
                        for entry in (response.tool_trace or []))
+        status = "degraded" if degraded else "succeeded"
+        # Harness P2: a cancellation request that landed mid-turn is the final
+        # word — committed effects stay, the run is recorded as cancelled.
+        if is_cancel_requested(self.agent.memory, run_id):
+            status = "cancelled"
+            mark_cancelled(self.agent.memory, run_id)
         self.agent.memory.workflow_run_update(
-            run_id, status="degraded" if degraded else "succeeded",
+            run_id, status=status,
             result={"text": response.text, "warnings": response.warnings,
-                    "conflicts": response.conflicts, "safety_status": response.safety_status})
+                    "conflicts": response.conflicts, "safety_status": response.safety_status,
+                    "audit_trail": response.audit_trail,
+                    "operation_outcomes": response.operation_outcomes,
+                    "answer_bundle": getattr(response, "answer_bundle", None)})
         return response
 
 
@@ -192,6 +236,8 @@ def build_workflow_state(*, event: CareEvent, session_id: str, turn_id: str,
                          client_event_id: str | None, event_id: str | None,
                          run_id: str, budget: dict[str, Any] | None) -> dict[str, Any]:
     """Initial WorkflowState.  Every value is JSON-safe (checkpoint redline)."""
+    ctx = RunContext(run_id=run_id, turn_id=turn_id, session_id=session_id,
+                     event_id=event_id, client_event_id=client_event_id)
     return {
         "session_id": session_id,
         "turn_id": turn_id,
@@ -201,13 +247,13 @@ def build_workflow_state(*, event: CareEvent, session_id: str, turn_id: str,
         "event": asdict(event),
         "observations": [],
         "trace": [],
+        "trace_flushed": 0,
         "reflection_notes": [],
         "cycle": 0,
         "degraded_reason": None,
         "route": "plan",
         "pending_action": None,
-        "budget": {"consumed_seconds": 0.0, "tokens_estimated": 0,
-                   **(budget or {})},
+        "budget": initial_budget(saved=budget),
         "breaker": {"consecutive_rejections": 0, "broken": False},
         "result": None,
         "error": None,
@@ -217,6 +263,9 @@ def build_workflow_state(*, event: CareEvent, session_id: str, turn_id: str,
         "review_case": None,
         "review_decision": None,
         "review_outcome": None,
+        # Harness P1-A: JSON-safe run context projection (ids/revisions/trace
+        # correlation only — no budget session, connections or credentials).
+        "ctx": ctx.checkpoint_dict(),
     }
 
 
@@ -226,6 +275,19 @@ class LangGraphAgentRunner:
     wrapped agent's own."""
 
     graph_version = GRAPH_VERSION
+
+    def _save_manifest(self, run_id: str) -> None:
+        """Harness P1-C: one immutable RunManifest per run (best-effort)."""
+        try:
+            from .harness.manifest import ManifestStore, build_manifest
+            store = ManifestStore(self.agent.memory.connection, self.agent.memory._lock)
+            store.save(build_manifest(run_id=run_id, agent=self.agent,
+                                      graph_version=self.graph_version,
+                                      state_schema_version=STATE_SCHEMA_VERSION,
+                                      review_enabled=self.review_enabled,
+                                      max_cycles=self.agent.max_cycles))
+        except Exception:
+            logger.debug("manifest save failed", exc_info=True)
 
     def __init__(self, agent: MedicationCoordinatorAgent,
                  checkpointer: Any | None = None,
@@ -320,27 +382,40 @@ class LangGraphAgentRunner:
         """Build the working AgentState view for the agent's own components.
         Node functions write mutations back before the step ends."""
         event = CareEvent(**wf["event"])
+        ctx = RunContext.from_checkpoint(wf.get("ctx") or {"run_id": wf["run_id"],
+                                                           "turn_id": wf["turn_id"],
+                                                           "session_id": wf["session_id"]})
+        # Harness P2: rebind the process-wide cancellation handle on every
+        # node — a cancel request raised between checkpoints must be observed
+        # at the next scheduling point of the resumed graph.
+        from .harness.progress import cancel_event_for
+        ctx.cancel_event = cancel_event_for(wf["run_id"])
         return AgentState(
             session_id=wf["session_id"], turn_id=wf["turn_id"], event=event,
             client_event_id=wf.get("client_event_id"),
             observations=[_observation_from_dict(item) for item in wf.get("observations", [])],
             trace=wf.get("trace", []),
+            trace_flushed=int(wf.get("trace_flushed") or 0),
             reflection_notes=wf.get("reflection_notes", []),
             cycle=int(wf.get("cycle", 0)),
             degraded_reason=wf.get("degraded_reason"),
+            # Harness P1-A: restore the shared run context from its JSON-safe
+            # checkpoint projection (principal re-resolved from configuration,
+            # never from the checkpoint).
+            ctx=ctx,
         )
 
     def _write_back(self, wf: dict[str, Any], state: AgentState,
                     node_started: float) -> dict[str, Any]:
         wf["observations"] = [_observation_to_dict(o) for o in state.observations]
         wf["trace"] = state.trace
+        wf["trace_flushed"] = state.trace_flushed
         wf["reflection_notes"] = state.reflection_notes
         wf["cycle"] = state.cycle
         wf["degraded_reason"] = state.degraded_reason
-        budget = dict(wf.get("budget") or {})
-        budget["consumed_seconds"] = round(
-            float(budget.get("consumed_seconds") or 0.0) + (time.perf_counter() - node_started), 4)
-        wf["budget"] = budget
+        wf["budget"] = CURRENT.get().sync()
+        if state.ctx is not None:
+            wf["ctx"] = state.ctx.checkpoint_dict()
         return wf
 
     @staticmethod
@@ -366,54 +441,35 @@ class LangGraphAgentRunner:
         agent = self.agent
         node_started = time.perf_counter()
         state = self._agent_state(wf)
-        budget = dict(wf.get("budget") or {})
-        wall = budget.get("wall_clock_seconds")
-        if wall is None:
-            configured = TurnBudget.from_env(agent.max_cycles)
-            wall, max_cycles = configured.wall_clock_seconds, configured.max_cycles
-            budget["wall_clock_seconds"], budget["max_cycles"] = wall, max_cycles
-        max_cycles = int(budget.get("max_cycles") or agent.max_cycles)
+        budget = CURRENT.get()
         breaker = dict(wf.get("breaker") or {})
-        elapsed = float(budget.get("consumed_seconds") or 0.0)
 
         def _finish(route: str, *, action: Any = None) -> dict[str, Any]:
             written = self._write_back(wf, state, node_started)
-            # _write_back recomputed consumed_seconds from the persisted
-            # budget; merge so this node's tokens estimate and the delta both
-            # survive (the budget must never lose accumulated values).
-            budget.update(written["budget"])
-            budget["wall_clock_seconds"] = wall
-            budget["max_cycles"] = max_cycles
-            written["budget"] = budget
             written["breaker"] = breaker
             written["route"] = route
             written["pending_action"] = asdict(action) if action is not None else None
             return written
 
-        # Loop exit (cycle reached max_cycles) — legacy 'max_cycles_exceeded'.
-        if int(wf.get("cycle", 0)) >= max_cycles:
-            state.degraded_reason = state.degraded_reason or "max_cycles_exceeded"
+        # Harness P2: cancellation is observed at the next scheduling point;
+        # the run finishes with what it has (publish records 'cancelled').
+        if state.ctx is not None and state.ctx.cancelled():
+            state.degraded_reason = "cancelled"
             state.trace.append({
-                "phase": "reflect", "cycle": state.cycle,
-                "note": f"达到 max_cycles={max_cycles}；停止工具执行并生成明确降级响应。",
+                "phase": "cancel", "cycle": state.cycle,
+                "note": "收到取消请求；停止后续规划与工具执行，已完成操作不受影响。",
             })
             return _finish("compose")
-
-        # Budget gate (completed cycles > 0 only — exactly like the legacy loop).
-        reserve = PLANNER_RESERVE_SECONDS if wall > PLANNER_RESERVE_SECONDS else 0.0
-        if int(wf.get("cycle", 0)) > 0 and elapsed > wall - reserve:
-            state.degraded_reason = "budget_exhausted:wall_clock"
-            state.trace.append({
-                "phase": "budget", "cycle": state.cycle, "exhausted": "wall_clock",
-                "elapsed_seconds": round(elapsed, 3),
-                "limits": {"wall_clock_seconds": wall,
-                           "token_budget": budget.get("token_budget"),
-                           "max_cycles": max_cycles},
-                "note": "回合预算耗尽；停止工具执行并生成明确降级响应（结果可能不完整）。",
-            })
+        # Harness P2: the no-progress stop survives the unconditional
+        # execute→plan edge — once the threshold tripped, no further planning
+        # happens; compose finishes the run safely.
+        if agent.no_progress_tracker.stop_pending(state.ctx.run_id if state.ctx else wf["run_id"]):
+            if state.degraded_reason is None:
+                state.degraded_reason = "no_progress:repeated_reads"
             return _finish("compose")
-
-        state.cycle += 1
+        if budget.gate(state):
+            return _finish("compose")
+        budget.cycle(state)
         if breaker.get("broken"):
             action = agent.planner._fallback(
                 state, None, "circuit_break", [], "planner_circuit_break",
@@ -424,6 +480,9 @@ class LangGraphAgentRunner:
             try:
                 action = agent.planner.decide(state)
                 breaker["consecutive_rejections"] = 0
+            except BudgetExceeded:
+                budget.gate(state)
+                return _finish("compose")
             except PlanningRejected:
                 breaker["consecutive_rejections"] = int(breaker.get("consecutive_rejections") or 0) + 1
                 state.trace.append({
@@ -440,9 +499,6 @@ class LangGraphAgentRunner:
                                  "本回合剩余周期切换确定性规划，不再消耗 LLM 调用。"),
                     })
                 return _finish("plan")
-            payload_chars = getattr(agent.planner, "last_payload_chars", 0)
-            if payload_chars:
-                budget["tokens_estimated"] = int(budget.get("tokens_estimated") or 0) + int(payload_chars / 1.5)
             planner_trace = getattr(agent.planner, "last_decision_trace", None)
             if not planner_trace:
                 planner_trace = {
@@ -484,7 +540,19 @@ class LangGraphAgentRunner:
         agent._flush_traces(state)
         wf = self._write_back(wf, state, started)
         wf["pending_action"] = None
-        wf["route"] = "plan"
+        # Harness P2: no-progress contract — a repeat feeds the planner
+        # structured feedback; at the threshold the loop stops re-planning.
+        route = "plan"
+        if agent._progress_verdict(state, observation) == "stop":
+            state.degraded_reason = "no_progress:repeated_reads"
+            state.trace.append({
+                "phase": "no_progress", "cycle": state.cycle,
+                "note": "连续重复读取未产生新进展；停止重复规划并安全收尾，不以重复结果提高置信度。",
+                "unfinished_items": agent._unfinished_items(state),
+            })
+            route = "compose"
+        wf = self._write_back(wf, state, started)
+        wf["route"] = route
         return wf
 
     def _node_compose(self, wf: dict[str, Any]) -> dict[str, Any]:
@@ -499,7 +567,9 @@ class LangGraphAgentRunner:
             "warnings": response.warnings,
             "conflicts": response.conflicts,
             "audit_trail": response.audit_trail,
+            "operation_outcomes": response.operation_outcomes,
             "safety_status": response.safety_status,
+            "answer_bundle": getattr(response, "answer_bundle", None),
         }
         wf["route"] = "publish"
         # Reliability P2 triage: severe warnings or an open conflict route the
@@ -553,6 +623,8 @@ class LangGraphAgentRunner:
         waiting["run_status"] = "waiting_review"
         waiting["review_case"] = wf["review_case"]
         wf["result"] = waiting
+        self._validate_result(wf)
+        wf["budget"] = CURRENT.get().sync()
         return wf
 
     def _node_await_review(self, wf: dict[str, Any]) -> dict[str, Any]:
@@ -569,124 +641,113 @@ class LangGraphAgentRunner:
         wf["review_decision"] = decision
         return wf
 
+    def _fresh_review_summary(self, wf, old_case):
+        # Re-read current facts. Old warning text is never rebound to a new
+        # hash. A bounded DDI check can contribute current candidate evidence;
+        # patient-condition validation remains explicitly incomplete.
+        with self.memory._lock:
+            snapshot = self.memory.snapshot()
+            fact_hash = self.memory.medication_set_hash()
+            fact_revision = self.memory.scope_revision('medications') + self.memory.scope_revision('semantic')
+        summary = {"previous_case_id": old_case["id"], "current_facts": snapshot,
+            "fact_hash": fact_hash, "fact_revision": fact_revision,
+            "verification_status": "incomplete", "warnings": [],
+            "conflicts": snapshot.get("open_conflicts", []),
+            "incomplete_checks": ["patient_condition_check"],
+            "memory_refs": [x["ref"] for k in ("medications", "semantic") for x in snapshot.get(k, [])]}
+        budget = CURRENT.get()
+        if budget.exhausted():
+            summary["incomplete_checks"].append("ddi_check")
+            summary["reason"] = "budget_exhausted:" + budget.exhausted()
+        else:
+            result = self.agent._act(self._agent_state(wf), ToolAction(tool="ddi_check",
+                purpose="review_current_facts", rationale="facts_changed", arguments={"medications": [
+                    m["display_name"] for m in snapshot.get("medications", [])]}))
+            budget.sync()
+            if result.ok and not budget.exhausted():
+                summary["current_ddi_candidates"] = result.result
+            else:
+                summary["incomplete_checks"].append("ddi_check")
+                summary["reason"] = "check_failed_or_budget_exhausted"
+        return summary
+
     def _node_apply_review(self, wf: dict[str, Any]) -> dict[str, Any]:
-        """Re-validate and apply the human decision through BOUNDED writes
-        only.  Freshness check first: facts moved since the case opened →
-        review_stale → the decision is refused, the old case cancelled and a
-        fresh round is opened (旧审批不授权新状态).  No graph goto, no state
-        patch, no reviewer-authored delivered text."""
         decision = dict(wf.get("review_decision") or {})
         decision_id = decision.get("decision_id")
-        action = decision.get("action")
-        payload = decision.get("payload") or {}
         record = self.memory.review_decision(decision_id) if decision_id else None
         case_id = (wf.get("review_case") or {}).get("id")
-        case = self.memory.review_case(case_id) if case_id is not None else None
-
-        def _park_again(new_case: dict[str, Any] | None = None) -> dict[str, Any]:
-            wf["route"] = "await_review"
-            wf["review_decision"] = None
-            if new_case is not None:
-                waiting = dict(wf.get("result") or {})
-                waiting["review_case"] = {
-                    "id": new_case["id"], "logic_key": new_case["logic_key"],
-                    "status": new_case["status"], "revision": new_case["revision"],
-                    "round": new_case["round"], "due_at": new_case["due_at"],
-                }
-                waiting["run_status"] = "waiting_review"
-                wf["review_case"] = waiting["review_case"]
-                wf["result"] = waiting
-            return wf
-
-        if record is None or case is None:
-            # Defensive: decision vanished or case closed while parked.
-            wf["degraded_reason"] = "review_decision_unapplicable"
-            wf["route"] = "publish"
-            return wf
-        if record.get("outcome") == "applied":
-            # Replayed resume — idempotent no-op, finish the run.
-            wf["route"] = "publish"
-            return wf
-
-        # Freshness: medication set / scope revisions must match the snapshot
-        # taken when the case opened.
-        current_hash = self.memory.medication_set_hash()
+        case = self.memory.review_case(case_id) if case_id else None
+        if record is None or case is None or record['case_id'] != case_id or case['run_id'] != wf['run_id']:
+            raise MemoryPolicyError("review decision/case/run mismatch")
+        # The database record is authoritative; the resume value is only an ID.
+        action, payload, actor = record['action'], record.get('payload') or {}, record['actor_id']
+        receipt = self.memory.operation_receipt('local-demo', 'review-apply:' + decision_id)
         current_rev = self.memory.scope_revision("medications") + self.memory.scope_revision("semantic")
-        if (case.get("fact_medication_set_hash") != current_hash
-                or int(case.get("fact_scope_revision") or 0) != current_rev):
+        stale = (case['fact_medication_set_hash'] != self.memory.medication_set_hash()
+                 or case['fact_scope_revision'] != current_rev)
+        if not receipt and (stale or record['outcome'] == 'review_stale'):
             self.memory.set_review_decision_outcome(decision_id, outcome="review_stale")
-            self.memory.close_review_case(
-                case["id"], status="cancelled",
-                reason="review_stale: patient facts changed while awaiting review",
-                actor="runner")
-            round_number = int(case.get("round") or 1) + 1
-            base_key = f"event:{wf.get('event_id') or wf['turn_id']}"
-            fresh_case = self.memory.open_review_case(
-                logic_key=f"{base_key}:{'+'.join(wf.get('review_reason_codes') or ['severe_warning'])}:r{round_number}",
-                event_id=wf.get("event_id"), run_id=wf["run_id"], thread_id=wf["run_id"],
-                reason_codes=[*(wf.get("review_reason_codes") or []), "review_stale"],
-                summary=dict(case.get("summary") or {}),
-                due_at=(_as_utc_now_utc() + timedelta(seconds=self.review_sla_seconds)).isoformat(timespec="seconds"),
-                round_number=round_number,
-            )
-            self._audit("review_decision_stale", "review_case", case["id"],
-                        {"decision_id": decision_id, "new_case": fresh_case["id"]}, "runner")
-            return _park_again(fresh_case)
-
-        # Bounded effects.
-        actor = decision.get("actor_id") or "reviewer"
-        if action == "resolve_conflict":
-            conflict_ref = payload.get("conflict_ref") or ""
-            match = re.fullmatch(r"(?:memory:)?conflict:(\d+)(?:@v\d+)?", str(conflict_ref))
-            if not match:
-                raise MemoryPolicyError(f"invalid conflict ref in review decision: {conflict_ref!r}")
-            self.memory.resolve_conflict(int(match.group(1)), action="resolved",
-                                         basis=f"专业审核：{payload.get('basis', '')}",
-                                         actor=actor)
-            note = REVIEW_RESOLVED_NOTICE
-        elif action == "confirm_reported_fact":
-            note = REVIEW_CONFIRMED_NOTICE
-        elif action == "reject_candidate":
-            note = REVIEW_REJECTED_NOTICE
-        elif action == "close_with_safe_guidance":
-            note = REVIEW_GUIDANCE_NOTICE
-        elif action == "request_more_info":
-            note = REVIEW_WAITING_USER_NOTICE
-        else:  # pragma: no cover - schema CHECK guards this
-            raise MemoryPolicyError(f"unsupported review action: {action}")
-
-        if action != "request_more_info":
-            # Document the decision as an audited episodic record (bounded,
-            # existing write path); it never injects clinical claims.
-            self.memory.record_event(
-                EpisodicFact(
-                    event_type="clinical_review",
-                    subject_key=f"review_case:{case['id']}",
-                    payload={"decision_id": decision_id, "action": action,
-                             "actor_id": actor, "basis": payload.get("basis", ""),
-                             "reason_codes": wf.get("review_reason_codes") or []},
-                    salience=0.95,
-                ),
-                session_id=wf["session_id"], turn_id=wf["turn_id"], source="reviewer",
-            )
-        self.memory.set_review_decision_outcome(decision_id, outcome="applied")
-        wf["review_outcome"] = {"action": action, "applied": True,
-                                "decision_id": decision_id}
-        result = dict(wf.get("result") or {})
-        result["text"] = (result.get("text", "") or WAITING_REVIEW_NOTICE) + note
-        result["run_status"] = "applied_review"
-        wf["result"] = result
-        if action == "request_more_info":
-            self.memory.close_review_case(case["id"], status="waiting_user",
-                                          reason=payload.get("question", ""), actor=actor)
-            wf["degraded_reason"] = "review_waiting_user"
-            wf["route"] = "publish"
-        else:
-            wf["route"] = "publish"
+            self.memory.close_review_case(case_id, status="cancelled",
+                reason="review_stale: patient facts changed", actor="runner")
+            round_number = case['round'] + 1
+            key = f"event:{wf.get('event_id') or wf['turn_id']}:{'+'.join(wf.get('review_reason_codes') or ['severe_warning'])}:r{round_number}"
+            fresh_case = self.memory.review_case_by_logic_key(key)
+            if fresh_case is None:
+                # I/O is outside the case transaction; open verifies this
+                # snapshot again under the write lock before binding its hash.
+                summary = self._fresh_review_summary(wf, case)
+                fresh_case = self.memory.open_review_case(logic_key=key,
+                    event_id=wf.get('event_id'), run_id=wf['run_id'], thread_id=wf['run_id'],
+                    reason_codes=[*(wf.get('review_reason_codes') or []), 'review_stale'],
+                    summary=summary, round_number=round_number,
+                    due_at=(_as_utc_now_utc() + timedelta(seconds=self.review_sla_seconds)).isoformat(timespec='seconds'))
+            self.memory.audit_review_stale(decision_id, case_id, fresh_case['id'])
+            wf['review_case'] = {k: fresh_case[k] for k in ('id','logic_key','status','revision','round','due_at')}
+            wf['review_logic_key'] = key
+            wf['review_decision'] = None
+            wf['route'] = 'await_review'
+            wf['result'] = {'text': '患者事实已变化，旧审核依据已过期。当前事实已重新读取；患者个体风险检查尚未完成，不能据此判断无风险。建议咨询医生/药师。',
+                'warnings': [], 'conflicts': [], 'audit_trail': {'memory_refs': fresh_case['summary'].get('memory_refs', [])},
+                'review_case': wf['review_case'], 'run_status': 'waiting_review', 'safety_status': 'enforced'}
+            self._validate_result(wf)
+            wf['budget'] = CURRENT.get().sync()
+            return wf
+        outcome = self.memory.apply_review_effect(decision_id, session_id=wf['session_id'], turn_id=wf['turn_id'])
+        notes = {'resolve_conflict': REVIEW_RESOLVED_NOTICE, 'confirm_reported_fact': REVIEW_CONFIRMED_NOTICE,
+            'reject_candidate': REVIEW_REJECTED_NOTICE, 'close_with_safe_guidance': REVIEW_GUIDANCE_NOTICE,
+            'request_more_info': REVIEW_WAITING_USER_NOTICE}
+        wf['review_outcome'] = outcome
+        result = dict(wf.get('result') or {})
+        # Replayed apply starts from its prior checkpoint body and reconstructs
+        # the same suffix after reading the atomic effect receipt.
+        result['text'] = result.get('text', '') + notes[action]
+        result['run_status'] = 'applied_review'
+        result['review_case'] = self.memory.review_case(case_id)
+        wf['result'] = result
+        wf['route'] = 'publish'
+        if action == 'request_more_info':
+            wf['degraded_reason'] = 'review_waiting_user'
+        self._validate_result(wf)
+        wf['budget'] = CURRENT.get().sync()
         return wf
+
+    def _validate_result(self, wf):
+        result = wf.get('result') or {}
+        errors = self.agent._check_response(result.get('text', ''), warnings=result.get('warnings', []),
+            conflicts=result.get('conflicts', []), memory_refs=(result.get('audit_trail') or {}).get('memory_refs', []),
+            escalation_required=True, refusal_required=False)
+        if errors:
+            raise RuntimeError('safety boundary: review response blocked: ' + ','.join(errors))
 
     def _node_publish(self, wf: dict[str, Any]) -> dict[str, Any]:
         status = "degraded" if wf.get("degraded_reason") else "succeeded"
+        # Harness P2: a cancellation request outranks the normal terminal
+        # mapping — already-committed domain effects stay, the run is recorded
+        # as cancelled.  CAS on the request row keeps publish/cancel races
+        # converging to exactly one final status.
+        if is_cancel_requested(self.memory, wf["run_id"]):
+            status = "cancelled"
+            mark_cancelled(self.memory, wf["run_id"])
         self.memory.workflow_run_update(
             wf["run_id"], status=status, result=wf.get("result"),
             budget=wf.get("budget"))
@@ -702,24 +763,30 @@ class LangGraphAgentRunner:
         graph = self._ensure_graph()
         config = {"configurable": {"thread_id": run_id}}
         existing = self.memory.workflow_run_get(run_id)
+        if existing is not None and existing.get("graph_version") != "accepted":
+            self._check_restore_manifest(run_id)
         if existing is None:
             self.memory.workflow_run_start(
                 run_id=run_id, event_id=event_id, idempotency_key=client_event_id,
                 thread_id=run_id, graph_version=self.graph_version,
                 state_schema_version=STATE_SCHEMA_VERSION,
                 model_id=getattr(getattr(self.agent, "planner", None), "model", None))
+            self._save_manifest(run_id)
+        elif existing.get("graph_version") == "accepted":
+            # Harness P2: stamp the real runner version onto the row the API
+            # acceptance pre-created ('accepted'/'queued') — an in-flight run
+            # is still never silently re-routed.  Idempotent; promotion to
+            # 'running' does not touch a cancelled run.
+            self.memory.workflow_run_start(
+                run_id=run_id, event_id=event_id, idempotency_key=client_event_id,
+                thread_id=run_id, graph_version=self.graph_version,
+                state_schema_version=STATE_SCHEMA_VERSION,
+                model_id=getattr(getattr(self.agent, "planner", None), "model", None))
+            self._save_manifest(run_id)
         if self._has_checkpoint(config) and existing is not None:
-            # Crash recovery: continue from the last completed step.  If the
-            # framework cannot resume (e.g. the run already terminated), fall
-            # back to a full re-run — P0 operation receipts make that safe.
             logger.info("graph run resumed run_id=%s", run_id)
-            try:
-                final = graph.invoke(None, config)
-            except Exception:
-                logger.warning("resume failed for run_id=%s; re-running from "
-                               "start (receipt-protected)", run_id, exc_info=True)
-                final = self._invoke_fresh(graph, config, event, session_id, turn_id,
-                                           client_event_id, event_id, run_id, existing)
+            final = self._invoke_budgeted(graph, None, config, run_id,
+                                          saved=graph.get_state(config).values.get("budget"))
         else:
             final = self._invoke_fresh(graph, config, event, session_id, turn_id,
                                        client_event_id, event_id, run_id, existing)
@@ -735,15 +802,17 @@ class LangGraphAgentRunner:
         return AgentResponse(
             text=result.get("text", ""), warnings=result.get("warnings", []),
             conflicts=result.get("conflicts", []), audit_trail=audit_trail,
-            tool_trace=final.get("trace", []), safety_status=result.get("safety_status", "enforced"))
+            operation_outcomes=result.get("operation_outcomes", []),
+            tool_trace=final.get("trace", []), safety_status=result.get("safety_status", "enforced"),
+            answer_bundle=result.get("answer_bundle"))
 
     def _invoke_fresh(self, graph, config, event, session_id, turn_id,
                       client_event_id, event_id, run_id, existing) -> dict[str, Any]:
         initial = build_workflow_state(
             event=event, session_id=session_id, turn_id=turn_id,
             client_event_id=client_event_id, event_id=event_id, run_id=run_id,
-            budget=(existing or {}).get("budget"))
-        return graph.invoke(initial, config)
+            budget=initial_budget(self.agent.max_cycles, (existing or {}).get("budget")))
+        return self._invoke_budgeted(graph, initial, config, run_id, saved=initial["budget"])
 
     def resume(self, run_id: str, resume_value: Any) -> dict[str, Any]:
         """Apply an authorized human decision via ``Command(resume=...)`` on
@@ -751,17 +820,41 @@ class LangGraphAgentRunner:
         terminal state (publish ran) or a re-parked interrupt state
         (``__interrupt__`` present — e.g. a review_stale round was opened)."""
         from langgraph.types import Command
+        self._check_restore_manifest(run_id)
         graph = self._ensure_graph()
-        return graph.invoke(Command(resume=resume_value),
-                            {"configurable": {"thread_id": run_id}})
+        config = {"configurable": {"thread_id": run_id}}
+        checkpoint = graph.get_state(config)
+        if not checkpoint.values:
+            raise RuntimeError("missing review checkpoint")
+        current_case = (checkpoint.values.get("review_case") or {}).get("id")
+        # A retry after a committed checkpoint must not feed the old decision
+        # into the next round's interrupt. Continue errored apply/publish nodes.
+        if checkpoint.next == ("await_review",) and current_case == resume_value.get("case_id"):
+            value = Command(resume=resume_value)
+        else:
+            value = None
+        return self._invoke_budgeted(graph, value, config, run_id,
+                                     saved=checkpoint.values.get("budget"))
+
+    def _check_restore_manifest(self, run_id: str) -> None:
+        from .harness.manifest import enforce_restore
+        enforce_restore(memory=self.memory, agent=self.agent, run_id=run_id,
+                        graph_version=self.graph_version,
+                        state_schema_version=STATE_SCHEMA_VERSION,
+                        review_enabled=self.review_enabled)
+
+    def _invoke_budgeted(self, graph, value, config, run_id, saved=None):
+        self.memory.activate_workflow_run(run_id)
+        with budget_scope(self.memory, run_id, self.agent.max_cycles, saved) as budget:
+            final = graph.invoke(value, config)
+            final["budget"] = budget.sync()
+            if "__interrupt__" in final:
+                self.memory.workflow_run_update(run_id, status="waiting_review",
+                    budget=final["budget"], result=final.get("result"))
+            return final
 
     def _has_checkpoint(self, config: dict[str, Any]) -> bool:
-        try:
-            for _ in self._ensure_checkpointer().list(config, limit=1):
-                return True
-        except Exception:
-            logger.debug("checkpoint listing failed", exc_info=True)
-        return False
+        return next(iter(self._ensure_checkpointer().list(config, limit=1)), None) is not None
 
 
 class RunnerRouter:
@@ -783,6 +876,9 @@ class RunnerRouter:
     def close(self) -> None:
         if self.graph is not None:
             self.graph.close()
+        recorder = getattr(self.agent, "_span_recorder", None)
+        if recorder is not None and recorder.exporter is not None:
+            recorder.exporter.close()
 
     def run(self, **kwargs: Any) -> Any:
         run_id = kwargs.get("run_id") or kwargs.get("turn_id")

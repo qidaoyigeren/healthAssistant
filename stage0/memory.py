@@ -93,6 +93,14 @@ class IdempotencyKeyReused(MemoryPolicyError):
     """Raised when a client event id is replayed with a different payload."""
 
 
+class ReviewFactsMovedError(RuntimeError):
+    """Snapshot changed between a bounded check and its case/effect commit."""
+
+
+class EffectUnknownError(RuntimeError):
+    """Historical decision claims an effect without a verifiable receipt."""
+
+
 class LeaseRejected(MemoryPolicyError):
     """Raised when a task update fails lease fencing (stale/expired worker).
 
@@ -449,6 +457,7 @@ CREATE TABLE IF NOT EXISTS agent_checkpoints (
 -- them, and never duplicates mutation content.
 CREATE TABLE IF NOT EXISTS turn_traces (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_id TEXT UNIQUE,
     session_id TEXT NOT NULL,
     turn_id TEXT NOT NULL,
     cycle INTEGER,
@@ -568,6 +577,15 @@ CREATE TABLE IF NOT EXISTS resume_tasks (
     created_at TEXT NOT NULL, consumed_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS llm_attempts (
+    attempt_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, kind TEXT NOT NULL,
+    operation_id TEXT, cycle INTEGER,
+    status TEXT NOT NULL, reserved_tokens INTEGER NOT NULL,
+    reserved_seconds REAL NOT NULL, usage_tokens INTEGER, estimated_tokens INTEGER,
+    created_at TEXT NOT NULL, settled_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_llm_attempt_run ON llm_attempts(run_id, status);
+
 -- Stage 10: transactional outbox for the async /events flow and other LLM
 -- side effects.  The intent row is written in the same transaction as the
 -- idempotency-key claim; a single in-process worker consumes tasks with the
@@ -628,9 +646,67 @@ def _ensure_r0_schema(connection: sqlite3.Connection) -> bool:
     # max_attempts has a NOT NULL default; SQLite allows ADD COLUMN with a
     # non-NULL default (existing rows read back the default).
     _add_column("outbox_tasks", "max_attempts", "INTEGER NOT NULL DEFAULT 3")
+    # Keep the old status CHECK compatible; execution_state carries scheduling
+    # and failure classification separately from pending/consumed delivery.
+    _add_column("resume_tasks", "execution_state", "TEXT NOT NULL DEFAULT 'ready'")
+    _add_column("resume_tasks", "attempts", "INTEGER NOT NULL DEFAULT 0")
+    _add_column("resume_tasks", "last_error_class", "TEXT")
+    _add_column("resume_tasks", "error", "TEXT")
+    _add_column("resume_tasks", "next_attempt_at", "TEXT")
+    _add_column("resume_tasks", "lease_token", "TEXT")
+    _add_column("resume_tasks", "lease_expires_at", "TEXT")
+    _add_column("workflow_runs", "waiting_since", "TEXT")
+    _add_column("workflow_runs", "human_wait_seconds", "REAL NOT NULL DEFAULT 0")
+    _add_column("workflow_runs", "queue_wait_seconds", "REAL")
+    _add_column("llm_attempts", "operation_id", "TEXT")
+    _add_column("llm_attempts", "cycle", "INTEGER")
     # operation_receipts lives in the main SCHEMA (IF NOT EXISTS), so legacy
     # databases pick it up on the next open without a separate script here.
     return altered
+
+
+def _ensure_p2harness_schema(connection: sqlite3.Connection) -> bool:
+    """Harness P2 migration: ``workflow_runs.status`` learns the ``queued``
+    value (a run row now exists from API acceptance, before the worker claims
+    the task, so progress cursors and cancellation address a real run).
+    SQLite cannot ALTER a CHECK constraint, so the table is rebuilt in place;
+    every column and row is carried over verbatim (additive semantics)."""
+    row = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='workflow_runs'").fetchone()
+    if row is None or "'queued'" in (row["sql"] or ""):
+        return False
+    connection.executescript("""
+        ALTER TABLE workflow_runs RENAME TO workflow_runs_old_p2;
+        CREATE TABLE workflow_runs (
+            run_id TEXT PRIMARY KEY,
+            event_id TEXT,
+            idempotency_key TEXT,
+            thread_id TEXT,
+            graph_version TEXT NOT NULL,
+            state_schema_version TEXT,
+            model_id TEXT,
+            status TEXT NOT NULL CHECK(status IN ('queued','running','waiting_review','succeeded','degraded','failed','cancelled')),
+            budget_json TEXT,
+            result_json TEXT,
+            error TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            waiting_since TEXT,
+            human_wait_seconds REAL NOT NULL DEFAULT 0,
+            queue_wait_seconds REAL
+        );
+        INSERT INTO workflow_runs(run_id,event_id,idempotency_key,thread_id,graph_version,
+                                  state_schema_version,model_id,status,budget_json,result_json,
+                                  error,created_at,updated_at,waiting_since,human_wait_seconds,
+                                  queue_wait_seconds)
+            SELECT run_id,event_id,idempotency_key,thread_id,graph_version,
+                   state_schema_version,model_id,status,budget_json,result_json,
+                   error,created_at,updated_at,waiting_since,human_wait_seconds,
+                   queue_wait_seconds FROM workflow_runs_old_p2;
+        DROP TABLE workflow_runs_old_p2;
+        CREATE INDEX IF NOT EXISTS idx_workflow_runs_status ON workflow_runs(status, updated_at);
+    """)
+    return True
 
 
 # Patient-condition warnings are recorded with kind='warning' but their pair
@@ -686,6 +762,12 @@ EPISODIC_HALF_LIFE_DAYS = {
 }
 
 
+try:
+    from .turn_budget import completion_call, check_lease
+except ImportError:
+    from turn_budget import completion_call, check_lease
+
+
 class StructuredFactExtractor:
     """LLM structured extraction with a bounded deterministic fallback."""
 
@@ -722,7 +804,7 @@ class StructuredFactExtractor:
 
         config = extract_ddi.resolve_llm_config(model=self.model)
         client = extract_ddi.create_llm_client(config)
-        response = client.chat.completions.create(
+        response = completion_call("fact_extractor", client,
             model=config["model"],
             messages=[
                 {"role": "system", "content": self.SYSTEM_PROMPT},
@@ -924,6 +1006,7 @@ class MemoryStore:
         migrated = _ensure_p1_schema(self.connection) or migrated
         migrated = _ensure_p2_schema(self.connection) or migrated
         migrated = _ensure_r0_schema(self.connection) or migrated
+        migrated = _ensure_p2harness_schema(self.connection) or migrated
         if migrated:
             self.connection.execute(
                 "INSERT OR REPLACE INTO schema_meta(key,value) VALUES('schema_version',?)",
@@ -967,6 +1050,12 @@ class MemoryStore:
         source: str,
         actor: str = "memory_manager",
     ) -> None:
+        # Set only while the single-writer lock owns an attributed operation.
+        # Attribution commits alongside each actual mutation, surviving the
+        # domain-commit / receipt-publication crash window.
+        run_id = getattr(self, "_audit_run_id", None)
+        if run_id:
+            details = {**details, "run_id": run_id}
         self.connection.execute(
             "INSERT INTO audit_log(action,actor,target_type,target_id,details_json,source,created_at) VALUES(?,?,?,?,?,?,?)",
             (action, actor, target_type, target_id, _json(details), source, utc_now()),
@@ -1541,79 +1630,102 @@ class MemoryStore:
         schedule: str | None = None,
         source_uri: str | None = None,
     ) -> dict[str, Any]:
+        with self._lock, self.connection:
+            return self._apply_medication_change_tx(
+                action=action, name=name, ingredients=ingredients, session_id=session_id,
+                turn_id=turn_id, source=source, occurred_at=occurred_at, dose=dose,
+                route=route, schedule=schedule, source_uri=source_uri,
+            )
+
+    def _apply_medication_change_tx(
+        self,
+        *,
+        action: str,
+        name: str,
+        ingredients: Sequence[dict[str, Any]] | None,
+        session_id: str,
+        turn_id: str,
+        source: str,
+        occurred_at: str | None = None,
+        dose: str | None = None,
+        route: str | None = None,
+        schedule: str | None = None,
+        source_uri: str | None = None,
+    ) -> dict[str, Any]:
+        """Domain projection within a caller-owned transaction and writer lock."""
         action = action.lower().strip()
         if action not in {"add", "remove", "dose_change"}:
             raise ValueError("medication action must be add, remove, or dose_change")
         med_key = re.sub(r"\s+", "", name).lower()
         when = _iso(occurred_at)
         now = utc_now()
-        with self._lock, self.connection:
-            current = self.connection.execute(
-                "SELECT * FROM medications WHERE medication_key=? AND status='active' ORDER BY version DESC LIMIT 1",
-                (med_key,),
-            ).fetchone()
-            if action == "add" and current:
-                same = (
-                    current["dose"] == dose and current["route"] == route and current["schedule"] == schedule
-                    and current["ingredients_json"] == _json(list(ingredients or []))
-                )
-                if same:
-                    medication = self._medication_row(current)
-                    self._audit("deduplicate", "medication", medication["id"], {"ref": medication["ref"]}, source)
-                    return {"outcome": "deduplicated", "medication": medication, "event": None}
-                action = "dose_change"
-            if action in {"remove", "dose_change"} and current is None:
-                event = self._record_event_tx(
-                    EpisodicFact(
-                        event_type="medication_change_unresolved",
-                        subject_key=med_key,
-                        payload={"action": action, "name": name, "reason": "no active medication matched"},
-                        occurred_at=when,
-                        salience=0.8,
-                    ),
-                    session_id=session_id, turn_id=turn_id, source=source,
-                )
-                return {"outcome": "unresolved", "medication": None, "event": event}
-
-            predecessor_id = current["id"] if current else None
-            if current:
-                self.connection.execute(
-                    "UPDATE medications SET status=?, end_at=? WHERE id=?",
-                    ("stopped" if action == "remove" else "superseded", when, current["id"]),
-                )
-            medication = None
-            if action != "remove":
-                version = self.connection.execute(
-                    "SELECT COALESCE(MAX(version),0)+1 FROM medications WHERE medication_key=?",
-                    (med_key,),
-                ).fetchone()[0]
-                cursor = self.connection.execute(
-                    """INSERT INTO medications(medication_key,display_name,ingredients_json,dose,route,schedule,status,start_at,end_at,source,source_uri,version,predecessor_id,created_at)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (med_key, name, _json(list(ingredients or [])), dose, route, schedule, "active", when, None, source, source_uri, version, predecessor_id, now),
-                )
-                medication = self._medication_row(self.connection.execute("SELECT * FROM medications WHERE id=?", (cursor.lastrowid,)).fetchone())
-                self._audit(action, "medication", medication["id"], {"ref": medication["ref"], "name": name}, source)
-            else:
+        check_lease()
+        current = self.connection.execute(
+            "SELECT * FROM medications WHERE medication_key=? AND status='active' ORDER BY version DESC LIMIT 1",
+            (med_key,),
+        ).fetchone()
+        if action == "add" and current:
+            same = (
+                current["dose"] == dose and current["route"] == route and current["schedule"] == schedule
+                and current["ingredients_json"] == _json(list(ingredients or []))
+            )
+            if same:
                 medication = self._medication_row(current)
-                self._audit("remove", "medication", medication["id"], {"ref": medication["ref"], "name": name}, source)
-
-            self._invalidate_medication_dependents_tx(changed_name=name)
-
-            event_type = {"add": "medication_add", "remove": "medication_remove", "dose_change": "medication_dose_change"}[action]
-            payload = {
-                "action": action,
-                "name": name,
-                "dose": dose,
-                "route": route,
-                "schedule": schedule,
-                "medication_ref": medication["ref"],
-            }
+                self._audit("deduplicate", "medication", medication["id"], {"ref": medication["ref"]}, source)
+                return {"outcome": "deduplicated", "medication": medication, "event": None}
+            action = "dose_change"
+        if action in {"remove", "dose_change"} and current is None:
             event = self._record_event_tx(
-                EpisodicFact(event_type=event_type, subject_key=med_key, payload=payload, occurred_at=when, salience=0.9),
+                EpisodicFact(
+                    event_type="medication_change_unresolved",
+                    subject_key=med_key,
+                    payload={"action": action, "name": name, "reason": "no active medication matched"},
+                    occurred_at=when,
+                    salience=0.8,
+                ),
                 session_id=session_id, turn_id=turn_id, source=source,
             )
-            return {"outcome": action, "medication": medication, "event": event}
+            return {"outcome": "unresolved", "medication": None, "event": event}
+
+        predecessor_id = current["id"] if current else None
+        if current:
+            self.connection.execute(
+                "UPDATE medications SET status=?, end_at=? WHERE id=?",
+                ("stopped" if action == "remove" else "superseded", when, current["id"]),
+            )
+        medication = None
+        if action != "remove":
+            version = self.connection.execute(
+                "SELECT COALESCE(MAX(version),0)+1 FROM medications WHERE medication_key=?",
+                (med_key,),
+            ).fetchone()[0]
+            cursor = self.connection.execute(
+                """INSERT INTO medications(medication_key,display_name,ingredients_json,dose,route,schedule,status,start_at,end_at,source,source_uri,version,predecessor_id,created_at)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (med_key, name, _json(list(ingredients or [])), dose, route, schedule, "active", when, None, source, source_uri, version, predecessor_id, now),
+            )
+            medication = self._medication_row(self.connection.execute("SELECT * FROM medications WHERE id=?", (cursor.lastrowid,)).fetchone())
+            self._audit(action, "medication", medication["id"], {"ref": medication["ref"], "name": name}, source)
+        else:
+            medication = self._medication_row(current)
+            self._audit("remove", "medication", medication["id"], {"ref": medication["ref"], "name": name}, source)
+
+        self._invalidate_medication_dependents_tx(changed_name=name)
+
+        event_type = {"add": "medication_add", "remove": "medication_remove", "dose_change": "medication_dose_change"}[action]
+        payload = {
+            "action": action,
+            "name": name,
+            "dose": dose,
+            "route": route,
+            "schedule": schedule,
+            "medication_ref": medication["ref"],
+        }
+        event = self._record_event_tx(
+            EpisodicFact(event_type=event_type, subject_key=med_key, payload=payload, occurred_at=when, salience=0.9),
+            session_id=session_id, turn_id=turn_id, source=source,
+        )
+        return {"outcome": action, "medication": medication, "event": event}
 
     def create_conflict(
         self,
@@ -1708,6 +1820,7 @@ class MemoryStore:
 
         # ---- T0: persist the raw event (own small transaction) ------------
         with self._lock, self.connection:
+            check_lease()
             existing = self.connection.execute(
                 "SELECT * FROM interactions WHERE event_key=?", (event_key,)
             ).fetchone()
@@ -1803,6 +1916,7 @@ class MemoryStore:
         # ---- T1: single atomic commit of the whole event projection -------
         try:
             with self._lock, self.connection:
+                check_lease()
                 seen_semantic: set[tuple[str, str, str]] = set()
                 for fact, _origin in semantic_candidates:
                     key = (fact.namespace, fact.key, _json(fact.value))
@@ -1853,6 +1967,7 @@ class MemoryStore:
                 self._promotion_scan()
             except Exception as exc:  # promotion must never fail a consolidation
                 with self._lock, self.connection:
+                    check_lease()
                     self._audit("promotion_scan_error", "semantic", None,
                                 {"event_key": event_key, "error": f"{type(exc).__name__}: {exc}"},
                                 "memory_promotion")
@@ -1861,6 +1976,7 @@ class MemoryStore:
             # Separate small transaction: T1 rolled back, mark the event failed
             # so a restart can find and retry it.  Never report success here.
             with self._lock, self.connection:
+                check_lease()
                 self.connection.execute(
                     "UPDATE interactions SET process_status='failed' WHERE event_key=? AND process_status<>'committed'",
                     (event_key,),
@@ -2220,69 +2336,73 @@ class MemoryStore:
         dependent conclusions stale so previous conclusions stop presenting as
         current while a recheck is pending.
         """
+        with self._lock, self.connection:
+            return self._resolve_conflict_tx(conflict, action=action, basis=basis,
+                                             actor=actor, chosen_ref=chosen_ref)
+
+    def _resolve_conflict_tx(self, conflict, *, action, basis, actor="caregiver", chosen_ref=None):
         if action not in {"resolved", "dismissed", "reopened", "undo"}:
             raise ValueError("conflict action must be resolved, dismissed, reopened, or undo")
-        with self._lock, self.connection:
-            if isinstance(conflict, int):
-                row = self.connection.execute("SELECT * FROM conflicts WHERE id=?", (conflict,)).fetchone()
-            else:
-                resolved = self.resolve_ref(conflict)
-                row = self.connection.execute(
-                    "SELECT * FROM conflicts WHERE id=?", (resolved["item_id"],)
-                ).fetchone()
-            if row is None:
-                raise ValueError(f"unknown conflict: {conflict}")
-            now = utc_now()
-            previous_status = row["status"]
-            if action == "undo":
-                last = self.connection.execute(
-                    "SELECT * FROM conflict_actions WHERE conflict_id=? AND undone_by IS NULL ORDER BY id DESC LIMIT 1",
-                    (row["id"],),
-                ).fetchone()
-                if last is None:
-                    raise ValueError("nothing to undo for this conflict")
-                restore_status = last["previous_status"] or "open"
-                self.connection.execute(
-                    "UPDATE conflicts SET status=?, resolution_json=?, resolved_at=? WHERE id=?",
-                    (restore_status,
-                     None if restore_status == "open" else row["resolution_json"],
-                     None if restore_status == "open" else row["resolved_at"],
-                     row["id"]),
-                )
-                self.connection.execute(
-                    """INSERT INTO conflict_actions(conflict_id,action,basis,actor,previous_status,created_at,undone_by)
-                       VALUES(?,?,?,?,?,?,?)""",
-                    (row["id"], "undo", f"undo of action #{last['id']}: {last['basis']}", actor, previous_status, now, last["id"]),
-                )
-                action_taken = "undo"
-            else:
-                new_status = "open" if action == "reopened" else action
-                resolution = None
-                resolved_at = None
-                if new_status != "open":
-                    resolution = _json({"action": action, "basis": basis, "actor": actor, "chosen_ref": chosen_ref, "at": now})
-                    resolved_at = now
-                self.connection.execute(
-                    "UPDATE conflicts SET status=?, resolution_json=?, resolved_at=? WHERE id=?",
-                    (new_status, resolution, resolved_at, row["id"]),
-                )
-                self.connection.execute(
-                    """INSERT INTO conflict_actions(conflict_id,action,basis,actor,chosen_ref,previous_status,created_at)
-                       VALUES(?,?,?,?,?,?,?)""",
-                    (row["id"], action, basis, actor, chosen_ref, previous_status, now),
-                )
-                action_taken = action
-                if action == "reopened" and "dependency" not in self.ablations:
-                    stale = self._conclusions_depending_on_refs_tx([row["left_ref"], row["right_ref"]])
-                    if stale:
-                        self._invalidate_conclusions_tx(stale, f"conflict #{row['id']} reopened")
-            updated = self.connection.execute("SELECT * FROM conflicts WHERE id=?", (row["id"],)).fetchone()
-            item = dict(updated)
-            item["resolution"] = _from_json(item.pop("resolution_json"))
-            item["ref"] = memory_ref("conflict", item["id"], 1)
-            self._audit(f"conflict_{action_taken}", "conflict", row["id"],
-                        {"action": action_taken, "basis": basis, "actor": actor, "previous_status": previous_status}, actor)
-            return item
+        if isinstance(conflict, int):
+            row = self.connection.execute("SELECT * FROM conflicts WHERE id=?", (conflict,)).fetchone()
+        else:
+            resolved = self.resolve_ref(conflict)
+            row = self.connection.execute(
+                "SELECT * FROM conflicts WHERE id=?", (resolved["item_id"],)
+            ).fetchone()
+        if row is None:
+            raise ValueError(f"unknown conflict: {conflict}")
+        now = utc_now()
+        previous_status = row["status"]
+        if action == "undo":
+            last = self.connection.execute(
+                "SELECT * FROM conflict_actions WHERE conflict_id=? AND undone_by IS NULL ORDER BY id DESC LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if last is None:
+                raise ValueError("nothing to undo for this conflict")
+            restore_status = last["previous_status"] or "open"
+            self.connection.execute(
+                "UPDATE conflicts SET status=?, resolution_json=?, resolved_at=? WHERE id=?",
+                (restore_status,
+                 None if restore_status == "open" else row["resolution_json"],
+                 None if restore_status == "open" else row["resolved_at"],
+                 row["id"]),
+            )
+            self.connection.execute(
+                """INSERT INTO conflict_actions(conflict_id,action,basis,actor,previous_status,created_at,undone_by)
+                   VALUES(?,?,?,?,?,?,?)""",
+                (row["id"], "undo", f"undo of action #{last['id']}: {last['basis']}", actor, previous_status, now, last["id"]),
+            )
+            action_taken = "undo"
+        else:
+            new_status = "open" if action == "reopened" else action
+            resolution = None
+            resolved_at = None
+            if new_status != "open":
+                resolution = _json({"action": action, "basis": basis, "actor": actor, "chosen_ref": chosen_ref, "at": now})
+                resolved_at = now
+            self.connection.execute(
+                "UPDATE conflicts SET status=?, resolution_json=?, resolved_at=? WHERE id=?",
+                (new_status, resolution, resolved_at, row["id"]),
+            )
+            self.connection.execute(
+                """INSERT INTO conflict_actions(conflict_id,action,basis,actor,chosen_ref,previous_status,created_at)
+                   VALUES(?,?,?,?,?,?,?)""",
+                (row["id"], action, basis, actor, chosen_ref, previous_status, now),
+            )
+            action_taken = action
+            if action == "reopened" and "dependency" not in self.ablations:
+                stale = self._conclusions_depending_on_refs_tx([row["left_ref"], row["right_ref"]])
+                if stale:
+                    self._invalidate_conclusions_tx(stale, f"conflict #{row['id']} reopened")
+        updated = self.connection.execute("SELECT * FROM conflicts WHERE id=?", (row["id"],)).fetchone()
+        item = dict(updated)
+        item["resolution"] = _from_json(item.pop("resolution_json"))
+        item["ref"] = memory_ref("conflict", item["id"], 1)
+        self._audit(f"conflict_{action_taken}", "conflict", row["id"],
+                    {"action": action_taken, "basis": basis, "actor": actor, "previous_status": previous_status}, actor)
+        return item
 
     def _conclusions_citing_refs_tx(self, refs: Sequence[str]) -> list[int]:
         rows = self.connection.execute(
@@ -2475,12 +2595,29 @@ class MemoryStore:
 
     def record_turn_trace(self, session_id: str, turn_id: str, cycle: int | None,
                           phase: str, payload: Any) -> None:
-        """Persist one trace entry (plan/act/observe/reflect/respond/...)."""
+        """Persist process metadata only; evidence stays in domain/checkpoint
+        storage.  Harness P1-C: a stable ``entry_id`` (hash of the sanitised
+        entry) plus INSERT OR IGNORE makes persistence idempotent — a
+        checkpoint replay or a duplicated ``_flush_traces`` can no longer
+        append the same entry twice."""
+        if isinstance(payload, dict):
+            safe = {k: payload[k] for k in ('phase', 'cycle', 'tool', 'ok', 'source',
+                    'exhausted', 'tokens_estimated', 'elapsed_seconds', 'limits',
+                    'escalation_required', 'refusal_required') if k in payload}
+            if isinstance(payload.get('decision'), dict):
+                safe['decision'] = {'tool': payload['decision'].get('tool')}
+            if isinstance(payload.get('planner'), dict):
+                planner = payload['planner']
+                safe['planner'] = {k: planner[k] for k in ('mode','source','model','fallback_kind','latency_ms') if k in planner}
+                safe['planner']['validation_status'] = (planner.get('validation') or {}).get('status')
+            payload = safe
+        entry_id = hashlib.sha256(_json({"s": session_id, "t": turn_id, "c": cycle,
+                                         "p": phase, "y": payload}).encode("utf-8")).hexdigest()
         with self._lock, self.connection:
             self.connection.execute(
-                "INSERT INTO turn_traces(session_id,turn_id,cycle,phase,payload_json,created_at) "
-                "VALUES(?,?,?,?,?,?)",
-                (session_id, turn_id, cycle, phase, _json(payload), utc_now()),
+                "INSERT OR IGNORE INTO turn_traces(entry_id,session_id,turn_id,cycle,phase,payload_json,created_at) "
+                "VALUES(?,?,?,?,?,?,?)",
+                (entry_id, session_id, turn_id, cycle, phase, _json(payload), utc_now()),
             )
 
     def traces_for_turn(self, session_id: str, turn_id: str) -> list[dict[str, Any]]:
@@ -2501,46 +2638,52 @@ class MemoryStore:
                          task_payload: dict[str, Any],
                          event_id: str | None = None,
                          run_id: str | None = None) -> dict[str, Any]:
-        """Atomically claim the request-level idempotency key and enqueue the
-        ``process_event`` outbox task.
-
-        Both writes share one transaction, so a crash can never leave a
-        claimed key without a task to fulfil it.  ``event_id``/``run_id`` are
-        the server-generated business identities (Reliability P0): the task's
-        ``turn_id`` is the ``run_id`` — never a truncation of the key, so two
-        legal keys sharing a long prefix can no longer collide.  Returns one
-        of: ``new`` | ``replay_committed`` | ``replay_in_flight`` |
-        ``retry_failed`` | ``conflict`` (same key, different payload).
-        """
-        now = utc_now()
+        """Atomically accept a request and enqueue its existing outbox workflow."""
         with self._lock, self.connection:
-            existing = self.connection.execute(
-                "SELECT * FROM idempotency_keys WHERE key=?", (idempotency_key,)
-            ).fetchone()
-            if existing is not None:
-                row = dict(existing)
-                if row["request_hash"] != request_hash:
-                    return {"state": "conflict", "row": row}
-                state = {"committed": "replay_committed", "in_flight": "replay_in_flight",
-                         "failed": "retry_failed"}[row["status"]]
-                return {"state": state, "row": row}
-            self.connection.execute(
-                "INSERT INTO idempotency_keys(key,request_hash,status,created_at,updated_at,event_id,run_id) "
-                "VALUES(?,?, 'in_flight', ?, ?, ?, ?)",
-                (idempotency_key, request_hash, now, now, event_id, run_id))
-            self.connection.execute(
-                """INSERT OR IGNORE INTO outbox_tasks(task_type,payload_json,dedup_key,status,attempts,deadline_at,created_at,updated_at)
-                   VALUES('process_event', ?, ?, 'open', 0, ?, ?, ?)""",
-                (_json(task_payload), f"api-event:{idempotency_key}",
-                 (_as_utc(None) + timedelta(seconds=OUTBOX_TASK_DEADLINE_SECONDS)).isoformat(timespec="seconds"),
-                 now, now))
-            task_row = self.connection.execute(
-                "SELECT * FROM outbox_tasks WHERE dedup_key=?", (f"api-event:{idempotency_key}",)
-            ).fetchone()
-            self._audit("api_event_accepted", "interaction", None,
-                        {"idempotency_key": idempotency_key, "event_id": event_id,
-                         "run_id": run_id}, "api")
-            return {"state": "new", "task": dict(task_row) if task_row is not None else None}
+            return self._accept_api_event_tx(idempotency_key=idempotency_key, request_hash=request_hash,
+                task_payload=task_payload, event_id=event_id, run_id=run_id)
+
+    def _accept_api_event_tx(self, *, idempotency_key: str, request_hash: str,
+                         task_payload: dict[str, Any],
+                         event_id: str | None = None,
+                         run_id: str | None = None) -> dict[str, Any]:
+        now = utc_now()
+        existing = self.connection.execute(
+            "SELECT * FROM idempotency_keys WHERE key=?", (idempotency_key,)
+        ).fetchone()
+        if existing is not None:
+            row = dict(existing)
+            if row["request_hash"] != request_hash:
+                return {"state": "conflict", "row": row}
+            state = {"committed": "replay_committed", "in_flight": "replay_in_flight",
+                     "failed": "retry_failed"}[row["status"]]
+            return {"state": state, "row": row}
+        self.connection.execute(
+            "INSERT INTO idempotency_keys(key,request_hash,status,created_at,updated_at,event_id,run_id) "
+            "VALUES(?,?, 'in_flight', ?, ?, ?, ?)",
+            (idempotency_key, request_hash, now, now, event_id, run_id))
+        # Harness P2: the run row exists from ACCEPTANCE with status
+        # 'queued', so progress cursors and cancellation address a real
+        # run before the worker claims the task.  The runner version is
+        # stamped by workflow_run_start at execution time.
+        self.connection.execute(
+            """INSERT OR IGNORE INTO workflow_runs(run_id,event_id,idempotency_key,thread_id,
+                        graph_version,state_schema_version,status,created_at,updated_at)
+               VALUES(?,?,?,?,?,'2','queued',?,?)""",
+            (run_id, event_id, idempotency_key, run_id, 'accepted', now, now))
+        self.connection.execute(
+            """INSERT OR IGNORE INTO outbox_tasks(task_type,payload_json,dedup_key,status,attempts,deadline_at,created_at,updated_at)
+               VALUES('process_event', ?, ?, 'open', 0, ?, ?, ?)""",
+            (_json(task_payload), f"api-event:{idempotency_key}",
+             (_as_utc(None) + timedelta(seconds=OUTBOX_TASK_DEADLINE_SECONDS)).isoformat(timespec="seconds"),
+             now, now))
+        task_row = self.connection.execute(
+            "SELECT * FROM outbox_tasks WHERE dedup_key=?", (f"api-event:{idempotency_key}",)
+        ).fetchone()
+        self._audit("api_event_accepted", "interaction", None,
+                    {"idempotency_key": idempotency_key, "event_id": event_id,
+                     "run_id": run_id}, "api")
+        return {"state": "new", "task": dict(task_row) if task_row is not None else None}
 
     def complete_idempotency_key(self, key: str, *, response: Any,
                                  status_code: int, failed: bool = False) -> None:
@@ -2809,6 +2952,7 @@ class MemoryStore:
         method (see ``record_warnings_batch``).
         """
         with self._lock:
+            check_lease()
             existing = self.operation_receipt(scope_id, operation_id)
             if existing is not None:
                 if existing["input_hash"] != input_hash:
@@ -2816,9 +2960,17 @@ class MemoryStore:
                         f"operation '{operation_id}' was already executed with different input")
                 if existing["status"] == "succeeded":
                     return existing["result"], True
-            result = executor()
+            previous_run = getattr(self, "_audit_run_id", None)
+            self._audit_run_id = run_id
+            try:
+                result = executor()
+                if run_id and isinstance(result, dict):
+                    result = {**result, "audit_attribution_version": 1}
+            finally:
+                self._audit_run_id = previous_run
             now = utc_now()
             with self.connection:
+                check_lease()
                 self.connection.execute(
                     """INSERT OR REPLACE INTO operation_receipts
                        (scope_id,operation_id,event_id,run_id,operation_type,target_ref,
@@ -2854,6 +3006,7 @@ class MemoryStore:
         if not operation_id:
             raise ValueError("record_warnings_batch requires an operation id")
         with self._lock, self.connection:
+            check_lease()
             existing = self.connection.execute(
                 "SELECT * FROM operation_receipts WHERE scope_id='local-demo' AND operation_id=?",
                 (operation_id,)).fetchone()
@@ -2925,17 +3078,29 @@ class MemoryStore:
         idempotency_key: str | None = None,
         thread_id: str | None = None,
         graph_version: str,
-        state_schema_version: str | None = None,
+        state_schema_version: str | None = '2',
         model_id: str | None = None,
         budget: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Create (or idempotently return) the run row.  The runner version is
-        snapshotted once: an in-flight run is never silently re-routed."""
+        snapshotted once: an in-flight run is never silently re-routed.
+
+        Harness P2: a row pre-created at API acceptance carries the placeholder
+        version ``accepted`` and status ``queued``; the first real runner
+        start stamps the runner version, promotes ``queued → running`` and
+        never touches a cancelled run (cancellation wins the race)."""
         now = utc_now()
         with self._lock, self.connection:
             existing = self.connection.execute(
                 "SELECT * FROM workflow_runs WHERE run_id=?", (run_id,)).fetchone()
             if existing is not None:
+                if existing["graph_version"] == 'accepted' and existing["status"] == 'queued':
+                    self.connection.execute(
+                        "UPDATE workflow_runs SET graph_version=?,state_schema_version=?,"
+                        "status='running',updated_at=? WHERE run_id=? AND status='queued'",
+                        (graph_version, state_schema_version, now, run_id))
+                    existing = self.connection.execute(
+                        "SELECT * FROM workflow_runs WHERE run_id=?", (run_id,)).fetchone()
                 item = dict(existing)
                 item["budget"] = _from_json(item.pop("budget_json"))
                 item["result"] = _from_json(item.pop("result_json"))
@@ -2978,12 +3143,19 @@ class MemoryStore:
                 return
             merged = _from_json(row["budget_json"]) or {}
             if budget:
-                merged.update(budget)
+                try:
+                    from .turn_budget import merge_budget
+                except ImportError:
+                    from turn_budget import merge_budget
+                merged = merge_budget(merged, budget)
             fields: list[str] = ["budget_json=?", "updated_at=?"]
             values: list[Any] = [_json(merged), utc_now()]
             if status is not None:
                 fields.append("status=?")
                 values.append(status)
+                if status == 'waiting_review':
+                    fields.append('waiting_since=COALESCE(waiting_since,?)')
+                    values.append(utc_now())
             if result is not None:
                 fields.append("result_json=?")
                 values.append(_json(result))
@@ -2993,6 +3165,49 @@ class MemoryStore:
             values.append(run_id)
             self.connection.execute(
                 f"UPDATE workflow_runs SET {', '.join(fields)} WHERE run_id=?", values)
+
+    def activate_workflow_run(self, run_id):
+        with self._lock, self.connection:
+            row = self.connection.execute('SELECT waiting_since FROM workflow_runs WHERE run_id=?', (run_id,)).fetchone()
+            if row and row['waiting_since']:
+                elapsed = max(0., (_as_utc(None) - _as_utc(row['waiting_since'])).total_seconds())
+                self.connection.execute('UPDATE workflow_runs SET human_wait_seconds=human_wait_seconds+?,waiting_since=NULL WHERE run_id=?', (elapsed, run_id))
+
+    def record_workflow_queue_wait(self, run_id, created_at, claimed_at):
+        seconds = max(0., (_as_utc(claimed_at) - _as_utc(created_at)).total_seconds())
+        with self._lock, self.connection:
+            self.connection.execute('UPDATE workflow_runs SET queue_wait_seconds=COALESCE(queue_wait_seconds,?) WHERE run_id=?', (seconds, run_id))
+
+    def unsettled_llm_attempts(self, run_id: str) -> list[dict[str, Any]]:
+        return [dict(row) for row in self.connection.execute(
+            "SELECT * FROM llm_attempts WHERE run_id=? AND status IN ('reserved','unknown')",
+            (run_id,))]
+
+    def reserve_llm_attempt(self, attempt_id, run_id, kind, tokens, seconds, budget):
+        with self._lock, self.connection:
+            self.connection.execute(
+                "INSERT INTO llm_attempts(attempt_id,run_id,kind,status,reserved_tokens,"
+                "reserved_seconds,created_at,operation_id,cycle) VALUES(?,?,?,'reserved',?,?,?,?,?)",
+                (attempt_id, run_id, kind, tokens, seconds, utc_now(),
+                 f"{run_id}:{kind}:cycle:{budget['cycles_consumed']}", budget['cycles_consumed']))
+            self.connection.execute('UPDATE workflow_runs SET budget_json=? WHERE run_id=?',
+                                    (_json(budget), run_id))
+
+    def settle_llm_attempt(self, attempt_id, status, actual, estimated, budget):
+        with self._lock, self.connection:
+            row = self.connection.execute('SELECT run_id FROM llm_attempts WHERE attempt_id=?',
+                                          (attempt_id,)).fetchone()
+            self.connection.execute('UPDATE llm_attempts SET status=?,usage_tokens=?,estimated_tokens=?,settled_at=? '
+                                    'WHERE attempt_id=? AND status=\'reserved\'',
+                                    (status, actual, estimated, utc_now(), attempt_id))
+            self.connection.execute('UPDATE workflow_runs SET budget_json=? WHERE run_id=?',
+                                    (_json(budget), row['run_id']))
+
+    def assert_outbox_lease(self, task_id: int, lease_token: str) -> None:
+        row = self.connection.execute("SELECT 1 FROM outbox_tasks WHERE id=? AND status='running' "
+            "AND lease_token=? AND lease_expires_at>?", (task_id, lease_token, utc_now())).fetchone()
+        if row is None:
+            raise LeaseRejected('outbox lease no longer valid')
 
     # ---- Reliability P2: human review closed loop ------------------------
 
@@ -3014,10 +3229,15 @@ class MemoryStore:
         a second ticket is never created for the same trigger."""
         now = utc_now()
         with self._lock, self.connection:
+            check_lease()
             existing = self.connection.execute(
                 "SELECT * FROM review_cases WHERE logic_key=?", (logic_key,)).fetchone()
             if existing is not None:
                 return self._review_case_row(existing)
+            if 'fact_revision' in summary and (
+                    summary['fact_revision'] != self.scope_revision('medications') + self.scope_revision('semantic') or
+                    summary.get('fact_hash') != self._medication_set_hash_tx()):
+                raise ReviewFactsMovedError('facts changed before review case commit')
             cursor = self.connection.execute(
                 """INSERT INTO review_cases(scope_id,logic_key,event_id,run_id,thread_id,reason_codes,
                                             status,priority,summary_json,fact_medication_set_hash,
@@ -3172,15 +3392,45 @@ class MemoryStore:
         return item
 
     def pending_resume_tasks(self, *, limit: int = 10) -> list[dict[str, Any]]:
+        with self._lock, self.connection:
+            self.connection.execute("UPDATE resume_tasks SET execution_state=CASE WHEN attempts>=3 THEN 'failed' ELSE 'retryable' END, "
+                "last_error_class='retryable',lease_token=NULL WHERE status='pending' AND execution_state='running' AND lease_expires_at<=?", (utc_now(),))
         return [dict(row) for row in self.connection.execute(
-            "SELECT * FROM resume_tasks WHERE status='pending' ORDER BY id LIMIT ?",
-            (max(1, min(limit, 50)),))]
+            "SELECT * FROM resume_tasks WHERE status='pending' AND execution_state IN ('ready','retryable') "
+            "AND (next_attempt_at IS NULL OR next_attempt_at<=?) ORDER BY id LIMIT ?",
+            (utc_now(), max(1, min(limit, 50))))]
+
+    def claim_resume_task(self, task_id):
+        token = uuid.uuid4().hex
+        with self._lock, self.connection:
+            cursor = self.connection.execute("UPDATE resume_tasks SET execution_state='running', attempts=attempts+1,lease_token=?,lease_expires_at=? "
+                "WHERE id=? AND status='pending' AND execution_state IN ('ready','retryable') AND (next_attempt_at IS NULL OR next_attempt_at<=?)",
+                (token, (_as_utc(None)+timedelta(seconds=300)).isoformat(timespec='seconds'), task_id, utc_now()))
+            return token if cursor.rowcount == 1 else None
+
+    def assert_resume_lease(self, task_id, token):
+        row = self.connection.execute("SELECT 1 FROM resume_tasks WHERE id=? AND status='pending' AND execution_state='running' AND lease_token=? AND lease_expires_at>?",
+                                      (task_id, token, utc_now())).fetchone()
+        if row is None:
+            raise LeaseRejected('resume lease no longer valid')
+
+    def fail_resume_task(self, task_id: int, error_class: str, error: str) -> str:
+        if error_class not in {'retryable', 'permanent', 'safety', 'effect_unknown'}:
+            raise ValueError('invalid resume error class')
+        with self._lock, self.connection:
+            row = self.connection.execute('SELECT attempts FROM resume_tasks WHERE id=?', (task_id,)).fetchone()
+            attempts = row['attempts']
+            state = 'retryable' if error_class == 'retryable' and attempts < 3 else 'failed'
+            next_at = (_as_utc(None) + timedelta(seconds=min(300, 5 * 2 ** (attempts - 1)))).isoformat(timespec='seconds')
+            self.connection.execute('UPDATE resume_tasks SET execution_state=?,attempts=?,last_error_class=?,error=?,next_attempt_at=? WHERE id=?',
+                (state, attempts, error_class, error, next_at, task_id))
+            return state
 
     def consume_resume_task(self, task_id: int, *, operation_id: str) -> bool:
         """CAS consume: exactly one worker applies a given decision."""
         with self._lock, self.connection:
             cursor = self.connection.execute(
-                "UPDATE resume_tasks SET status='consumed', consumed_at=? "
+                "UPDATE resume_tasks SET status='consumed', execution_state='done', consumed_at=? "
                 "WHERE id=? AND operation_id=? AND status='pending'",
                 (utc_now(), task_id, operation_id))
             return cursor.rowcount == 1
@@ -3198,12 +3448,80 @@ class MemoryStore:
             raise MemoryPolicyError(f"unsupported terminal review status: {status}")
         now = utc_now()
         with self._lock, self.connection:
+            check_lease()
+            existing = self.review_case(case_id)
+            if existing and existing['status'] == status:
+                return existing
             self.connection.execute(
                 "UPDATE review_cases SET status=?, resolved_at=COALESCE(? , resolved_at), updated_at=? WHERE id=?",
                 (status, now if status == "resolved" else None, now, case_id))
             self._audit(f"review_case_{status}", "review_case", case_id,
                         {"reason": reason}, actor)
             return self.review_case(case_id)
+
+    def audit_review_stale(self, decision_id: str, case_id: int, new_case_id: int):
+        """Audit and transition receipt together; no swallowed audit failures."""
+        operation_id = 'review-stale:' + decision_id
+        with self._lock, self.connection:
+            if self.operation_receipt('local-demo', operation_id):
+                return
+            self._audit('review_decision_stale', 'review_case', case_id,
+                        {'decision_id': decision_id, 'new_case': new_case_id}, 'runner')
+            case = self.review_case(case_id)
+            self._review_receipt_tx(operation_id, str(case_id), {'new_case_id': new_case_id},
+                                    run_id=case['run_id'], event_id=case['event_id'])
+
+    def _review_receipt_tx(self, operation_id, input_hash, result, *, run_id=None, event_id=None):
+        now = utc_now()
+        self.connection.execute("INSERT INTO operation_receipts(scope_id,operation_id,operation_type,input_hash,status,result_json,created_at,updated_at,run_id,event_id) "
+            "VALUES('local-demo',?,'apply_review',?,'succeeded',?,?,?,?,?)",
+            (operation_id, input_hash, _json(result), now, now, run_id, event_id))
+
+    def apply_review_effect(self, decision_id, *, session_id, turn_id):
+        """Atomic bounded domain effect + decision outcome + receipt + case close."""
+        with self._lock, self.connection:
+            try:
+                from .turn_budget import check_lease
+            except ImportError:
+                from turn_budget import check_lease
+            check_lease()
+            record = self.review_decision(decision_id)
+            if record is None:
+                raise MemoryPolicyError('review decision missing')
+            receipt = self.operation_receipt('local-demo', 'review-apply:' + decision_id)
+            if receipt:
+                return receipt['result']
+            if record['outcome'] == 'applied':
+                raise EffectUnknownError('historical applied review has no atomic effect receipt')
+            case = self.review_case(record['case_id'])
+            if record['outcome'] != 'recorded' or case['status'] != 'in_review':
+                raise MemoryPolicyError('review decision no longer applicable')
+            if (case['fact_medication_set_hash'] != self._medication_set_hash_tx() or
+                case['fact_scope_revision'] != self.scope_revision('semantic') + self.scope_revision('medications')):
+                raise ReviewFactsMovedError('review facts moved before effect commit')
+            action, payload, actor = record['action'], record['payload'] or {}, record['actor_id']
+            if case['summary'].get('verification_status') == 'incomplete' and action in {'resolve_conflict', 'confirm_reported_fact'}:
+                raise MemoryPolicyError('incomplete evidence permits only guidance, rejection or more information')
+            if action == 'resolve_conflict':
+                ref = payload.get('conflict_ref')
+                refs = {c['ref'] for c in case['summary'].get('conflicts', [])}
+                if ref not in refs:
+                    raise MemoryPolicyError('conflict is outside reviewed evidence')
+                self._resolve_conflict_tx(ref, action='resolved', basis=payload.get('basis', ''), actor=actor)
+            if action != 'request_more_info':
+                self._record_event_tx(EpisodicFact(event_type='clinical_review',
+                    subject_key=f"review_case:{case['id']}", payload={'decision_id': decision_id,
+                    'action': action, 'actor_id': actor, 'basis': payload.get('basis', '')}, salience=.95),
+                    session_id=session_id, turn_id=turn_id, source='reviewer')
+            status = 'waiting_user' if action == 'request_more_info' else 'resolved'
+            self.connection.execute('UPDATE review_cases SET status=?,resolved_at=?,updated_at=? WHERE id=?',
+                                    (status, utc_now(), utc_now(), case['id']))
+            self.connection.execute("UPDATE review_decisions SET outcome='applied' WHERE decision_id=?", (decision_id,))
+            outcome = {'action': action, 'applied': True, 'decision_id': decision_id}
+            self._review_receipt_tx('review-apply:' + decision_id, decision_id, outcome,
+                                    run_id=case['run_id'], event_id=case['event_id'])
+            self._audit('review_decision_applied', 'review_case', case['id'], outcome, 'runner')
+            return outcome
 
     def mark_overdue_review_cases(self) -> int:
         """Sweep past-due non-terminal cases to ``overdue``.  Overdue is an

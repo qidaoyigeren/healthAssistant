@@ -963,8 +963,9 @@ class Stage6BehaviorTests(unittest.TestCase):
         self.assertGreaterEqual(len(divergent_turns), 2)
         # Divergence #1: condition check before DDI on medication changes.
         self.assertIn("clarithromycin", divergent_turns)
-        # Divergence #2: context_packet recall instead of medication_timeline.
-        self.assertIn("recall", divergent_turns)
+        # Explicit medication queries now use the same deterministic route.
+        self.assertNotIn("recall", divergent_turns)
+        self.assertIn("contrast", divergent_turns)
         # Emergency fallbacks never fired in the scripted run.
         for _, entry in _plan_entries(agentic):
             self.assertNotEqual(entry["planner"].get("fallback_kind"), "emergency")

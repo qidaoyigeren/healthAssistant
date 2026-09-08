@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import time
@@ -22,11 +23,13 @@ from pathlib import Path
 from typing import Any, Callable, Sequence
 
 try:
+    from .turn_budget import TurnBudget, BudgetExceeded, CURRENT, budget_scope, provider_call, completion_call, check_lease
     from . import ddi_engine, extract_ddi, rag
     from .memory import EpisodicFact, MemoryStore, SemanticFact
     from .memory_context import build_context
     from .response_safety import check_composed_response, composed_text_prescribes
 except ImportError:  # Support ``python stage0/agent.py`` style imports.
+    from turn_budget import TurnBudget, BudgetExceeded, CURRENT, budget_scope, provider_call, completion_call, check_lease
     import ddi_engine  # type: ignore
     import extract_ddi  # type: ignore
     import rag  # type: ignore
@@ -34,11 +37,35 @@ except ImportError:  # Support ``python stage0/agent.py`` style imports.
     from memory_context import build_context  # type: ignore
     from response_safety import check_composed_response, composed_text_prescribes
 
+try:
+    from .harness.schema import schema_errors
+    from .harness.errors import ToolErrorKind, ToolExecutionError
+    from .harness.runtime import RunContext, LOCAL_DEMO_PRINCIPAL
+    from .harness.tools import HarnessHooks, ToolResult
+    from .harness.default_tools import DEFAULT_TOOL_SPECS, build_default_executor
+    from .harness.context import bounded_patient_snapshot, omissions, view_is_complete
+    from .harness.summary import build_run_summary, summarize_observation
+except ImportError:  # Support ``python stage0/agent.py`` style imports.
+    from harness.schema import schema_errors  # type: ignore
+    from harness.errors import ToolErrorKind, ToolExecutionError  # type: ignore
+    from harness.runtime import RunContext, LOCAL_DEMO_PRINCIPAL  # type: ignore
+    from harness.tools import HarnessHooks, ToolResult  # type: ignore
+    from harness.default_tools import DEFAULT_TOOL_SPECS, build_default_executor  # type: ignore
+    from harness.context import bounded_patient_snapshot, omissions, view_is_complete  # type: ignore
+    from harness.summary import build_run_summary, summarize_observation  # type: ignore
+
 
 ROOT = Path(__file__).resolve().parent
 
-# Reliability P0: wall-clock reserve kept for the deterministic completion
-# (compose + final safety check) after the loop stops making planner calls.
+logger = logging.getLogger("stage0.agent")
+
+
+# Harness P1-B: evidence ids embedded in stored summaries/source refs — used
+# to protect dependent evidence from retention pruning.
+_EVIDENCE_ID_PATTERN = re.compile(r"ev-[0-9a-f]{20}")
+
+# Compatibility export for older callers. Runtime admission and the bounded
+# local completion margin are now owned by turn_budget.BudgetSession.
 PLANNER_RESERVE_SECONDS = 15.0
 
 AGENT_SYSTEM_PROMPT = """你是“用药协管员”，只做记录、检索、风险提示和就医沟通辅助。
@@ -78,6 +105,17 @@ class Observation:
     # Stage 8 B2: the cycle this observation belongs to; the planner payload
     # keeps the most recent cycles in full and summarizes the rest by it.
     cycle: int = 0
+    # Harness P1-A: stable error classification from the shared executor.
+    # ``error_kind`` uses the ToolErrorKind vocabulary; ``recoverable`` tells
+    # the loop whether a different proposal may succeed.  ``evidence_refs``
+    # carries EvidenceStore ids captured by the executor (P1-B).
+    error_kind: str | None = None
+    recoverable: bool | None = None
+    evidence_refs: list[str] = field(default_factory=list)
+    # Harness P2: set by the loop when this observation repeated the previous
+    # read signature with no new progress — structured feedback to the
+    # planner (existing evidence stands), never a safety violation by itself.
+    no_progress: bool = False
 
 
 @dataclass
@@ -99,6 +137,10 @@ class AgentState:
     # break a turn).
     trace_flushed: int = 0
     trace_persistence_failed: bool = False
+    # Harness P1-A: the shared run context (trusted principal/scope, identity,
+    # budget handle, cancellation).  Never serialized into checkpoints as an
+    # object — the graph runner carries ctx.checkpoint_dict() instead.
+    ctx: Any = None
 
     def observation(self, tool: str, purpose: str | None = None) -> Observation | None:
         for item in reversed(self.observations):
@@ -128,6 +170,11 @@ class AgentResponse:
     # the actual tool results (semantic fact write outcome + medication_change
     # outcome incl. deduplicated/unresolved).  Never a blanket "success".
     operation_outcomes: list[dict[str, Any]] = field(default_factory=list)
+    # Product P1: versioned structured bundle derived from the SAME data that
+    # produced the delivered text/warnings (one trusted source).  Built after
+    # the safety gate in _finalize; consumers may ignore it (backwards
+    # compatible additive field).
+    answer_bundle: dict[str, Any] | None = None
 
 
 class DDITool:
@@ -135,6 +182,7 @@ class DDITool:
         self.detector = detector or ddi_engine.detect
 
     def __call__(self, medications: list[str], focus_medication: str | None = None) -> dict[str, Any]:
+        ddi_engine.EVIDENCE_TRACE.set(None)
         warnings = self.detector(medications)
         if focus_medication:
             normalized_focus = ddi_engine.normalize_medications([focus_medication])
@@ -148,6 +196,7 @@ class DDITool:
             "focus_medication": focus_medication,
             "warnings": warnings,
             "detector": "stage0.ddi_engine.detect",
+            "research": {k: v for k, v in (ddi_engine.EVIDENCE_TRACE.get() or {}).items() if k != 'chunks'},
         }
 
 
@@ -329,6 +378,8 @@ class MemoryWriteTool:
                 operation_type="consolidate_event",
                 input_hash=input_hash,
                 executor=_consolidate,
+                run_id=state.turn_id,
+                event_id=event_key,
             )
             result["operation_replayed"] = replayed
             return result
@@ -344,7 +395,7 @@ class MemoryWriteTool:
                 {
                     "warning": warning,
                     "salience": self._warning_salience(warning),
-                    "text": self._warning_text(warning),
+                    "text": MemoryWriteTool._warning_text(warning),
                     "source_refs": self._warning_sources(warning),
                     "occurred_at": event.occurred_at,
                 }
@@ -399,6 +450,7 @@ class MemoryWriteTool:
 
     @staticmethod
     def _warning_sources(warning: dict[str, Any]) -> list[dict[str, Any]]:
+        evidence_id = warning.get("evidence_id")
         uri = warning.get("source_url")
         if uri:
             primary = {
@@ -407,16 +459,21 @@ class MemoryWriteTool:
                 "quote": warning.get("source_text"),
                 "retrieval": warning.get("detection_path", "rag"),
             }
+            if evidence_id:
+                primary["evidence_id"] = evidence_id
             return [primary, *warning.get("additional_sources", [])]
         # This path is deliberately marked uncertain.  It still gives an exact
         # local provenance pointer and the safety layer will force escalation.
         warning["confidence"] = "low"
-        return [{
+        provenance = {
             "source_type": "local_detector_provenance",
             "uri": str((ROOT / "data" / "ddi_pair_index.json").resolve()),
             "quote": None,
             "retrieval": warning.get("detection_path", "ddi_engine"),
-        }, *warning.get("additional_sources", [])]
+        }
+        if evidence_id:
+            provenance["evidence_id"] = evidence_id
+        return [provenance, *warning.get("additional_sources", [])]
 
 
 class ClarificationTool:
@@ -499,7 +556,7 @@ class AgentPlanner:
                 return ToolAction("memory_read", "profile_snapshot", {"query": "snapshot"}, "核对整合后的患者档案和未决冲突。")
             return None
 
-        if event.event_type == "medication_change":
+        if event.event_type in {"medication_change", "medication_recheck"}:
             if state.observation("memory_read", "safety_context") is None:
                 return ToolAction("memory_read", "safety_context", {"query": "snapshot"}, "读取当前用药、过敏和肝肾功能，建立安全检查上下文。")
             snapshot = state.observation("memory_read", "safety_context").result
@@ -612,7 +669,7 @@ class AgentPlanner:
                     )
             return None
 
-        if event.event_type in {"query_current_medications", "user_message"} and self._asks_current_medications(event.text):
+        if event.event_type == "query_current_medications" or (event.event_type == "user_message" and self._asks_current_medications(event.text)):
             if state.observation("memory_read", "medication_timeline") is None:
                 return ToolAction(
                     "memory_read", "medication_timeline", {"query": "medication_timeline"},
@@ -630,7 +687,7 @@ class AgentPlanner:
 
     @staticmethod
     def _asks_current_medications(text: str) -> bool:
-        return any(pattern in text for pattern in ("现在吃什么药", "当前用药", "在吃哪些药", "用药清单"))
+        return bool(re.fullmatch(r'\s*(?:现在吃什么药|当前用药|当前用药清单|在吃哪些药|用药清单)[？?。！!]?\s*', text))
 
     @staticmethod
     def _context_refs(snapshot: dict[str, Any], focus: str | None) -> list[str]:
@@ -748,11 +805,11 @@ PLANNER_SYSTEM_PROMPT = """你是用药协管系统的 ReAct 决策器：每一�
 """
 
 
-MEMORY_READ_QUERIES = (
-    "snapshot", "current_medications", "medication_timeline", "conflicts",
-    "context_packet", "pending_rechecks",
-)
-MEMORY_WRITE_OPERATIONS = ("consolidate_event", "record_warnings", "create_clinical_conflict")
+# Harness P1-A: the argument schemas moved into ``harness/default_tools.py``
+# as ToolSpec definitions — the planner prompt, the guard and the executor all
+# read the same objects, so prompt/schema/Python parameters cannot drift.
+MEMORY_READ_QUERIES = DEFAULT_TOOL_SPECS["memory_read"].argument_schema["properties"]["query"]["enum"]
+MEMORY_WRITE_OPERATIONS = DEFAULT_TOOL_SPECS["memory_write"].argument_schema["properties"]["operation"]["enum"]
 
 
 # Canonical proposal schema shared verbatim by the planner prompt and the guard.
@@ -760,42 +817,7 @@ MEMORY_WRITE_OPERATIONS = ("consolidate_event", "record_warnings", "create_clini
 # optional.  The Stage 5 prompt/validator disagreement (65% fallback) came from
 # these two disagreeing on the proposal shape.
 PLANNER_ARGUMENT_SCHEMAS: dict[str, dict[str, Any]] = {
-    "ddi_check": {
-        "type": "object",
-        "properties": {
-            "medications": {"type": "array", "items": {"type": "string"}, "minItems": 1},
-            "focus_medication": {"type": "string"},
-        },
-        "required": ["medications"],
-    },
-    "rag_search": {
-        "type": "object",
-        "properties": {
-            "query": {"type": "string"},
-            "top_k": {"type": "integer"},
-            "section": {"type": "string"},
-            "drug_name": {"type": "string"},
-        },
-        "required": ["query"],
-    },
-    "memory_read": {
-        "type": "object",
-        "properties": {"query": {"type": "string", "enum": list(MEMORY_READ_QUERIES)}},
-        "required": ["query"],
-    },
-    # The model selects a logical write only.  Warning bodies, citations,
-    # memory references and conflict links are absent: the guard materializes
-    # those executor-only fields from successful observations.
-    "memory_write": {
-        "type": "object",
-        "properties": {"operation": {"type": "string", "enum": list(MEMORY_WRITE_OPERATIONS)}},
-        "required": ["operation"],
-    },
-    "ask_clarification": {
-        "type": "object",
-        "properties": {"question": {"type": "string"}},
-        "required": ["question"],
-    },
+    name: dict(spec.argument_schema) for name, spec in DEFAULT_TOOL_SPECS.items()
 }
 
 
@@ -811,28 +833,20 @@ CANONICAL_PROPOSAL_SCHEMA = {
 }
 
 
-def schema_errors(schema: dict[str, Any], value: Any, path: str = "proposal") -> list[str]:
-    kind = schema.get("type")
-    valid = {"object": isinstance(value, dict), "array": isinstance(value, list),
-             "string": isinstance(value, str), "integer": isinstance(value, int) and not isinstance(value, bool)}.get(kind, True)
-    if not valid:
-        return [f"{path} must be {kind}"]
-    if "enum" in schema and value not in schema["enum"]:
-        return [f"{path} has an invalid value"]
-    errors: list[str] = []
-    if kind == "object":
-        errors.extend(f"{path}.{key} is required" for key in schema.get("required", []) if key not in value)
-        for key, item in schema.get("properties", {}).items():
-            if key in value:
-                errors.extend(schema_errors(item, value[key], f"{path}.{key}"))
-    if kind == "array":
-        if len(value) < schema.get("minItems", 0):
-            errors.append(f"{path} requires at least one item")
-        for item in value:
-            errors.extend(schema_errors(schema.get("items", {}), item, path))
-    if kind == "string" and not value.strip():
-        errors.append(f"{path} must not be empty")
-    return errors
+def registered_planner_tool_schemas(tools: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Build the planner catalog from the executor's actually registered tools.
+
+    Harness P1-A: the authoritative source is the shared ToolExecutor; when
+    one is not reachable (direct tests passing a bare tool dict) the default
+    spec registry is used.  Either way prompt and guard see the same schemas."""
+    executor = getattr(tools, "executor", None) if not isinstance(tools, dict) else None
+    if executor is not None:
+        return executor.catalog()
+    return {
+        name: PLANNER_ARGUMENT_SCHEMAS[name]
+        for name in tools
+        if name in PLANNER_ARGUMENT_SCHEMAS
+    }
 
 
 def registered_planner_tool_schemas(tools: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -1281,8 +1295,8 @@ class LLMPlanner:
         self.last_payload_chars = len(json.dumps(payload, ensure_ascii=False, default=str))
         if self.proposal_provider is not None:
             try:
-                return self._parse_json(self.proposal_provider(payload))
-            except PlannerProposalError:
+                return self._parse_json(provider_call("planner", self.proposal_provider, payload))
+            except (PlannerProposalError, BudgetExceeded):
                 raise
             except Exception as exc:
                 raise PlannerProposalError("provider_error", "provider_error", f"{type(exc).__name__}: {exc}") from exc
@@ -1297,7 +1311,7 @@ class LLMPlanner:
             # persistent failure still raises and becomes an emergency fallback.
             last_error: PlannerProposalError | None = None
             for attempt in range(2):
-                response = self.client.chat.completions.create(
+                response = completion_call("planner", self.client,
                     model=self.model,
                     messages=[
                         {"role": "system", "content": PLANNER_SYSTEM_PROMPT},
@@ -1316,7 +1330,7 @@ class LLMPlanner:
                         continue
                     raise
             raise last_error  # pragma: no cover - loop always returns or raises
-        except PlannerProposalError:
+        except (PlannerProposalError, BudgetExceeded):
             raise
         except Exception as exc:
             raise PlannerProposalError("provider_error", "provider_error", f"{type(exc).__name__}: {exc}") from exc
@@ -1382,6 +1396,11 @@ class LLMPlanner:
             "observations": self._bounded_observations(state),
             "reflection_notes": [note[:800] for note in state.reflection_notes[-6:]],
             "completed_steps": successful[-12:],
+            # Harness P1-B: structured run summary (completed goals, evidence
+            # ids, unresolved issues, failure categories, fact revision) —
+            # deterministic extraction, no LLM summarisation.
+            "run_summary": build_run_summary(state),
+            "context_omissions": omissions(self._patient_snapshot()),
             "pending_safety_goals": self.guard.unmet_requirements(state),
             "recent_trace": self._bounded_trace(state),
         }
@@ -1417,16 +1436,17 @@ class LLMPlanner:
                             chunk["text"] = chunk["text"][: cls.RAG_TEXT_CHARS]
                 out.append(item)
             else:
+                # Harness P1-B: structured summary instead of the hash-only
+                # digest — completed effect, counts, evidence ids (or an
+                # explicit not_recorded marker for pre-P1 observations) and
+                # the failure category.
+                item = summarize_observation(observation)
                 try:
                     rendered = json.dumps(observation.result, ensure_ascii=False, default=str, sort_keys=True)
-                    size, digest = len(rendered), hashlib.sha256(rendered.encode("utf-8")).hexdigest()[:8]
+                    item["result_size"] = len(rendered)
                 except Exception:
-                    size, digest = 0, "unserializable"
-                out.append({
-                    "tool": observation.tool, "purpose": observation.purpose,
-                    "ok": observation.ok, "cycle": observation.cycle,
-                    "result_size": size, "result_digest": digest,
-                })
+                    item["result_size"] = 0
+                out.append(item)
         return out
 
     @classmethod
@@ -1463,7 +1483,13 @@ class LLMPlanner:
         return out
 
     def _patient_snapshot(self) -> dict[str, Any]:
-        """Bounded patient memory snapshot for grounding; never credentials."""
+        """Bounded patient memory snapshot for grounding; never credentials.
+
+        Harness P1-B: field-semantic bounding replaces the generic 12-item
+        list cut — critical collections (medications, critical facts,
+        conflicts) stay complete up to generous caps and carry explicit
+        omission markers beyond them, so an omission can never pass as a
+        completed check."""
         if self.context_provider is None:
             return {}
         try:
@@ -1472,7 +1498,7 @@ class LLMPlanner:
             return {}
         if not isinstance(snapshot, dict):
             return {}
-        return self._compact(snapshot, depth=0)
+        return bounded_patient_snapshot(snapshot)
 
     @classmethod
     def _compact(cls, value: Any, *, depth: int, max_depth: int = 5) -> Any:
@@ -1561,7 +1587,9 @@ class HybridPlanner:
         medication_grounding: Callable[[], list[dict[str, Any]]] | None = None,
         snapshot_provider: Callable[[], dict[str, Any]] | None = None,
         context_provider: Callable[[], dict[str, Any]] | None = None,
+        hooks: "HarnessHooks | None" = None,
     ):
+        self.hooks = hooks
         self.deterministic_planner = deterministic_planner or AgentPlanner()
         self.enabled = enabled
         self.validator = validator or (
@@ -1589,15 +1617,21 @@ class HybridPlanner:
         self.last_payload_chars = 0
 
     def bind_tools(self, tools: dict[str, Any]) -> None:
-        """Bind schemas to the concrete executor registry owned by the agent."""
+        """Bind schemas to the concrete executor registry owned by the agent.
 
-        schemas = registered_planner_tool_schemas(tools)
+        Harness P1-A: accepts either the tool-callable dict (legacy callers)
+        or a prebuilt catalog from ``ToolExecutor.catalog()`` — extra tools
+        registered on the executor flow through untouched."""
+
+        schemas = tools if all(isinstance(value, dict) and "type" in value for value in tools.values()) \
+            else registered_planner_tool_schemas(tools)
         self.validator.tool_schemas = dict(schemas)
         self.llm_planner.tool_schemas = dict(schemas)
 
     def decide(self, state: AgentState) -> ToolAction | None:
         started = time.perf_counter()
-        if not self.enabled:
+        hooks = getattr(self, "hooks", None)
+        if not self.enabled or state.event.event_type in {'query_current_medications', 'medication_recheck'}:
             action = self.deterministic_planner.decide(state)
             self.last_decision_trace = self._trace(
                 "deterministic", action and asdict(action),
@@ -1606,6 +1640,9 @@ class HybridPlanner:
             )
             return action
 
+        if hooks is not None:
+            hooks.emit("before_model", ctx=state.ctx, kind="planner",
+                       meta={"mode": "hybrid", "cycle": getattr(state, "cycle", None)})
         try:
             proposal = self.llm_planner.propose(state)
             self.last_payload_chars = self.llm_planner.last_payload_chars
@@ -1614,6 +1651,10 @@ class HybridPlanner:
             category = "schema" if exc.kind == "schema_error" else exc.kind
             error = {"code": exc.code, "category": category, "message": str(exc)}
             # Provider/parse failure: the only emergency fallback path.
+            if hooks is not None:
+                hooks.emit("after_model", ctx=state.ctx, kind="planner",
+                           meta={"status": "fallback", "fallback_kind": "emergency",
+                                 "error_code": exc.code, "cycle": getattr(state, "cycle", None)})
             return self._fallback(
                 state, None, "proposal_error", [error], exc.kind, started,
                 fallback_kind="emergency",
@@ -1625,6 +1666,11 @@ class HybridPlanner:
             self.last_decision_trace = self._trace(
                 "rejected", proposal, "safety_rejected", False, validation.errors, None, started, fallback_kind=None,
             )
+            if hooks is not None:
+                hooks.emit("after_model", ctx=state.ctx, kind="planner",
+                           meta={"status": "safety_rejected", "guard_rejected": True,
+                                 "error_codes": [e.get("code") for e in validation.errors],
+                                 "cycle": getattr(state, "cycle", None)})
             raise PlanningRejected(reason)
 
         try:
@@ -1634,12 +1680,22 @@ class HybridPlanner:
             self.last_decision_trace = self._trace(
                 "rejected", proposal, "safety_rejected", False, [error], None, started, fallback_kind=None,
             )
+            if hooks is not None:
+                hooks.emit("after_model", ctx=state.ctx, kind="planner",
+                           meta={"status": "materialization_error", "guard_rejected": True,
+                                 "cycle": getattr(state, "cycle", None)})
             raise PlanningRejected("materialization_error") from exc
         self.model = self.llm_planner.model
         self.last_decision_trace = self._trace(
             "llm", proposal, "accepted", True, [], None, started,
             fallback_kind=None, corrections=list(self.validator.last_corrections),
         )
+        if hooks is not None:
+            hooks.emit("after_model", ctx=state.ctx, kind="planner",
+                       meta={"status": "accepted", "payload_chars": self.last_payload_chars,
+                             "corrections": list(self.validator.last_corrections),
+                             "cycle": getattr(state, "cycle", None),
+                             "latency_ms": self.last_decision_trace.get("latency_ms")})
         return action
 
     def _fallback(
@@ -1755,7 +1811,7 @@ class ResponseComposer:
 
     def compose(self, payload: dict[str, Any]) -> str:
         if self.response_provider is not None:
-            return str(self.response_provider(payload))
+            return str(provider_call("composer", self.response_provider, payload))
         if self.client is None:
             config = self.config or extract_ddi.resolve_llm_config(self.model)
             if not config.get("api_key"):
@@ -1781,7 +1837,7 @@ class ResponseComposer:
         return str(response.choices[0].message.content or "")
 
     def _create(self, payload: dict[str, Any], options: dict[str, Any] | None = None):
-        return self.client.chat.completions.create(
+        return completion_call("composer", self.client,
             model=self.model,
             messages=[
                 {"role": "system", "content": RESPONSE_SYSTEM_PROMPT},
@@ -1789,45 +1845,6 @@ class ResponseComposer:
             ],
             temperature=0,
             **(options or self.options or extract_ddi.llm_completion_options()),
-        )
-
-
-@dataclass(frozen=True)
-class TurnBudget:
-    """Per-turn resource ceiling (Stage 8 B1).
-
-    The first exhausted budget degrades the turn to a deterministic completion
-    with an explicit "结果可能不完整" notice; it never skips the response safety
-    checks.  Token accounting is a conservative chars/1.5 estimate over every
-    planner payload (each cycle resends the full prompt): the estimator
-    over-counts JSON/catalog overhead relative to real tokenizer usage, so the
-    default backstop is 150k estimated units — enough for a full 16-cycle turn
-    of realistic payloads — while the wall-clock budget is the primary limiter
-    for live turns.  Provider usage values replace the estimate in Stage 11.
-    """
-
-    max_cycles: int = 16
-    wall_clock_seconds: float = 120.0
-    token_budget: int = 150_000
-
-    @classmethod
-    def from_env(cls, max_cycles: int) -> "TurnBudget":
-        def as_float(name: str, default: float) -> float:
-            try:
-                return max(0.0, float(os.getenv(name, str(default))))
-            except ValueError:
-                return default
-
-        def as_int(name: str, default: int) -> int:
-            try:
-                return max(0, int(os.getenv(name, str(default))))
-            except ValueError:
-                return default
-
-        return cls(
-            max_cycles=max_cycles,
-            wall_clock_seconds=as_float("AGENT_TURN_BUDGET_SECONDS", 120.0),
-            token_budget=as_int("AGENT_TURN_TOKEN_BUDGET", 150_000),
         )
 
 
@@ -1890,7 +1907,7 @@ class ResponseVerifier:
         }, ensure_ascii=False, default=str)
         try:
             if self.provider is not None:
-                raw = str(self.provider(payload))
+                raw = str(provider_call("verifier", self.provider, payload, self.timeout_seconds))
             else:
                 if self.client is None:
                     from openai import OpenAI
@@ -1903,7 +1920,7 @@ class ResponseVerifier:
                     self.client = OpenAI(api_key=config["api_key"], base_url=config["base_url"],
                                          timeout=self.timeout_seconds, max_retries=0)
                     self.model = config["model"]
-                response = self.client.chat.completions.create(
+                response = completion_call("verifier", self.client, timeout=self.timeout_seconds,
                     model=self.model,
                     messages=[
                         {"role": "system", "content": VERIFIER_SYSTEM_PROMPT},
@@ -1979,10 +1996,12 @@ class MedicationCoordinatorAgent:
         response_provider: Callable[[dict[str, Any]], str] | None = None,
         verifier: "ResponseVerifier | None" = None,
         llm_verifier_enabled: bool = False,
+        hooks: "HarnessHooks | None" = None,
     ):
         self.memory = memory
         self.safety = SafetyBoundary()
         self.max_cycles = max_cycles
+        self.hooks = hooks or HarnessHooks()
         self.tools: dict[str, Any] = {
             "ddi_check": ddi_tool or DDITool(),
             "rag_search": rag_tool or RAGTool(),
@@ -1990,7 +2009,36 @@ class MedicationCoordinatorAgent:
             "memory_write": MemoryWriteTool(memory),
             "ask_clarification": ClarificationTool(),
         }
-        tool_schemas = registered_planner_tool_schemas(self.tools)
+        # Harness P1-A: one shared executor behind both runners.  Registering a
+        # tool here (spec + handler) makes it available to the planner catalog,
+        # the guard and both loops without touching either runner.
+        # Harness P1-B: an immutable EvidenceStore over the same SQLite file
+        # captures retrieval results; read_evidence is the authorised way back.
+        from .harness.evidence import EvidenceStore
+        self.evidence_store = EvidenceStore(memory.connection, memory._lock)
+        # Harness P2: controlled read reuse (same-run + cross-run).  Both
+        # flags default OFF; the executor consults reuse only for pure reads.
+        from .harness.reuse import ReuseCoordinator
+        self.reuse = ReuseCoordinator(connection=memory.connection, lock=memory._lock)
+        self.executor = build_default_executor(self, hooks=self.hooks,
+                                               evidence_store=self.evidence_store,
+                                               reuse=self.reuse,
+                                               corpus_version_fn=self._corpus_version)
+        # Harness P2: product-facing progress ledger + restart-safe
+        # no-progress tracker over the same SQLite file.
+        from .harness.progress import NoProgressTracker, ProgressEventStore
+        self.progress_store = ProgressEventStore(memory.connection, memory._lock)
+        self.no_progress_tracker = NoProgressTracker(memory.connection, memory._lock)
+        if self._progress_events_enabled():
+            self.hooks.add("after_tool", self._emit_tool_progress)
+        tool_schemas = self.executor.catalog()
+        # Harness P1-C: call-level spans (replay-deduplicated, optional OTel
+        # export).  Persistence failures never affect the turn itself.
+        try:
+            from .harness.observability import attach_recorder
+            self._span_recorder = attach_recorder(self, memory)
+        except Exception:
+            self._span_recorder = None
         # Deterministic ground truth injected into the guard so safety-critical
         # executor inputs never depend on what the LLM proposed.
         self.planner = planner or (
@@ -2004,11 +2052,12 @@ class MedicationCoordinatorAgent:
                 medication_grounding=memory.current_medications,
                 snapshot_provider=memory.snapshot,
                 context_provider=memory.snapshot,
+                hooks=self.hooks,
             )
             if llm_planner_enabled else AgentPlanner()
         )
         if isinstance(self.planner, HybridPlanner):
-            self.planner.bind_tools(self.tools)
+            self.planner.bind_tools(tool_schemas)
         # Stage 6: the final response text is LLM-composed and post-checked;
         # the template is a logged fallback.  SafetyBoundary stays the final gate.
         self.response_composer = (
@@ -2032,11 +2081,163 @@ class MedicationCoordinatorAgent:
         if hasattr(self.memory, "recheck_hook"):
             self.memory.recheck_hook = self._recheck_hook
 
+    # ---- Harness P2: progress events, corpus version, no-progress ----------
+
+    @staticmethod
+    def _progress_events_enabled() -> bool:
+        import os as _os
+        raw = _os.getenv("STAGE0_RUN_PROGRESS", "1").strip().lower()
+        return raw in {"1", "true", "yes", "on"}
+
+    def _emit_tool_progress(self, event) -> None:
+        """Map a completed tool dispatch onto the product progress vocabulary.
+        Details are deliberately coarse: tool name, ok/error kind and evidence
+        COUNT only — never raw results, reasoning or unreviewed text."""
+        ctx = event.ctx
+        if ctx is None or not getattr(ctx, "run_id", None):
+            return
+        from .harness.progress import TOOL_EVENT_KINDS
+        kind = TOOL_EVENT_KINDS.get(event.tool or "")
+        if kind is None:
+            return
+        meta = event.meta or {}
+        self.progress_store.emit(
+            ctx.run_id, kind, cycle=meta.get("cycle"), tool=event.tool,
+            detail={"ok": bool(meta.get("ok")),
+                    "error_kind": meta.get("error_kind"),
+                    "evidence_count": len(meta.get("evidence_refs") or []),
+                    "reused": bool(meta.get("reused"))})
+
+    def _corpus_version(self) -> str:
+        """Content-derived corpus fingerprint for reuse keys: the RAG index's
+        config + chunk files.  A corpus update is automatically a new key."""
+        try:
+            from pathlib import Path as _Path
+            from . import rag as _rag
+            index_dir = _Path(_rag.INDEX_DIR)
+            config = index_dir / "config.json"
+            chunks = index_dir / "chunks.jsonl"
+            return "rag:%d:%d" % (config.stat().st_mtime_ns, chunks.stat().st_mtime_ns)
+        except Exception:
+            return "corpus:unversioned"
+
+    def _no_progress_limit(self) -> int:
+        """0 / unset = disabled (default).  Set to >=1 to enable loop-level
+        no-progress detection (first repeats give structured feedback; at the
+        threshold the loop stops re-planning and finishes safely)."""
+        import os as _os
+        try:
+            return max(0, int(_os.getenv("AGENT_NO_PROGRESS_LIMIT", "0")))
+        except ValueError:
+            return 0
+
+    def _progress_verdict(self, state: AgentState, observation: Observation) -> str:
+        """Classify one executed action for the no-progress contract.
+
+        * a successful domain WRITE is always progress and resets the counter;
+        * a read (or failed action) with the SAME normalized signature as the
+          previous action — same tool, args, revision, result — is a repeat:
+          the observation is annotated ``no_progress`` and structured feedback
+          names the evidence that already stands;
+        * at the configured threshold the verdict is ``stop``: the loop stops
+          re-planning and finishes safely.  Nothing here treats a single
+          repeat as a safety violation, and a changed revision (write, review
+          round, new user information) produces a different signature, so real
+          progress is never mis-killed.
+        """
+        run_id = state.ctx.run_id if state.ctx else state.turn_id
+        if observation.ok and observation.tool == "memory_write":
+            self.no_progress_tracker.reset(run_id)
+            return "progress"
+        limit = self._no_progress_limit()
+        if limit <= 0:
+            return "continue"
+        spec = self.executor.spec(observation.tool)
+        if spec is None or spec.kind != "read":
+            return "continue"
+        import hashlib as _hashlib
+        import json as _json
+        revision = self.executor._current_revision(state)
+        result_digest = _hashlib.sha256(_json.dumps(
+            observation.result, ensure_ascii=False, sort_keys=True, default=str
+        ).encode("utf-8")).hexdigest()[:16]
+        from .harness.progress import read_signature
+        signature = read_signature(
+            observation.tool, observation.arguments, scope_id=state.ctx.principal.scope_id
+            if state.ctx else "local-demo",
+            patient_revision=revision, corpus_version=self._corpus_version(),
+            tool_version=f"{spec.schema_version}:{'ok' if observation.ok else observation.error_kind}:{result_digest}")
+        verdict = self.no_progress_tracker.record(run_id, signature, limit=limit)
+        if verdict["verdict"] == "stopped":
+            # Already shut down for this run (e.g. a graph replay after the
+            # stop) — keep the terminal no-progress verdict.
+            return "stop"
+        if verdict["verdict"] == "repeat":
+            observation.no_progress = True
+            state.trace.append({
+                "phase": "no_progress", "cycle": state.cycle,
+                "note": (f"重复读取 {observation.tool} 未产生新信息；已有证据继续有效"
+                         f"（第 {verdict['repeats']}/{limit} 次重复），不因重复提高置信度。"),
+                "evidence_refs": observation.evidence_refs,
+            })
+            state.reflection_notes.append(
+                f"重复读取 {observation.tool} 未带来新证据；不因相同结果提高置信度。")
+        # verdict == "progress": record() already advanced the tracker — no
+        # reset here, or the repeat baseline would be wiped every step.
+        return verdict["verdict"]
+
     def run_pending_rechecks(self, *, max_jobs: int = 2) -> dict[str, Any]:
-        """Consume pending recheck tasks (called by the app after each turn)."""
-        return self.memory.recheck_pending(max_jobs=max_jobs)
+        """Consume pending recheck tasks (called by the app after each turn).
+
+        Harness P1-B: a retention sweep runs alongside — evidence older than
+        the window is pruned unless an active/parked run, a pending review
+        case or a stored conclusion still depends on it."""
+        result = self.memory.recheck_pending(max_jobs=max_jobs)
+        try:
+            # Retention must never break rechecks; prune stats ride along when
+            # the result shape allows it.
+            if isinstance(result, dict):
+                return {**result, "evidence_prune": self.prune_evidence()}
+        except Exception:
+            pass
+        return result
+
+    def prune_evidence(self, *, older_than_days: float = 90.0) -> dict[str, int]:
+        """Orphan-recycling rule (P1-B): active runs, pending review cases and
+        conclusions protect their evidence; everything else past the window
+        goes."""
+        active = {row["run_id"] for row in self.memory.connection.execute(
+            "SELECT run_id FROM workflow_runs WHERE status IN ('running','waiting_review')")}
+        protected: set[str] = set()
+        for case in self.memory.connection.execute(
+                "SELECT summary_json FROM review_cases WHERE status IN ('open','waiting_user')"):
+            summary = case["summary_json"] or ""
+            protected.update(_EVIDENCE_ID_PATTERN.findall(summary))
+        for row in self.memory.connection.execute("SELECT source_refs_json FROM conclusions"):
+            protected.update(_EVIDENCE_ID_PATTERN.findall(row["source_refs_json"] or ""))
+        return self.evidence_store.prune(older_than_days=older_than_days,
+                                         active_run_ids=active,
+                                         protected_evidence_ids=protected)
 
     def _recheck_hook(self, store: MemoryStore, conclusion: dict[str, Any]) -> dict[str, Any] | None:
+        if CURRENT.get() is not None:
+            return self._bounded_recheck(store, conclusion)
+        run_id = f"recheck:{conclusion['id']}:{store.medication_set_hash()}:{store.scope_revision('semantic')}"
+        store.workflow_run_start(run_id=run_id, graph_version='legacy')
+        with budget_scope(store, run_id, self.max_cycles):
+            return self._bounded_recheck(store, conclusion)
+
+    def _bounded_recheck(self, store, conclusion):
+        reason = CURRENT.get().exhausted()
+        if reason:
+            raise BudgetExceeded(reason)
+        result = self._recheck_dispatch(store, conclusion)
+        reason = CURRENT.get().exhausted()
+        if reason:
+            raise BudgetExceeded(reason)
+        return result
+
+    def _recheck_dispatch(self, store: MemoryStore, conclusion: dict[str, Any]) -> dict[str, Any] | None:
         """Dispatch one stale conclusion to its kind's recheck executor.
 
         ``warning`` conclusions produced by the whole-list DDI scan re-run the
@@ -2166,13 +2367,24 @@ class MedicationCoordinatorAgent:
     def handle(self, event: CareEvent, *, session_id: str, turn_id: str | None = None,
                client_event_id: str | None = None) -> AgentResponse:
         turn_id = turn_id or f"turn-{uuid.uuid4().hex[:10]}"
+        run_id = CURRENT.get().run_id if CURRENT.get() else turn_id
+        self.memory.workflow_run_start(run_id=run_id, thread_id=run_id,
+            event_id=None, idempotency_key=client_event_id, graph_version="legacy")
+        with budget_scope(self.memory, run_id, self.max_cycles):
+            return self._handle(event, session_id=session_id, turn_id=turn_id,
+                                client_event_id=client_event_id)
+
+    def _handle(self, event: CareEvent, *, session_id: str, turn_id: str | None = None,
+               client_event_id: str | None = None) -> AgentResponse:
+        turn_id = turn_id or f"turn-{uuid.uuid4().hex[:10]}"
         self.memory.expire_working(session_id, except_turn=turn_id)
         state = AgentState(session_id=session_id, turn_id=turn_id, event=event,
                            client_event_id=client_event_id)
+        # Harness P1-A: one RunContext per turn carries the trusted local-demo
+        # principal, identity and budget handle through every tool dispatch.
+        state.ctx = self._context_for(state)
         # Stage 8 B1: per-turn budget (wall-clock / estimated tokens / cycles).
-        budget = TurnBudget.from_env(self.max_cycles)
-        turn_started = time.perf_counter()
-        tokens_estimated = 0
+        budget = CURRENT.get()
         # Stage 8 B3: consecutive-rejection circuit breaker.
         try:
             rejection_limit = max(1, int(os.getenv("PLANNER_SAFETY_REJECTION_LIMIT", "2")))
@@ -2180,33 +2392,20 @@ class MedicationCoordinatorAgent:
             rejection_limit = 2
         consecutive_rejections = 0
         circuit_broken = False
-        while state.cycle < budget.max_cycles:
-            elapsed = time.perf_counter() - turn_started
-            exhausted = None
-            # Reliability P0: reserve a safety margin before the wall-clock
-            # limit so the *next* planner call (up to 60s) cannot silently
-            # cross the deadline — the loop-top check alone could not bound a
-            # running call.  Budgets smaller than the reserve keep the original
-            # threshold unchanged.
-            reserve = PLANNER_RESERVE_SECONDS if budget.wall_clock_seconds > PLANNER_RESERVE_SECONDS else 0.0
-            if elapsed > budget.wall_clock_seconds - reserve:
-                exhausted = "wall_clock"
-            elif tokens_estimated > budget.token_budget:
-                exhausted = "tokens"
-            if exhausted is not None and state.cycle > 0:
-                state.degraded_reason = f"budget_exhausted:{exhausted}"
+        while True:
+            # Harness P2: cancellation is observed at the next scheduling
+            # point — a decided-but-not-yet-executed plan is dropped, an
+            # in-flight model call result is discarded by this gate.
+            if state.ctx is not None and state.ctx.cancelled():
+                state.degraded_reason = "cancelled"
                 state.trace.append({
-                    "phase": "budget", "cycle": state.cycle,
-                    "exhausted": exhausted,
-                    "elapsed_seconds": round(elapsed, 3),
-                    "tokens_estimated": tokens_estimated,
-                    "limits": {"wall_clock_seconds": budget.wall_clock_seconds,
-                               "token_budget": budget.token_budget,
-                               "max_cycles": budget.max_cycles},
-                    "note": "回合预算耗尽；停止工具执行并生成明确降级响应（结果可能不完整）。",
+                    "phase": "cancel", "cycle": state.cycle,
+                    "note": "收到取消请求；停止后续规划与工具执行，已完成操作不受影响。",
                 })
                 break
-            state.cycle += 1
+            if budget.gate(state):
+                break
+            budget.cycle(state)
             if circuit_broken:
                 # B3: the breaker has tripped — finish the turn deterministically
                 # without spending further planner LLM calls.
@@ -2218,6 +2417,9 @@ class MedicationCoordinatorAgent:
                 try:
                     action = self.planner.decide(state)
                     consecutive_rejections = 0
+                except BudgetExceeded:
+                    budget.gate(state)
+                    break
                 except PlanningRejected:
                     consecutive_rejections += 1
                     state.trace.append({"phase": "plan", "cycle": state.cycle, "decision": {"tool": "replan"},
@@ -2232,11 +2434,6 @@ class MedicationCoordinatorAgent:
                                      "本回合剩余周期切换确定性规划，不再消耗 LLM 调用。"),
                         })
                     continue
-                payload_chars = getattr(self.planner, "last_payload_chars", 0)
-                if payload_chars:
-                    # Conservative estimate for Chinese-heavy payloads; provider
-                    # usage values replace it when wired in (Stage 11 埋点).
-                    tokens_estimated += int(payload_chars / 1.5)
             plan_trace = {
                 "phase": "plan", "cycle": state.cycle,
                 "decision": asdict(action) if action else {"tool": "respond"},
@@ -2274,6 +2471,17 @@ class MedicationCoordinatorAgent:
             })
             self._reflect(state, observation)
             self._flush_traces(state)
+            # Harness P2: no-progress contract — structured feedback on a
+            # repeat, safe shutdown at the threshold.
+            if self._progress_verdict(state, observation) == "stop":
+                state.degraded_reason = "no_progress:repeated_reads"
+                unfinished = self._unfinished_items(state)
+                state.trace.append({
+                    "phase": "no_progress", "cycle": state.cycle,
+                    "note": "连续重复读取未产生新进展；停止重复规划并安全收尾，不以重复结果提高置信度。",
+                    "unfinished_items": unfinished,
+                })
+                return self._finalize(state, self._respond(state))
         if state.degraded_reason is None:
             state.degraded_reason = "max_cycles_exceeded"
             state.trace.append({
@@ -2282,10 +2490,101 @@ class MedicationCoordinatorAgent:
             })
         return self._finalize(state, self._respond(state))
 
+    def _unfinished_items(self, state: AgentState) -> list[str]:
+        """Explicit unfinished items for a safe shutdown (P2 constraint 4):
+        safety requirements the guard still counts as unmet, plus failed tool
+        attempts — never inferred confidence from repeated results."""
+        unfinished = list(PlannerPolicyGuard().unmet_requirements(state))
+        unfinished.extend(f"{item.tool}_failed" for item in state.observations if not item.ok)
+        return sorted(set(unfinished)) or ["unresolved_read_repetition"]
+
     def _finalize(self, state: AgentState, response: AgentResponse) -> AgentResponse:
-        """Flush remaining turn traces, then apply the final safety boundary."""
+        """Flush remaining turn traces, then apply the final safety boundary.
+
+        The safety gate is code, not a hook: ``before_publish`` is strictly
+        observational and runs before it."""
+        check_lease()
+        self.hooks.emit("before_publish", ctx=state.ctx,
+                        meta={"degraded_reason": state.degraded_reason,
+                              "safety_status": response.safety_status})
         self._flush_traces(state)
-        return self.safety.enforce(response)
+        enforced = self.safety.enforce(response)
+        # Product P1: the AnswerBundle is derived AFTER the safety gate from
+        # exactly the delivered response — the same warnings/conflicts/refs
+        # the text and cards render from.  It adds no new facts and never
+        # bypasses the gate.
+        try:
+            enforced.answer_bundle = self._build_answer_bundle(state, enforced)
+        except Exception:  # bundle is additive; a failure must not break delivery
+            logger.exception("answer bundle build failed run=%s", state.turn_id)
+            enforced.answer_bundle = None
+        return enforced
+
+    def _build_answer_bundle(self, state: AgentState,
+                             response: AgentResponse) -> dict[str, Any]:
+        audit = response.audit_trail or {}
+        claims: list[dict[str, Any]] = []
+        for index, warning in enumerate(response.warnings):
+            citations = warning.get("citations") or []
+            from .evidence_quality import assess_claim
+            assessments = []
+            for citation in citations:
+                identifier = citation.get('evidence_id') if isinstance(citation, dict) else None
+                if not identifier:
+                    continue
+                with self.memory._lock:
+                    row = self.memory.connection.execute('SELECT content,content_hash FROM evidence_records WHERE evidence_id=? AND (scope_id=? OR access_class=?)',
+                        (identifier, 'local-demo', 'general_label')).fetchone()
+                import hashlib
+                content = row['content'] if row and hashlib.sha256(row['content'].encode()).hexdigest() == row['content_hash'] else ''
+                assessments.append(assess_claim(quote=citation.get('quote'), text=content,
+                    entities=[warning.get('drug_a', ''), warning.get('drug_b', '')], evidence_id=identifier,
+                    conditions_known=warning.get('drug_b') != '患者个体风险'))
+            verdicts = {a['status'] for a in assessments}
+            support = 'insufficient' if not verdicts or len(verdicts) > 1 else next(iter(verdicts))
+            claims.append({
+                "claim_id": f"warning:{index}",
+                "kind": "warning",
+                "statement": warning.get("text")
+                             or MemoryWriteTool._warning_text(warning),
+                "status": "current",
+                'support_status': support, 'support_assessments': assessments,
+                "evidence_refs": [c["evidence_id"] for c in citations
+                                  if isinstance(c, dict) and c.get("evidence_id")],
+            })
+        for index, conflict in enumerate(response.conflicts):
+            claims.append({
+                "claim_id": f"conflict:{index}",
+                "kind": "conflict",
+                "statement": conflict.get("description")
+                             or conflict.get("ref", f"conflict:{index}"),
+                "status": "open",
+                "evidence_refs": [],
+            })
+        evidence_refs = sorted({ref for claim in claims for ref in claim["evidence_refs"]})
+        fact_refs = list(dict.fromkeys(audit.get("memory_refs") or []))
+        unresolved = [conflict.get("ref") for conflict in response.conflicts if conflict.get("ref")]
+        if state.degraded_reason:
+            unresolved.append(f"degraded:{state.degraded_reason}")
+        consolidated = PlannerPolicyGuard._consolidation(state) is not None
+        return {
+            "bundle_version": "answer-bundle@1",
+            "safety_status": response.safety_status,
+            "claims": claims,
+            "fact_refs": fact_refs,
+            "evidence_refs": evidence_refs,
+            "patient_revision": {
+                "medications": self.memory.scope_revision("medications"),
+                "semantic": self.memory.scope_revision("semantic"),
+            },
+            "unresolved_questions": [item for item in unresolved if item],
+            "coverage": {
+                "consolidated": consolidated,
+                "response_source": audit.get("response_source"),
+                "degraded_reason": state.degraded_reason,
+                'research': [o.result.get('research') for o in state.observations if o.tool == 'ddi_check' and isinstance(o.result, dict) and o.result.get('research')],
+            },
+        }
 
     def _flush_traces(self, state: AgentState) -> None:
         """Persist new trace entries to turn_traces (Stage 8 B6).
@@ -2318,16 +2617,43 @@ class MedicationCoordinatorAgent:
             "purpose": action.purpose, "arguments": action.arguments,
             "planner_source": planner_source,
         })
+        ctx = state.ctx or self._context_for(state)
         try:
-            if action.tool == "memory_write":
-                result = self.tools[action.tool](state=state, **action.arguments)
-            else:
-                result = self.tools[action.tool](**action.arguments)
-            if action.tool == "rag_search" and isinstance(result, dict):
-                result = self._attach_condition_warnings(state, result)
-            return Observation(action.tool, action.purpose, action.arguments, result, True)
-        except Exception as exc:
-            return Observation(action.tool, action.purpose, action.arguments, {"error": f"{type(exc).__name__}: {exc}"}, False)
+            check_lease()
+            tool_result = self.executor.execute(ctx, action.tool, action.arguments, state=state)
+        except BudgetExceeded:
+            # Budget exhaustion during dispatch is a run-level terminal state,
+            # never a retryable tool failure: classify it explicitly and let
+            # the loop's budget gate terminate the turn.
+            state.degraded_reason = "budget_exhausted:tool_dispatch"
+            return Observation(action.tool, action.purpose, action.arguments,
+                               {"error": "budget_exhausted", "error_kind": "budget_exhausted",
+                                "recoverable": False}, False,
+                               error_kind="budget_exhausted", recoverable=False)
+        if tool_result.ok:
+            return Observation(action.tool, action.purpose, action.arguments,
+                               tool_result.value, True,
+                               evidence_refs=tool_result.evidence_refs)
+        error = dict(tool_result.error or {})
+        return Observation(action.tool, action.purpose, action.arguments,
+                           error, False, error_kind=error.get("error_kind"),
+                           recoverable=error.get("recoverable"))
+
+    def _context_for(self, state: AgentState) -> RunContext:
+        """Build the shared RunContext for a turn (both runners converge here
+        when the runner did not supply one).  The cancel handle comes from the
+        process-wide registry so an API-thread cancel request reaches the
+        running turn at its next scheduling point (P2)."""
+        run_id = CURRENT.get().run_id if CURRENT.get() else state.turn_id
+        from .harness.progress import cancel_event_for
+        ctx = RunContext(
+            run_id=run_id,
+            turn_id=state.turn_id, session_id=state.session_id,
+            client_event_id=state.client_event_id,
+            cancel_event=cancel_event_for(run_id),
+        )
+        state.ctx = ctx
+        return ctx
 
     def _attach_condition_warnings(self, state: AgentState, result: dict[str, Any]) -> dict[str, Any]:
         """Deterministically derive patient-condition warnings from label text.
@@ -2338,7 +2664,10 @@ class MedicationCoordinatorAgent:
         LLM decides *whether and what* to query; the code decides what the
         retrieved label text implies for this patient's recorded facts.
         """
-        if not self._is_safety_condition_event(state):
+        if state is None or not self._is_safety_condition_event(state):
+            # state=None is a legitimate worker dispatch (Harness P3 read-only
+            # workers run outside the parent AgentState); enrichment is a
+            # parent-turn concern and simply does not apply.
             return result
         snapshot_observation = next(
             (
@@ -2401,7 +2730,11 @@ class MedicationCoordinatorAgent:
         state.trace.append({"phase": "reflect", "cycle": state.cycle, "note": note})
 
     def _respond(self, state: AgentState) -> AgentResponse:
-        """Compose the final response; LLM-authored with a logged template fallback."""
+        """Compose and verify exactly the delivered response."""
+        if CURRENT.get() is not None:
+            if (state.degraded_reason or '').startswith('budget_exhausted:'):
+                CURRENT.get().reason = state.degraded_reason.split(':', 1)[1]
+            CURRENT.get().gate(state, check_cycles=False)
         warnings: list[dict[str, Any]] = []
         conflicts: list[dict[str, Any]] = []
         memory_refs: list[str] = []
@@ -2412,7 +2745,7 @@ class MedicationCoordinatorAgent:
                 warnings.extend(observation.result.get("recorded_warnings", []))
                 if observation.result.get("conflict"):
                     conflicts.append(observation.result["conflict"])
-        if self.response_composer is None:
+        if self.response_composer is None and not state.degraded_reason:
             clarification = state.successful_observation("ask_clarification")
             if clarification:
                 return AgentResponse(clarification.result["question"], [], [],
@@ -2432,6 +2765,8 @@ class MedicationCoordinatorAgent:
         composed, compose_error = self._compose_response(
             state, warnings, conflicts, memory_refs, escalation_required, refusal_required,
         )
+        if CURRENT.get() is not None:
+            CURRENT.get().gate(state, check_cycles=False)
         if composed is not None:
             text = composed
             response_source = "llm"
@@ -2466,10 +2801,20 @@ class MedicationCoordinatorAgent:
                         text += f"\n未决矛盾 [{conflict['ref']}]：报告 [{conflict['left_ref']}]；证据 [{conflict['right_ref']}]。"
                     compose_error = (compose_error or "") + ";template_sanitized:" + ",".join(template_errors)
         if (state.degraded_reason or "").startswith("budget_exhausted"):
+            if PlannerPolicyGuard._consolidation(state) is None:
+                text = "本次事件尚未保存；用药相互作用及患者个体风险检查未完成。建议咨询医生/药师。"
+            else:
+                text = "本次报告已保存；后续用药相互作用或患者个体风险检查未全部完成，不能据此判断无风险。建议咨询医生/药师。"
+                for warning in warnings:
+                    text += f"\n{MemoryWriteTool._warning_text(warning)} 来源：{warning['citations'][0]['uri']}；审计：{warning['audit_trail']['warning_memory']}"
             # B1: fixed code-owned notice, prepended BEFORE the final check so
             # the checked text is exactly the delivered text.
             text = BUDGET_DEGRADED_NOTICE + "\n" + text
-        if self.response_composer is not None:
+            for conflict in conflicts:
+                text += f"\n未决矛盾 [{conflict['ref']}]：报告 [{conflict['left_ref']}]；证据 [{conflict['right_ref']}]。"
+            if refusal_required:
+                text += "\n我不能诊断、开药或建议调整剂量。"
+        if self.response_composer is not None or state.degraded_reason:
             final_errors = self._check_response(text, warnings=warnings, conflicts=conflicts,
                 memory_refs=memory_refs, escalation_required=escalation_required,
                 refusal_required=refusal_required)
@@ -2603,6 +2948,9 @@ class MedicationCoordinatorAgent:
         composer = self.response_composer
         if composer is None:
             return None, None
+        if CURRENT.get() is not None and CURRENT.get().exhausted():
+            return None, "budget_exhausted"
+        self.hooks.emit("before_model", ctx=state.ctx, kind="composer", meta={})
         payload = {
             "care_event": {
                 "event_type": state.event.event_type,
@@ -2644,8 +2992,12 @@ class MedicationCoordinatorAgent:
         try:
             text = composer.compose(payload)
         except Exception as exc:
+            self.hooks.emit("after_model", ctx=state.ctx, kind="composer",
+                            meta={"status": "error", "reason": f"composer_error:{type(exc).__name__}"})
             return None, f"composer_error:{type(exc).__name__}"
         if not isinstance(text, str) or not text.strip():
+            self.hooks.emit("after_model", ctx=state.ctx, kind="composer",
+                            meta={"status": "empty"})
             return None, "composer_empty"
         text = text.strip()
         problems = self._check_response(
@@ -2658,6 +3010,8 @@ class MedicationCoordinatorAgent:
         )
         state.trace.append({"phase": "response_validation", "cycle": state.cycle, "candidate": text,
                             "errors": problems, "verifier": getattr(self, "_last_verifier_info", None)})
+        self.hooks.emit("after_model", ctx=state.ctx, kind="composer",
+                        meta={"status": "validated", "postcheck_errors": problems})
         if problems:
             return None, "postcheck_failed:" + ";".join(problems)
         return text, None
@@ -2781,7 +3135,14 @@ class MedicationCoordinatorAgent:
         if failed_tools:
             text += "\n部分工具调用失败，结果不完整；建议咨询医生/药师。"
         elif state.degraded_reason:
-            text += "\n规划达到安全循环上限，结果可能不完整；建议咨询医生/药师。"
+            if str(state.degraded_reason).startswith("no_progress"):
+                unfinished = self._unfinished_items(state)
+                text += ("\n重复读取未产生新信息，已停止进一步检索（不以重复结果提高置信度）；"
+                         f"未完成项：{'、'.join(unfinished)}。建议咨询医生/药师。")
+            elif state.degraded_reason == "cancelled":
+                text += "\n任务已按请求取消；已完成记录保留，未完成的检查不再执行。建议咨询医生/药师。"
+            else:
+                text += "\n规划达到安全循环上限，结果可能不完整；建议咨询医生/药师。"
         return text
 
     @staticmethod

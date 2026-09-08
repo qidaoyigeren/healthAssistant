@@ -16,6 +16,12 @@ import re
 import time
 from pathlib import Path
 
+try:
+    from .turn_budget import completion_call, BudgetExceeded, CURRENT
+except ImportError:
+    from turn_budget import completion_call, BudgetExceeded, CURRENT
+
+
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
 TOKENDANCE_BASE_URL = "https://tokendance.space/gateway/v1"
@@ -337,7 +343,7 @@ def _production_call(client, model: str, source_drug: str, text: str, delay: flo
     last_error: Exception | None = None
     for attempt in range(3):
         try:
-            response = client.chat.completions.create(
+            response = completion_call("ddi_extractor", client,
                 model=model,
                 messages=[
                     {"role": "system", "content": PROMPT},
@@ -366,8 +372,12 @@ def _production_call(client, model: str, source_drug: str, text: str, delay: flo
             # Retrying that deterministic negative wastes provider calls and
             # can turn a clean result into a sampling-induced false positive.
             return triples
+        except BudgetExceeded:
+            raise
         except Exception as exc:
             last_error = exc
+            if CURRENT.get() is not None and CURRENT.get().exhausted():
+                raise
             if attempt < 2:
                 time.sleep(max(1.0, delay) * (attempt + 1))
     raise RuntimeError(f"production extraction failed after three attempts: {last_error}")
@@ -482,7 +492,7 @@ def evaluate(gold_path: Path, output: Path, model: str | None, delay: float = 1.
         prediction = None
         for attempt in range(3):
             try:
-                response = client.chat.completions.create(
+                response = completion_call("ddi_extractor", client,
                     model=model,
                     messages=[{"role": "system", "content": EVAL_PROMPT}, {"role": "user", "content": user_content}],
                     tools=[EVAL_TOOL],

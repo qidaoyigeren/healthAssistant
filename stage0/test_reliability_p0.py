@@ -453,7 +453,7 @@ class LogSanitizationTests(unittest.TestCase):
                 self.assertNotIn(leak, joined)
                 self.assertIn("RuntimeError", joined)
                 self.assertIn("trace-xyz", joined)  # id correlation, not content
-                self.assertIn("error_class=retryable", joined)
+                self.assertIn("error_class=permanent", joined)
             finally:
                 api.close()
 
