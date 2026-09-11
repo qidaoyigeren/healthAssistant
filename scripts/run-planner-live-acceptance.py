@@ -13,9 +13,10 @@ PROTOCOL = ROOT / 'docs/agent-capability-upgrade/closeout-2026-09-10/planner-rel
 
 
 def fingerprint():
-    paths = sorted([*ROOT.glob('stage0/**/*.py'), *ROOT.glob('frontend/src/**/*.ts'),
-                    *ROOT.glob('frontend/src/**/*.tsx'), *ROOT.glob('scripts/*.py')])
-    return hashlib.sha256(b''.join(str(p.relative_to(ROOT)).encode() + p.read_bytes() for p in paths)).hexdigest()
+    """BINDING repo scope — see stage0/source_fingerprint.py."""
+    sys.path.insert(0, str(ROOT))
+    from stage0.source_fingerprint import SCOPE_REPO, source_fingerprint
+    return source_fingerprint(SCOPE_REPO)
 
 
 def main():

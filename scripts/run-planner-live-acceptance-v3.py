@@ -66,10 +66,11 @@ CHILD_ENV = {
 
 
 def fingerprint() -> str:
-    paths = sorted([*ROOT.glob('stage0/**/*.py'), *ROOT.glob('frontend/src/**/*.ts'),
-                    *ROOT.glob('frontend/src/**/*.tsx'), *ROOT.glob('scripts/*.py')])
-    return hashlib.sha256(b''.join(str(p.relative_to(ROOT)).encode() + p.read_bytes()
-                                   for p in paths)).hexdigest()
+    """BINDING repo scope (stage0 + frontend/src + scripts/) — the widest, so
+    a record citing it is comparable with any other repo-scope record."""
+    sys.path.insert(0, str(ROOT))
+    from stage0.source_fingerprint import SCOPE_REPO, source_fingerprint
+    return source_fingerprint(SCOPE_REPO)
 
 
 def effective_config() -> dict:

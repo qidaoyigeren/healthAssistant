@@ -24,8 +24,12 @@ FROZEN = ROOT / 'docs/agent-capability-upgrade/A0/baseline-source.zip'
 
 
 def fingerprint():
-    files = sorted(p for p in (ROOT / 'stage0').rglob('*.py') if '__pycache__' not in str(p))
-    return hashlib.sha256(b''.join(str(p.relative_to(ROOT)).encode() + p.read_bytes() for p in files)).hexdigest()
+    """Digest of the runtime scope — see stage0/source_fingerprint.py.
+
+    Kept as a module-level name because scripts/replay-agent-closeout.py
+    imports it."""
+    from stage0.source_fingerprint import SCOPE_RUNTIME, source_fingerprint
+    return source_fingerprint(SCOPE_RUNTIME)
 
 
 def freeze():

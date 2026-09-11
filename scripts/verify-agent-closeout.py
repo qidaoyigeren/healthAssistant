@@ -17,9 +17,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def fingerprint():
-    paths = sorted([*ROOT.glob('stage0/**/*.py'), *ROOT.glob('frontend/src/**/*.ts'),
-                    *ROOT.glob('frontend/src/**/*.tsx')])
-    return hashlib.sha256(b''.join(str(p.relative_to(ROOT)).encode() + p.read_bytes() for p in paths)).hexdigest()
+    """App scope (stage0 + frontend/src, NO scripts/) — see
+    stage0/source_fingerprint.py.
+
+    NOTE: narrower than the live-acceptance entries' repo scope, so the two
+    digests are not comparable.  Scope is explicit now precisely so that is
+    visible instead of being discovered as a false 'source changed' alarm."""
+    sys.path.insert(0, str(ROOT))
+    from stage0.source_fingerprint import SCOPE_APP, source_fingerprint
+    return source_fingerprint(SCOPE_APP)
 
 
 def main():

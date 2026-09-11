@@ -27,11 +27,16 @@ def write_json(path, value):
 
 
 def source_fingerprints():
-    files = list((ROOT / "stage0").rglob("*.py")) + list((ROOT / "frontend" / "src").rglob("*.ts*"))
-    files += [ROOT / "scripts/harness-browser-acceptance.js", ROOT / "frontend/package-lock.json",
-              ROOT / "requirements-harness-observability.txt"]
-    return {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in sorted(files) if p.is_file()}
+    """Per-file digests over the app scope plus the harness-specific assets.
+
+    Delegates to stage0/source_fingerprint.py so this cannot drift from the
+    scope the acceptance entries use.  The three extras are files the harness
+    round ships that the app scope does not cover."""
+    from stage0.source_fingerprint import SCOPE_APP, source_fingerprint_map
+    return source_fingerprint_map(SCOPE_APP, extra=(
+        "scripts/harness-browser-acceptance.js",
+        "frontend/package-lock.json",
+        "requirements-harness-observability.txt"))
 
 
 def main():

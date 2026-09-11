@@ -62,6 +62,35 @@ class LiveRegressionTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'Live authorization does not cover'):
                 extract_ddi.assert_live_authorized(tampered)
 
+    def test_fingerprint_scopes_are_nested_and_deliberately_distinct(self):
+        """The trap this guards: two entry points hashed different file sets,
+        so their digests could never match and a comparison read as 'source
+        changed'. Scope is now explicit, named and nested."""
+        from stage0.source_fingerprint import (SCOPE_APP, SCOPE_REPO, SCOPE_RUNTIME,
+                                               source_files, source_fingerprint)
+        runtime = {str(p) for p in source_files(SCOPE_RUNTIME)}
+        app = {str(p) for p in source_files(SCOPE_APP)}
+        repo = {str(p) for p in source_files(SCOPE_REPO)}
+        self.assertTrue(runtime < app < repo, 'scopes must be strictly nested')
+        self.assertIn('scripts', ''.join(repo - app))       # repo adds scripts/
+        self.assertIn('frontend', ''.join(app - runtime))   # app adds the frontend
+        # Distinct, so a cross-scope comparison is visibly wrong rather than
+        # silently plausible.
+        self.assertEqual(3, len({source_fingerprint(s) for s in (SCOPE_RUNTIME, SCOPE_APP, SCOPE_REPO)}))
+
+    def test_fingerprint_rejects_unknown_scope_and_normalises_extra(self):
+        import hashlib
+        from stage0.source_fingerprint import (ROOT, SCOPE_APP, source_files,
+                                               source_fingerprint_map)
+        with self.assertRaisesRegex(ValueError, 'unknown fingerprint scope'):
+            source_files('not_a_scope')
+        relative = ('requirements-harness-observability.txt',)
+        absolute = (ROOT / 'requirements-harness-observability.txt',)
+        self.assertEqual(source_fingerprint_map(SCOPE_APP, extra=relative),
+                         source_fingerprint_map(SCOPE_APP, extra=absolute))
+        entry = source_fingerprint_map(SCOPE_APP, extra=relative)['requirements-harness-observability.txt']
+        self.assertEqual(hashlib.sha256((ROOT / relative[0]).read_bytes()).hexdigest(), entry)
+
     def test_standalone_recheck_records_terminal_status_without_refilling_budget(self):
         from stage0.turn_budget import BudgetExceeded
         with tempfile.TemporaryDirectory() as directory, MemoryStore(Path(directory)/'memory.db') as store:
