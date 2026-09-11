@@ -1,0 +1,30 @@
+{
+  "protocol": "agent-acceptance@1",
+  "stage": "A3",
+  "generated_at": "2026-09-09",
+  "source_fingerprint": "35747cb0fa46b290e7b2a07aa59e0083370cfc8775fbc575f465917512b5fd43",
+  "engineering_status": "pass",
+  "real_model_quality": "unavailable",
+  "provider_availability": "unavailable",
+  "independent_held_out": "unavailable",
+  "verification": {
+    "adaptive_tests": {"command": "python -m unittest stage0.test_agent_adaptive -v", "result": "8/8 OK"},
+    "backend_batch_1": {"command": "python -m unittest stage0.test_agent_investigation stage0.test_agent_open_tasks stage0.test_agent_adaptive stage0.test_live_regressions stage0.test_stage8_agent stage0.test_harness_p0..p3 stage0.test_memory_p0..p2 stage0.test_reliability_p0..p2", "result": "228 OK"},
+    "backend_batch_2": {"command": "python -m unittest stage0.test_product_tasks stage0.test_product_evals stage0.test_product_evidence_quality stage0.test_product_reconciliation stage0.test_frontend_read_models stage0.test_stage10_server stage0.test_product_closeout", "result": "49 OK"},
+    "dev_set_regression": {"command": "python -m stage0.agent_evals.run_eval --policy gap --path replay", "result": {"total": 13, "passed": 13, "per_task_identical_to_A1_dev_replay_final": true}}
+  },
+  "routing": {
+    "routes": ["exact_query", "contract_flow", "open_planning", "legacy"],
+    "compound_request_keeps_all_goals": true,
+    "recorded_in_bundle": ["route", "route_basis"]
+  },
+  "phase_budget": {"wrap_up_reserve_rule": "~15% of cycle budget, min 1, partition of existing budget", "degraded_reason": "budget_reserved_for_wrapup", "recorded": ["limit_cycles", "wrap_up_reserved", "cycles_used", "token_usage"]},
+  "failure_taxonomy": {"classify_error": ["retryable", "permanent", "safety", "effect_unknown"], "error_detail": ["rate_limit", "timeout", "transient", "permanent", "effect_unknown", "validation"], "sdk_retry_amplification": "none (SDK max_retries defaults to 0; app layer owns bounded retries)"},
+  "key_files": ["stage0/router.py", "stage0/agent.py", "stage0/server.py", "stage0/test_agent_adaptive.py"],
+  "limitations": [
+    "no live-provider fault injection; classification/backoff verified by unit tests only",
+    "p50/p95 with a real model unavailable",
+    "quality non-inferiority enforced on synthetic dev set (reserved turns deliver bounded report, never claim completion)"
+  ],
+  "environment_note": "running RapidOCR-loading product suites together with the full sweep in one process can natively segfault on this Windows machine (pre-existing, independent of these changes); suites pass individually and in batches"
+}

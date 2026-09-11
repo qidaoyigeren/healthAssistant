@@ -1,0 +1,215 @@
+{
+  "started_at": "2026-09-11T14:30:57.957132+00:00",
+  "note": "synthetic content only; qualification for the v3 tool contract",
+  "records": [
+    {
+      "provider": "zhipu",
+      "model": "glm-4.7-flash",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "max_tokens": 4096,
+      "tool_choice": "required",
+      "thinking": "disabled",
+      "calls": [
+        {
+          "call": 1,
+          "at": "2026-09-11T14:29:21.580604+00:00",
+          "latency_ms": 724,
+          "outcome": "error",
+          "error_type": "RateLimitError",
+          "error": "Error code: 429 - {'error': {'code': '1305', 'message': '该模型当前访问量过大，请您稍后再试'}}",
+          "accepted": false
+        },
+        {
+          "call": 2,
+          "at": "2026-09-11T14:29:22.304184+00:00",
+          "latency_ms": 11788,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"query\":\"甲与乙 相互作用\",\"gap_id\":\"claim:abc\",\"expected_observation\":\"甲与乙的相互作用证据\"}"
+          ],
+          "content_present": false,
+          "total_tokens": 529,
+          "accepted": true
+        },
+        {
+          "call": 3,
+          "at": "2026-09-11T14:29:34.091818+00:00",
+          "latency_ms": 15179,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"query\":\"甲与乙 相互作用 药物相互作用\",\"gap_id\":\"claim:abc\",\"expected_observation\":\"甲与乙的相互作用证据\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "total_tokens": 541,
+          "accepted": true
+        },
+        {
+          "call": 4,
+          "at": "2026-09-11T14:29:49.270546+00:00",
+          "latency_ms": 11684,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"query\":\"甲与乙 相互作用\",\"gap_id\":\"claim:abc\",\"expected_observation\":\"甲与乙的相互作用证据\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "total_tokens": 536,
+          "accepted": true
+        },
+        {
+          "call": 5,
+          "at": "2026-09-11T14:30:00.954919+00:00",
+          "latency_ms": 1242,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"query\":\"甲与乙的相互作用\",\"gap_id\":\"claim:abc\",\"expected_observation\":\"甲与乙的相互作用证据\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "total_tokens": 535,
+          "accepted": true
+        }
+      ]
+    },
+    {
+      "provider": "tokendance",
+      "model": "glm-5.3-flash",
+      "base_url": "https://tokendance.space/gateway/v1",
+      "max_tokens": 4096,
+      "tool_choice": "required",
+      "thinking": "disabled",
+      "calls": [
+        {
+          "call": 1,
+          "at": "2026-09-11T14:30:02.199349+00:00",
+          "latency_ms": 10880,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"expected_observation\":\"在合并用药、药物相互作用或临床注意事项章节中，找到同时提及合成药甲与合成药乙的段落，给出两者联用是否需调整剂量、禁忌或需监测不良反应的原文表述。\",\"gap_id\":\"claim:abc\",\"query\":\"合成药甲与合成药乙联合使用是否存在药物-药物相互作用？相关禁忌、剂量调整或监测建议\",\"section\":\"药物相互作用\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "total_tokens": 771,
+          "accepted": true
+        },
+        {
+          "call": 2,
+          "at": "2026-09-11T14:30:13.079290+00:00",
+          "latency_ms": 9653,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"expected_observation\":\"说明书或文献中的\\\"药物相互作用\\\"相关段落，描述合成药甲与合成药乙联用时的药代动力学/药效学变化、禁忌或剂量调整建议\",\"gap_id\":\"claim:abc\",\"query\":\"合成药甲 与 合成药乙 联合使用 相互作用 禁忌 剂量调整\",\"section\":\"药物相互作用\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "total_tokens": 846,
+          "accepted": true
+        },
+        {
+          "call": 3,
+          "at": "2026-09-11T14:30:22.732435+00:00",
+          "latency_ms": 10824,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"expected_observation\":\"标签文本中关于合成药甲与合成药乙合用的相互作用描述（如禁忌、警告、剂量调整建议或药代动力学影响）；若无相关条目则返回不相关结果\",\"gap_id\":\"claim:abc\",\"query\":\"合成药甲 合成药乙 相互作用 联合用药 CYP代谢 禁忌 剂量调整\",\"section\":\"药物相互作用\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "total_tokens": 838,
+          "accepted": true
+        },
+        {
+          "call": 4,
+          "at": "2026-09-11T14:30:33.556540+00:00",
+          "latency_ms": 10342,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"expected_observation\":\"药物相互作用章节或临床研究文献中关于合成药甲与合成药乙合用导致药代动力学或药效学相互作用的描述（如CYP450酶抑制、QT延长、出血风险等），以及相关的严重程度与处置建议。\",\"gap_id\":\"claim:abc\",\"query\":\"合成药甲与合成药乙联合使用时的相互作用（机制、严重程度、临床处置建议）\",\"section\":\"药物相互作用\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "total_tokens": 748,
+          "accepted": true
+        },
+        {
+          "call": 5,
+          "at": "2026-09-11T14:30:43.898891+00:00",
+          "latency_ms": 14058,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"expected_observation\":\"说明书\\\"药物相互作用\\\"或\\\"联合用药\\\"相关段落，包含甲、乙两药（或其成分）同时使用的相互作用机制、临床后果及处理建议；若为仅提及单药或未提及乙药的内容，则记录为证据不充分。\",\"gap_id\":\"claim:abc\",\"query\":\"合成药甲 合成药乙 相互作用 联合用药 注意事项 禁忌\",\"section\":\"药物相互作用\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "total_tokens": 834,
+          "accepted": true
+        }
+      ]
+    }
+  ],
+  "summary": [
+    {
+      "provider": "zhipu",
+      "model": "glm-4.7-flash",
+      "calls": 5,
+      "accepted": 4,
+      "complete_contract": 4,
+      "rate_limited": 1,
+      "latency_ms_each": [
+        11788,
+        15179,
+        11684,
+        1242
+      ],
+      "latency_ms_median": 11788,
+      "problems": []
+    },
+    {
+      "provider": "tokendance",
+      "model": "glm-5.3-flash",
+      "calls": 5,
+      "accepted": 5,
+      "complete_contract": 5,
+      "rate_limited": 0,
+      "latency_ms_each": [
+        10880,
+        9653,
+        10824,
+        10342,
+        14058
+      ],
+      "latency_ms_median": 10824,
+      "problems": []
+    }
+  ],
+  "completed_at": "2026-09-11T14:30:57.957259+00:00"
+}

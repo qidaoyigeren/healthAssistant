@@ -1,0 +1,596 @@
+{
+  "task_id": "agent-dev-complete",
+  "cycles": 2,
+  "mode": "mock_transport",
+  "remote_calls": 0,
+  "request_schema": {
+    "request_count": 2,
+    "samples": [
+      {
+        "index": 0,
+        "model": "glm-4.7-flash",
+        "temperature": 0,
+        "tool_choice": {
+          "type": "function",
+          "function": {
+            "name": "propose_next_action"
+          }
+        },
+        "tool_names": [
+          "propose_next_action"
+        ],
+        "messages_roles": [
+          "system",
+          "user"
+        ],
+        "required": [
+          "decision",
+          "tool",
+          "arguments"
+        ],
+        "decision_enum": [
+          "tool"
+        ],
+        "tool_enum": [
+          "memory_write",
+          "memory_read"
+        ],
+        "arguments_type": "object",
+        "arguments_required_listed": true,
+        "arguments_properties": [
+          "operation",
+          "query"
+        ],
+        "arguments_description": "必须填写所选工具的参数，不能省略检索 query。各工具必填字段：memory_write: operation; memory_read: query",
+        "query_property": {
+          "type": "string",
+          "enum": [
+            "snapshot",
+            "current_medications",
+            "medication_timeline",
+            "conflicts",
+            "context_packet",
+            "pending_rechecks"
+          ]
+        }
+      },
+      {
+        "index": 1,
+        "model": "glm-4.7-flash",
+        "temperature": 0,
+        "tool_choice": {
+          "type": "function",
+          "function": {
+            "name": "propose_next_action"
+          }
+        },
+        "tool_names": [
+          "propose_next_action"
+        ],
+        "messages_roles": [
+          "system",
+          "user"
+        ],
+        "required": [
+          "decision",
+          "tool",
+          "arguments"
+        ],
+        "decision_enum": [
+          "tool"
+        ],
+        "tool_enum": [
+          "memory_write",
+          "memory_read"
+        ],
+        "arguments_type": "object",
+        "arguments_required_listed": true,
+        "arguments_properties": [
+          "operation",
+          "query"
+        ],
+        "arguments_description": "必须填写所选工具的参数，不能省略检索 query。各工具必填字段：memory_write: operation; memory_read: query",
+        "query_property": {
+          "type": "string",
+          "enum": [
+            "snapshot",
+            "current_medications",
+            "medication_timeline",
+            "conflicts",
+            "context_packet",
+            "pending_rechecks"
+          ]
+        }
+      }
+    ],
+    "findings": []
+  },
+  "state_sweep": [
+    {
+      "stage": "authority_open",
+      "permitted_tools": [
+        "memory_write",
+        "memory_read"
+      ],
+      "function_required": [
+        "decision",
+        "tool",
+        "arguments"
+      ],
+      "arguments_type": "object",
+      "arguments_properties": [
+        "operation",
+        "query"
+      ],
+      "arguments_required": null,
+      "query_property": {
+        "type": "string",
+        "enum": [
+          "snapshot",
+          "current_medications",
+          "medication_timeline",
+          "conflicts",
+          "context_packet",
+          "pending_rechecks"
+        ]
+      },
+      "evidence_id_property": null,
+      "raw_arguments_schema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "consolidate_event",
+              "record_warnings",
+              "create_clinical_conflict"
+            ]
+          },
+          "query": {
+            "type": "string",
+            "enum": [
+              "snapshot",
+              "current_medications",
+              "medication_timeline",
+              "conflicts",
+              "context_packet",
+              "pending_rechecks"
+            ]
+          }
+        },
+        "description": "必须填写所选工具的参数，不能省略检索 query。各工具必填字段：memory_write: operation; memory_read: query"
+      }
+    },
+    {
+      "stage": "claim_gaps_rag_allowed",
+      "permitted_tools": [
+        "memory_write",
+        "memory_read",
+        "rag_search",
+        "ddi_check"
+      ],
+      "function_required": [
+        "decision",
+        "tool",
+        "arguments"
+      ],
+      "arguments_type": "object",
+      "arguments_properties": [
+        "drug_name",
+        "focus_medication",
+        "medications",
+        "operation",
+        "query",
+        "section",
+        "top_k"
+      ],
+      "arguments_required": null,
+      "query_property": {
+        "type": "string"
+      },
+      "evidence_id_property": null,
+      "raw_arguments_schema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "consolidate_event",
+              "record_warnings",
+              "create_clinical_conflict"
+            ]
+          },
+          "query": {
+            "type": "string"
+          },
+          "top_k": {
+            "type": "integer"
+          },
+          "section": {
+            "type": "string"
+          },
+          "drug_name": {
+            "type": "string"
+          },
+          "medications": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "focus_medication": {
+            "type": "string"
+          }
+        },
+        "description": "必须填写所选工具的参数，不能省略检索 query。各工具必填字段：memory_write: operation; memory_read: query; rag_search: query; ddi_check: medications"
+      }
+    },
+    {
+      "stage": "evidence_unread",
+      "permitted_tools": [
+        "memory_write",
+        "memory_read",
+        "rag_search",
+        "ddi_check",
+        "read_evidence"
+      ],
+      "function_required": [
+        "decision",
+        "tool",
+        "arguments"
+      ],
+      "arguments_type": "object",
+      "arguments_properties": [
+        "drug_name",
+        "evidence_id",
+        "focus_medication",
+        "limit",
+        "medications",
+        "offset",
+        "operation",
+        "query",
+        "section",
+        "top_k"
+      ],
+      "arguments_required": null,
+      "query_property": {
+        "type": "string"
+      },
+      "evidence_id_property": {
+        "type": "string"
+      },
+      "raw_arguments_schema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "consolidate_event",
+              "record_warnings",
+              "create_clinical_conflict"
+            ]
+          },
+          "query": {
+            "type": "string"
+          },
+          "top_k": {
+            "type": "integer"
+          },
+          "section": {
+            "type": "string"
+          },
+          "drug_name": {
+            "type": "string"
+          },
+          "medications": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "focus_medication": {
+            "type": "string"
+          },
+          "evidence_id": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "description": "必须填写所选工具的参数，不能省略检索 query。各工具必填字段：memory_write: operation; memory_read: query; rag_search: query; ddi_check: medications; read_evidence: evidence_id"
+      }
+    },
+    {
+      "stage": "terminal",
+      "permitted_tools": [
+        "respond"
+      ],
+      "function_required": [
+        "decision"
+      ],
+      "arguments_type": "object",
+      "arguments_properties": [],
+      "arguments_required": null,
+      "query_property": null,
+      "evidence_id_property": null,
+      "raw_arguments_schema": {
+        "type": "object"
+      }
+    }
+  ],
+  "response_parsing": [
+    {
+      "input_tool": "rag_search",
+      "input_arguments": {
+        "query": "q1"
+      },
+      "ok": false,
+      "error": "PlannerProposalError: provider returned an unknown function"
+    },
+    {
+      "input_tool": "rag_search",
+      "input_arguments": "{\"query\": \"q2\"}",
+      "ok": false,
+      "error": "PlannerProposalError: provider returned an unknown function"
+    },
+    {
+      "input_tool": "rag_search",
+      "input_arguments": {},
+      "ok": false,
+      "error": "PlannerProposalError: provider returned an unknown function"
+    },
+    {
+      "input_tool": "memory_read",
+      "input_arguments": {
+        "query": "snapshot"
+      },
+      "ok": false,
+      "error": "PlannerProposalError: provider returned an unknown function"
+    },
+    {
+      "input_tool": null,
+      "input_arguments": null,
+      "parsed": {
+        "decision": "respond",
+        "rationale": "done"
+      },
+      "ok": true
+    }
+  ],
+  "tool_trace": [
+    {
+      "phase": "plan",
+      "cycle": 1,
+      "decision": {
+        "tool": "memory_write",
+        "purpose": "consolidate_interaction",
+        "arguments": {
+          "operation": "consolidate_event"
+        },
+        "rationale": "每次交互先进行结构化事实整合、去重和冲突检测。",
+        "gap_id": null,
+        "expected_observation": null
+      },
+      "planner": {
+        "mode": "hybrid",
+        "source": "fallback",
+        "proposal": null,
+        "validation": {
+          "status": "proposal_error",
+          "valid": false,
+          "errors": [
+            {
+              "code": "wrong_function",
+              "category": "schema",
+              "message": "provider returned an unknown function"
+            }
+          ]
+        },
+        "fallback_reason": "schema_error",
+        "fallback_kind": "emergency",
+        "argument_corrections": [],
+        "model": "glm-4.7-flash",
+        "latency_ms": 3.214,
+        "provider_attempts": [
+          {
+            "outcome": "response",
+            "latency_ms": 2.41
+          }
+        ]
+      }
+    },
+    {
+      "phase": "act",
+      "cycle": 1,
+      "tool": "memory_write",
+      "purpose": "consolidate_interaction",
+      "arguments": {
+        "operation": "consolidate_event"
+      },
+      "planner_source": "fallback"
+    },
+    {
+      "phase": "observe",
+      "cycle": 1,
+      "tool": "memory_write",
+      "purpose": "consolidate_interaction",
+      "ok": true,
+      "summary": {
+        "keys": [
+          "audit_attribution_version",
+          "consolidation",
+          "medication_change",
+          "memory_refs",
+          "operation_replayed"
+        ]
+      }
+    },
+    {
+      "phase": "investigation_progress",
+      "cycle": 1,
+      "tool": "memory_write",
+      "new_evidence_refs": [],
+      "new_read_refs": [],
+      "gap_changes": []
+    },
+    {
+      "phase": "reflect",
+      "cycle": 1,
+      "note": "观察结果足以继续规划。"
+    },
+    {
+      "phase": "plan",
+      "cycle": 2,
+      "decision": {
+        "tool": "memory_read",
+        "purpose": "investigation:authority",
+        "arguments": {
+          "query": "snapshot"
+        },
+        "rationale": "解决已记录缺口",
+        "gap_id": "authority",
+        "expected_observation": "获得完整当前事实及版本"
+      },
+      "planner": {
+        "mode": "hybrid",
+        "source": "fallback",
+        "proposal": null,
+        "validation": {
+          "status": "proposal_error",
+          "valid": false,
+          "errors": [
+            {
+              "code": "wrong_function",
+              "category": "schema",
+              "message": "provider returned an unknown function"
+            }
+          ]
+        },
+        "fallback_reason": "schema_error",
+        "fallback_kind": "emergency",
+        "argument_corrections": [],
+        "model": "glm-4.7-flash",
+        "latency_ms": 3.612,
+        "provider_attempts": [
+          {
+            "outcome": "response",
+            "latency_ms": 2.604
+          }
+        ]
+      }
+    },
+    {
+      "phase": "reflect",
+      "cycle": 2,
+      "note": "剩余周期只够收尾预留；不再开始新工具步骤，保留验证与发布资源。",
+      "unfinished_items": [
+        "unresolved_read_repetition"
+      ]
+    },
+    {
+      "phase": "respond",
+      "cycle": 2,
+      "source": "template",
+      "delivered_text": "有界证据核查报告\n已核查范围：尚无完成项。\n待补充/未解决：读取完整权威药单与关键事实。\n终止原因：budget_insufficient。\n这份报告仅说明有界标签核查结果；insufficient/unknown 不是无风险，未列药物不代表停药。建议咨询医生/药师。",
+      "investigation": {
+        "goal": "请核查当前用药合用的证据和剩余不确定性",
+        "scope_id": "local-demo",
+        "version": "investigation@1",
+        "contract_version": "medication-evidence-review@1",
+        "patient_version": {
+          "medications": 2,
+          "semantic": 0
+        },
+        "claims": [],
+        "gaps": [
+          {
+            "gap_id": "authority",
+            "kind": "patient_fact_missing",
+            "description": "读取完整权威药单与关键事实",
+            "status": "open"
+          }
+        ],
+        "checks": {
+          "authority": "uncovered",
+          "interaction_evidence": "uncovered",
+          "applicability": "uncovered"
+        },
+        "facts": {
+          "semantic": [],
+          "medications": [
+            {
+              "id": 1,
+              "medication_key": "合成药甲",
+              "display_name": "合成药甲",
+              "dose": "5 mg",
+              "route": null,
+              "schedule": null,
+              "status": "active",
+              "start_at": "2026-09-01T00:00:00+00:00",
+              "end_at": null,
+              "source": "synthetic-fixture",
+              "source_uri": null,
+              "version": 1,
+              "predecessor_id": null,
+              "created_at": "2026-09-11T11:26:07+00:00",
+              "start_at_basis": "reported",
+              "ingredients": [],
+              "ref": "memory:medication:1@v1"
+            },
+            {
+              "id": 2,
+              "medication_key": "合成药乙",
+              "display_name": "合成药乙",
+              "dose": "10 mg",
+              "route": null,
+              "schedule": null,
+              "status": "active",
+              "start_at": "2026-09-01T00:00:00+00:00",
+              "end_at": null,
+              "source": "synthetic-fixture",
+              "source_uri": null,
+              "version": 1,
+              "predecessor_id": null,
+              "created_at": "2026-09-11T11:26:07+00:00",
+              "start_at_basis": "reported",
+              "ingredients": [],
+              "ref": "memory:medication:2@v1"
+            }
+          ],
+          "open_conflicts": []
+        },
+        "conflicts": [],
+        "questions": [],
+        "candidates": [
+          {
+            "tool": "memory_read",
+            "purpose": "investigation:authority",
+            "arguments": {
+              "query": "snapshot"
+            },
+            "rationale": "解决已记录缺口",
+            "gap_id": "authority",
+            "expected_observation": "获得完整当前事实及版本"
+          }
+        ],
+        "evidence_refs": [],
+        "read_refs": [],
+        "content_hashes": [],
+        "queries": [],
+        "assessments": {},
+        "no_progress_count": 0,
+        "termination_reason": "budget_insufficient",
+        "authority_read": false,
+        "invalidations": [],
+        "context_integrity": "full_authority_checked_evidence_body_on_demand",
+        "mode": "llm"
+      }
+    }
+  ]
+}

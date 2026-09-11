@@ -1,0 +1,13 @@
+[32m[INFO] 2026-09-11 22:38:17,634 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+[32m[INFO] 2026-09-11 22:38:17,740 [RapidOCR] download_file.py:60: File exists and is valid: D:\py\HealthAssistant\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_det_small.onnx[0m
+[32m[INFO] 2026-09-11 22:38:17,740 [RapidOCR] main.py:63: Using D:\py\HealthAssistant\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_det_small.onnx[0m
+[32m[INFO] 2026-09-11 22:38:17,805 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+[32m[INFO] 2026-09-11 22:38:17,807 [RapidOCR] download_file.py:60: File exists and is valid: D:\py\HealthAssistant\.venv\Lib\site-packages\rapidocr\models\ch_ppocr_mobile_v2.0_cls_mobile.onnx[0m
+[32m[INFO] 2026-09-11 22:38:17,807 [RapidOCR] main.py:63: Using D:\py\HealthAssistant\.venv\Lib\site-packages\rapidocr\models\ch_ppocr_mobile_v2.0_cls_mobile.onnx[0m
+[32m[INFO] 2026-09-11 22:38:17,917 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+[32m[INFO] 2026-09-11 22:38:17,956 [RapidOCR] download_file.py:60: File exists and is valid: D:\py\HealthAssistant\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_rec_small.onnx[0m
+[32m[INFO] 2026-09-11 22:38:17,956 [RapidOCR] main.py:63: Using D:\py\HealthAssistant\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_rec_small.onnx[0m
+----------------------------------------------------------------------
+Ran 4 tests in 16.443s
+
+OK

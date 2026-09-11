@@ -1,0 +1,179 @@
+{
+  "started_at": "2026-09-11T14:28:22.823746+00:00",
+  "note": "synthetic content only; qualification for the v3 tool contract",
+  "records": [
+    {
+      "provider": "zhipu",
+      "model": "glm-4.7-flash",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "max_tokens": 4096,
+      "tool_choice": "required",
+      "calls": [
+        {
+          "call": 1,
+          "at": "2026-09-11T14:26:59.447495+00:00",
+          "latency_ms": 949,
+          "outcome": "error",
+          "error_type": "RateLimitError",
+          "error": "Error code: 429 - {'error': {'code': '1305', 'message': '该模型当前访问量过大，请您稍后再试'}}",
+          "accepted": false
+        },
+        {
+          "call": 2,
+          "at": "2026-09-11T14:27:00.396324+00:00",
+          "latency_ms": 20596,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "respond"
+          ],
+          "raw_arguments": [
+            "{\"rationale\":\"缺少关键信息：未提供合成药甲和合成药乙的具体名称、claim:abc的具体内容以及预期的观察结果。这些信息对于构建有效的检索问题至关重要。\"}"
+          ],
+          "content_present": false,
+          "total_tokens": 741,
+          "accepted": true
+        },
+        {
+          "call": 3,
+          "at": "2026-09-11T14:27:20.992533+00:00",
+          "latency_ms": 9187,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "respond"
+          ],
+          "raw_arguments": [
+            "{\"rationale\":\"需要用户提供 claim:abc 的具体内容才能提出准确的检索问题。\"}"
+          ],
+          "content_present": false,
+          "total_tokens": 859,
+          "accepted": true
+        },
+        {
+          "call": 4,
+          "at": "2026-09-11T14:27:30.179524+00:00",
+          "latency_ms": 6086,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"query\":\"合成药甲与合成药乙的相互作用\",\"gap_id\":\"claim:abc\",\"expected_observation\":\"关于合成药甲与合成药乙相互作用的证据\"}"
+          ],
+          "content_present": false,
+          "total_tokens": 743,
+          "accepted": true
+        }
+      ]
+    },
+    {
+      "provider": "tokendance",
+      "model": "glm-5.3-flash",
+      "base_url": "https://tokendance.space/gateway/v1",
+      "max_tokens": 4096,
+      "tool_choice": "required",
+      "calls": [
+        {
+          "call": 1,
+          "at": "2026-09-11T14:27:36.267020+00:00",
+          "latency_ms": 11020,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"expected_observation\":\"返回的片段应来自\\\"药物相互作用\\\"章节，明确描述合成药甲与合成药乙合用的机制（如代谢酶抑制/诱导）、临床后果（如血药浓度升高、毒性风险）及处理建议（剂量调整或避免合用）\",\"gap_id\":\"claim:abc\",\"query\":\"合成药甲 与 合成药乙 联合使用 相互作用 机制 临床意义 剂量调整建议\",\"section\":\"药物相互作用\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "total_tokens": 847,
+          "accepted": true
+        },
+        {
+          "call": 2,
+          "at": "2026-09-11T14:27:47.286574+00:00",
+          "latency_ms": 12178,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"expected_observation\":\"命中甲乙两药合用的相互作用条目，说明相互作用类型（如药代动力学 CYP 抑制/诱导或药效学叠加）、严重程度分级、临床表现及临床处置或联用禁忌建议\",\"gap_id\":\"claim:abc\",\"query\":\"合成药甲与合成药乙联合使用时的药物相互作用：相互作用机制、严重程度、临床表现及处置建议\",\"section\":\"药物相互作用\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "total_tokens": 873,
+          "accepted": true
+        },
+        {
+          "call": 3,
+          "at": "2026-09-11T14:27:59.464863+00:00",
+          "latency_ms": 13382,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"expected_observation\":\"命中药物相互作用章节中描述甲与乙联用禁忌或需调整剂量的段落，包含相互作用机制（如 CYP 酶抑制/诱导）与临床后果\",\"gap_id\":\"claim:abc\",\"query\":\"合成药甲 与 合成药乙 联合用药 相互作用 禁忌 药代动力学 机制\",\"section\":\"药物相互作用\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "total_tokens": 834,
+          "accepted": true
+        },
+        {
+          "call": 4,
+          "at": "2026-09-11T14:28:12.846916+00:00",
+          "latency_ms": 9977,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"expected_observation\":\"在药物相互作用或禁忌章节中找到甲与乙联合用药的具体证据（如 CYP450 酶抑制导致血药浓度升高、QT 延长风险、禁忌或需剂量调整的表述）\",\"gap_id\":\"claim:abc\",\"query\":\"合成药甲与合成药乙 联合用药 相互作用 风险 剂量调整\",\"section\":\"药物相互作用\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "total_tokens": 804,
+          "accepted": true
+        }
+      ]
+    }
+  ],
+  "summary": [
+    {
+      "provider": "zhipu",
+      "model": "glm-4.7-flash",
+      "calls": 4,
+      "accepted": 3,
+      "complete_contract": 3,
+      "rate_limited": 1,
+      "latency_ms_each": [
+        20596,
+        9187,
+        6086
+      ],
+      "latency_ms_median": 9187,
+      "problems": []
+    },
+    {
+      "provider": "tokendance",
+      "model": "glm-5.3-flash",
+      "calls": 4,
+      "accepted": 4,
+      "complete_contract": 4,
+      "rate_limited": 0,
+      "latency_ms_each": [
+        11020,
+        12178,
+        13382,
+        9977
+      ],
+      "latency_ms_median": 12178,
+      "problems": []
+    }
+  ],
+  "completed_at": "2026-09-11T14:28:22.823858+00:00"
+}

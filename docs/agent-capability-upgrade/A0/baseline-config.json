@@ -1,0 +1,15 @@
+{
+  "revision": "dfa95efde10ff2513d35b94bc1f70bd872455972",
+  "source_fingerprint": "d4b6661b9c1960ca5e393429bfdd43c806ac0eacadb14d6608d4d79a4a09e9f2",
+  "archive_sha256": "029a035ac62ade50d4cd9ad66a61485865fd792858f6dffcf23f9dd4ae68b032",
+  "dataset_sha256": "477220626b1f31509087ff0feed05f54274348c7b0cfee31e4184be18ffdfed8",
+  "policy": "pre-A1 working source, including pre-existing uncommitted fixes",
+  "scope": "synthetic-development",
+  "llm": false,
+  "config": {
+    "max_cycles": 12,
+    "wall_clock_seconds": 120,
+    "call_budget": 32,
+    "token_budget": 150000
+  }
+}

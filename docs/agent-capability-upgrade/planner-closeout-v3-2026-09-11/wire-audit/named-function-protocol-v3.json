@@ -1,0 +1,589 @@
+{
+  "task_id": "agent-dev-complete",
+  "cycles": 2,
+  "mode": "mock_transport",
+  "remote_calls": 0,
+  "request_schema": {
+    "request_count": 2,
+    "samples": [
+      {
+        "index": 0,
+        "model": "glm-4.7-flash",
+        "temperature": 0,
+        "tool_choice": "required",
+        "function_names": [
+          "memory_read",
+          "memory_write"
+        ],
+        "messages_roles": [
+          "system",
+          "user"
+        ],
+        "per_tool_required": {
+          "memory_read": [
+            "expected_observation",
+            "gap_id",
+            "query"
+          ],
+          "memory_write": [
+            "expected_observation",
+            "gap_id",
+            "operation"
+          ]
+        },
+        "per_tool_properties": {
+          "memory_read": [
+            "expected_observation",
+            "gap_id",
+            "query"
+          ],
+          "memory_write": [
+            "expected_observation",
+            "gap_id",
+            "operation"
+          ]
+        },
+        "rag_search_query": null
+      },
+      {
+        "index": 1,
+        "model": "glm-4.7-flash",
+        "temperature": 0,
+        "tool_choice": "required",
+        "function_names": [
+          "memory_read",
+          "memory_write"
+        ],
+        "messages_roles": [
+          "system",
+          "user"
+        ],
+        "per_tool_required": {
+          "memory_read": [
+            "expected_observation",
+            "gap_id",
+            "query"
+          ],
+          "memory_write": [
+            "expected_observation",
+            "gap_id",
+            "operation"
+          ]
+        },
+        "per_tool_properties": {
+          "memory_read": [
+            "expected_observation",
+            "gap_id",
+            "query"
+          ],
+          "memory_write": [
+            "expected_observation",
+            "gap_id",
+            "operation"
+          ]
+        },
+        "rag_search_query": null
+      }
+    ],
+    "findings": []
+  },
+  "state_sweep": [
+    {
+      "stage": "authority_open",
+      "permitted_tools": [
+        "memory_write",
+        "memory_read"
+      ],
+      "function_names": [
+        "memory_read",
+        "memory_write"
+      ],
+      "per_tool_required": {
+        "memory_read": [
+          "expected_observation",
+          "gap_id",
+          "query"
+        ],
+        "memory_write": [
+          "expected_observation",
+          "gap_id",
+          "operation"
+        ]
+      },
+      "per_tool_properties": {
+        "memory_read": [
+          "expected_observation",
+          "gap_id",
+          "query"
+        ],
+        "memory_write": [
+          "expected_observation",
+          "gap_id",
+          "operation"
+        ]
+      },
+      "rag_search_query": null,
+      "memory_read_query": {
+        "type": "string",
+        "enum": [
+          "snapshot",
+          "current_medications",
+          "medication_timeline",
+          "conflicts",
+          "context_packet",
+          "pending_rechecks"
+        ]
+      }
+    },
+    {
+      "stage": "claim_gaps_rag_allowed",
+      "permitted_tools": [
+        "memory_write",
+        "memory_read",
+        "rag_search",
+        "ddi_check"
+      ],
+      "function_names": [
+        "ddi_check",
+        "memory_read",
+        "memory_write",
+        "rag_search"
+      ],
+      "per_tool_required": {
+        "ddi_check": [
+          "expected_observation",
+          "gap_id",
+          "medications"
+        ],
+        "memory_read": [
+          "expected_observation",
+          "gap_id",
+          "query"
+        ],
+        "memory_write": [
+          "expected_observation",
+          "gap_id",
+          "operation"
+        ],
+        "rag_search": [
+          "expected_observation",
+          "gap_id",
+          "query"
+        ]
+      },
+      "per_tool_properties": {
+        "ddi_check": [
+          "expected_observation",
+          "focus_medication",
+          "gap_id",
+          "medications"
+        ],
+        "memory_read": [
+          "expected_observation",
+          "gap_id",
+          "query"
+        ],
+        "memory_write": [
+          "expected_observation",
+          "gap_id",
+          "operation"
+        ],
+        "rag_search": [
+          "drug_name",
+          "expected_observation",
+          "gap_id",
+          "query",
+          "section",
+          "top_k"
+        ]
+      },
+      "rag_search_query": {
+        "type": "string"
+      },
+      "memory_read_query": {
+        "type": "string",
+        "enum": [
+          "snapshot",
+          "current_medications",
+          "medication_timeline",
+          "conflicts",
+          "context_packet",
+          "pending_rechecks"
+        ]
+      }
+    },
+    {
+      "stage": "evidence_unread",
+      "permitted_tools": [
+        "memory_write",
+        "memory_read",
+        "rag_search",
+        "ddi_check",
+        "read_evidence"
+      ],
+      "function_names": [
+        "ddi_check",
+        "memory_read",
+        "memory_write",
+        "rag_search",
+        "read_evidence"
+      ],
+      "per_tool_required": {
+        "ddi_check": [
+          "expected_observation",
+          "gap_id",
+          "medications"
+        ],
+        "memory_read": [
+          "expected_observation",
+          "gap_id",
+          "query"
+        ],
+        "memory_write": [
+          "expected_observation",
+          "gap_id",
+          "operation"
+        ],
+        "rag_search": [
+          "expected_observation",
+          "gap_id",
+          "query"
+        ],
+        "read_evidence": [
+          "evidence_id",
+          "expected_observation",
+          "gap_id"
+        ]
+      },
+      "per_tool_properties": {
+        "ddi_check": [
+          "expected_observation",
+          "focus_medication",
+          "gap_id",
+          "medications"
+        ],
+        "memory_read": [
+          "expected_observation",
+          "gap_id",
+          "query"
+        ],
+        "memory_write": [
+          "expected_observation",
+          "gap_id",
+          "operation"
+        ],
+        "rag_search": [
+          "drug_name",
+          "expected_observation",
+          "gap_id",
+          "query",
+          "section",
+          "top_k"
+        ],
+        "read_evidence": [
+          "evidence_id",
+          "expected_observation",
+          "gap_id",
+          "limit",
+          "offset"
+        ]
+      },
+      "rag_search_query": {
+        "type": "string"
+      },
+      "memory_read_query": {
+        "type": "string",
+        "enum": [
+          "snapshot",
+          "current_medications",
+          "medication_timeline",
+          "conflicts",
+          "context_packet",
+          "pending_rechecks"
+        ]
+      }
+    },
+    {
+      "stage": "terminal",
+      "permitted_tools": [
+        "respond"
+      ],
+      "function_names": [
+        "respond"
+      ],
+      "per_tool_required": {
+        "respond": []
+      },
+      "per_tool_properties": {
+        "respond": [
+          "rationale"
+        ]
+      },
+      "rag_search_query": null,
+      "memory_read_query": null
+    }
+  ],
+  "response_parsing": [
+    {
+      "input_tool": "rag_search",
+      "input_arguments": {
+        "query": "q1"
+      },
+      "parsed": {
+        "decision": "tool",
+        "tool": "rag_search",
+        "arguments": {
+          "query": "q1"
+        }
+      },
+      "ok": true
+    },
+    {
+      "input_tool": "rag_search",
+      "input_arguments": "{\"query\": \"q2\"}",
+      "parsed": {
+        "decision": "tool",
+        "tool": "rag_search",
+        "arguments": {
+          "query": "q2"
+        }
+      },
+      "ok": true
+    },
+    {
+      "input_tool": "rag_search",
+      "input_arguments": {},
+      "parsed": {
+        "decision": "tool",
+        "tool": "rag_search",
+        "arguments": {}
+      },
+      "ok": true
+    },
+    {
+      "input_tool": "memory_read",
+      "input_arguments": {
+        "query": "snapshot"
+      },
+      "parsed": {
+        "decision": "tool",
+        "tool": "memory_read",
+        "arguments": {
+          "query": "snapshot"
+        }
+      },
+      "ok": true
+    },
+    {
+      "input_tool": null,
+      "input_arguments": null,
+      "parsed": {
+        "decision": "respond",
+        "rationale": "done"
+      },
+      "ok": true
+    }
+  ],
+  "tool_trace": [
+    {
+      "phase": "plan",
+      "cycle": 1,
+      "decision": {
+        "tool": "replan"
+      },
+      "planner": {
+        "mode": "hybrid",
+        "source": "rejected",
+        "proposal": {
+          "decision": "tool",
+          "tool": "memory_read",
+          "arguments": {
+            "query": "snapshot"
+          }
+        },
+        "validation": {
+          "status": "safety_rejected",
+          "valid": false,
+          "errors": [
+            {
+              "code": "invalid_gap_link",
+              "category": "safety",
+              "message": "gap_id 必须是当前 open gap 之一: ['authority']，且必须给出非空字符串 expected_observation（本步预期观察到的结果）。"
+            }
+          ]
+        },
+        "fallback_reason": null,
+        "fallback_kind": null,
+        "argument_corrections": [],
+        "model": "glm-4.7-flash",
+        "latency_ms": 5.512,
+        "provider_attempts": [
+          {
+            "outcome": "response",
+            "latency_ms": 4.55
+          }
+        ]
+      }
+    },
+    {
+      "phase": "plan",
+      "cycle": 2,
+      "decision": {
+        "tool": "replan"
+      },
+      "planner": {
+        "mode": "hybrid",
+        "source": "rejected",
+        "proposal": {
+          "decision": "tool",
+          "tool": "rag_search",
+          "arguments": {
+            "query": "阿司匹林 布洛芬 相互作用"
+          }
+        },
+        "validation": {
+          "status": "safety_rejected",
+          "valid": false,
+          "errors": [
+            {
+              "code": "invalid_gap_link",
+              "category": "safety",
+              "message": "gap_id 必须是当前 open gap 之一: ['authority']，且必须给出非空字符串 expected_observation（本步预期观察到的结果）。"
+            }
+          ]
+        },
+        "fallback_reason": null,
+        "fallback_kind": null,
+        "argument_corrections": [],
+        "model": "glm-4.7-flash",
+        "latency_ms": 4.758,
+        "provider_attempts": [
+          {
+            "outcome": "response",
+            "latency_ms": 3.846
+          }
+        ]
+      }
+    },
+    {
+      "phase": "plan",
+      "cycle": 2,
+      "decision": {
+        "tool": "circuit_break"
+      },
+      "note": "连续 2 次安全拒绝；本回合剩余周期切换确定性规划，不再消耗 LLM 调用。"
+    },
+    {
+      "phase": "budget",
+      "cycle": 2,
+      "exhausted": "cycles",
+      "tokens_estimated": 12389,
+      "elapsed_seconds": 0.02120479999575764,
+      "limits": {
+        "max_cycles": 2,
+        "wall_clock_seconds": 180.0,
+        "token_budget": 150000,
+        "call_budget": 8
+      }
+    },
+    {
+      "phase": "respond",
+      "cycle": 2,
+      "source": "template",
+      "delivered_text": "有界证据核查报告\n已核查范围：尚无完成项。\n待补充/未解决：读取完整权威药单与关键事实。\n终止原因：budget_insufficient。\n这份报告仅说明有界标签核查结果；insufficient/unknown 不是无风险，未列药物不代表停药。建议咨询医生/药师。",
+      "investigation": {
+        "goal": "请核查当前用药合用的证据和剩余不确定性",
+        "scope_id": "local-demo",
+        "version": "investigation@1",
+        "contract_version": "medication-evidence-review@1",
+        "patient_version": {
+          "medications": 2,
+          "semantic": 0
+        },
+        "claims": [],
+        "gaps": [
+          {
+            "gap_id": "authority",
+            "kind": "patient_fact_missing",
+            "description": "读取完整权威药单与关键事实",
+            "status": "open"
+          }
+        ],
+        "checks": {
+          "authority": "uncovered",
+          "interaction_evidence": "uncovered",
+          "applicability": "uncovered"
+        },
+        "facts": {
+          "semantic": [],
+          "medications": [
+            {
+              "id": 1,
+              "medication_key": "合成药甲",
+              "display_name": "合成药甲",
+              "dose": "5 mg",
+              "route": null,
+              "schedule": null,
+              "status": "active",
+              "start_at": "2026-09-01T00:00:00+00:00",
+              "end_at": null,
+              "source": "synthetic-fixture",
+              "source_uri": null,
+              "version": 1,
+              "predecessor_id": null,
+              "created_at": "2026-09-11T11:37:18+00:00",
+              "start_at_basis": "reported",
+              "ingredients": [],
+              "ref": "memory:medication:1@v1"
+            },
+            {
+              "id": 2,
+              "medication_key": "合成药乙",
+              "display_name": "合成药乙",
+              "dose": "10 mg",
+              "route": null,
+              "schedule": null,
+              "status": "active",
+              "start_at": "2026-09-01T00:00:00+00:00",
+              "end_at": null,
+              "source": "synthetic-fixture",
+              "source_uri": null,
+              "version": 1,
+              "predecessor_id": null,
+              "created_at": "2026-09-11T11:37:18+00:00",
+              "start_at_basis": "reported",
+              "ingredients": [],
+              "ref": "memory:medication:2@v1"
+            }
+          ],
+          "open_conflicts": []
+        },
+        "conflicts": [],
+        "questions": [],
+        "candidates": [
+          {
+            "tool": "memory_read",
+            "purpose": "investigation:authority",
+            "arguments": {
+              "query": "snapshot"
+            },
+            "rationale": "解决已记录缺口",
+            "gap_id": "authority",
+            "expected_observation": "获得完整当前事实及版本"
+          }
+        ],
+        "evidence_refs": [],
+        "read_refs": [],
+        "content_hashes": [],
+        "queries": [],
+        "assessments": {},
+        "no_progress_count": 0,
+        "termination_reason": "budget_insufficient",
+        "authority_read": false,
+        "invalidations": [],
+        "context_integrity": "full_authority_checked_evidence_body_on_demand",
+        "mode": "llm"
+      }
+    }
+  ]
+}

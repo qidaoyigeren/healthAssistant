@@ -1,0 +1,29 @@
+{
+  "provider": "zhipu",
+  "base_url": "https://open.bigmodel.cn/api/paas/v4",
+  "model": "glm-4.7-flash",
+  "planner_provider_retries": 0,
+  "planner_arg_autocorrect": "1",
+  "planner_tool_choice": "required",
+  "max_cycles": 12,
+  "seconds_per_run": 180,
+  "calls_per_run": 8,
+  "planned_k": 3,
+  "registered_tools": [
+    "ask_clarification",
+    "ddi_check",
+    "memory_read",
+    "memory_write",
+    "rag_search"
+  ],
+  "effective_env": {
+    "PYTHONIOENCODING": "utf-8",
+    "MEMORY_ENABLE_LLM": "0",
+    "AGENT_MULTI_REVIEW_MODEL_ENABLED": "0",
+    "PLANNER_PROVIDER_RETRIES": "0",
+    "PLANNER_ARG_AUTOCORRECT": "1",
+    "PLANNER_SAFETY_REJECTION_LIMIT": "2",
+    "AGENT_EVAL_MAX_CYCLES": "12"
+  },
+  "ambient_overridden": {}
+}

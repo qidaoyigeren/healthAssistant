@@ -1,0 +1,30 @@
+{
+  "protocol": "agent-acceptance@1",
+  "stage": "A4",
+  "generated_at": "2026-09-09",
+  "source_fingerprint": "488bd48ca5b4d5be9841055404667725659a35a42dad9fd92ae59e8453ce48fc",
+  "engineering_status": "pass",
+  "real_model_quality": "unavailable",
+  "multi_agent_value": "unavailable",
+  "provider_availability": "unavailable",
+  "independent_held_out": "unavailable",
+  "verification": {
+    "multi_agent_tests": {"command": "python -m unittest stage0.test_multi_agent_review -v", "result": "4/4 OK"},
+    "a1_a4_sweep": {"command": "python -m unittest stage0.test_multi_agent_review stage0.test_agent_investigation stage0.test_agent_open_tasks stage0.test_agent_adaptive", "result": "27 OK"},
+    "batch1_suites": {"result": "all OK (run individually: live_regressions, stage8_agent, harness_p0..p3, memory_p0..p2, reliability_p0..p2)"},
+    "frontend_build": {"command": "cd frontend && npm run build", "result": "OK"}
+  },
+  "experiment": {
+    "default": "on (user-directed change 2026-09-09; disable with AGENT_MULTI_REVIEW_ENABLED=0)",
+    "trigger_required": true,
+    "roles": ["evidence_researcher", "evidence_checker"],
+    "triggers": ["open_evidence_conflict", "wide_claim_set"],
+    "divergence_policy": "recorded, never voted or averaged",
+    "scope_revalidation": "parent drops refs outside its observed scope",
+    "usage": "per-worker cycles/calls summed into one task ledger",
+    "worker_model_labels": "deterministic / deterministic-hard-rules (honest, no model wired)"
+  },
+  "abc_comparison": "unavailable (requires authorized real-model workers)",
+  "adopt_recommendation": "not made",
+  "key_files": ["stage0/harness/multi_agent.py", "stage0/agent.py", "stage0/test_multi_agent_review.py", "frontend/src/features/assistant/InvestigationCard.tsx", "frontend/src/api/types.ts"]
+}

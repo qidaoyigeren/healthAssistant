@@ -1,0 +1,28 @@
+{
+  "engineering": {
+    "status": "pass",
+    "test_executions": 378,
+    "suite_count": 33,
+    "source_fingerprint": "7871ac2fc4d769ae7fb6911e4cb1617f370bb8982f048a525316996f5f435d9b",
+    "source_unchanged_during_tests": true,
+    "frontend_build": "pass",
+    "gap_replay": "13/13",
+    "gap_local_tools": "13/13",
+    "negative_control": "correctly_failed"
+  },
+  "real_model": {
+    "sample_k": 3,
+    "task_outcome_pass": 3,
+    "autonomous_planner_pass": 0,
+    "attempts": 13,
+    "actual_responses": 5,
+    "unknown_usage_attempts": 8,
+    "known_tokens": 17707,
+    "status": "not_accepted",
+    "final_reporting_fix_validated_online": false,
+    "recorded_zero_call_replay": "pass"
+  },
+  "multi_agent_real_model_comparison": "unavailable",
+  "independent_held_out": "unavailable",
+  "overall": "engineering_accepted_model_quality_not_accepted"
+}

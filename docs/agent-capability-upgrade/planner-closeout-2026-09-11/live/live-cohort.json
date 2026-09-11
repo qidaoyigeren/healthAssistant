@@ -1,0 +1,38 @@
+{
+  "started_at": "2026-09-11T11:07:52.175529+00:00",
+  "planned_k": 3,
+  "actual_k": 3,
+  "source_fingerprint": "184eed1475246687784151ff048ad105028c0245be3d12a3dcb24bbc6212ee24",
+  "protocol_sha256": "5caf74a8d8515d768b9909914ffcf2cde90d1e1a25970c8a1b587ae2faacfd96",
+  "dataset_sha256": "477220626b1f31509087ff0feed05f54274348c7b0cfee31e4184be18ffdfed8",
+  "configuration": {
+    "provider": "official_zhipu",
+    "model": "glm-4.7-flash",
+    "path": "replay",
+    "seconds_per_run": 180,
+    "calls_per_run": 8,
+    "planner_provider_retries": 1,
+    "independent_held_out": "unavailable"
+  },
+  "runs": [
+    {
+      "index": 1,
+      "exit_code": 1,
+      "artifact_present": true
+    },
+    {
+      "index": 2,
+      "exit_code": 0,
+      "artifact_present": true
+    },
+    {
+      "index": 3,
+      "exit_code": 0,
+      "artifact_present": true
+    }
+  ],
+  "source_unchanged": true,
+  "completed_at": "2026-09-11T11:09:27.191523+00:00",
+  "collection_status": "complete",
+  "quality_status": "requires_metrics_and_protocol_evaluation"
+}

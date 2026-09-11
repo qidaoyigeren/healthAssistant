@@ -1,5 +1,7 @@
 # HealthAssistant P0–P6 交付与验收
 
+后续已执行真实模型与检索调用，发现并修复多项问题；严格真实调用验收仍未通过，详见 [真实调用报告](../live-acceptance/README.md)。本目录保留较早的本地工程验收快照，不能用这里的 pass 代表真实模型质量通过。
+
 本轮按 P2 → P3 → P4 → P5 → P6 补齐默认实施范围，并保留 P0/P1 和既有 Harness/Review 能力。这里的完成口径是本地工程与合成场景，不是生产医学验证。最新运行结果以本目录 `acceptance-summary.json` 为准；旧的 `closeout/` 及 Harness 工件未覆盖。
 
 ## 最终运行结果（2026-09-08）

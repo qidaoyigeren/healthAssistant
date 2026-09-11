@@ -1,0 +1,34 @@
+{
+  "fixture": "synthetic-only",
+  "restart_snapshots_identical": true,
+  "persisted_task_id": "task:8fd1b1169b0e4f589182d62bc361352d",
+  "status": "completed",
+  "run_budget": {
+    "limit": 24,
+    "spent": 2,
+    "unit": "deterministic_steps"
+  },
+  "browser_checks": {
+    "historical_report_expanded": true,
+    "evidence_raw_body_visible": true,
+    "evidence_hash_verified_visible": true,
+    "visit_summary_generated": true,
+    "html_download_succeeded": true,
+    "downloaded_html_content_inspected": true,
+    "downloaded_html_visual_reopen": "unavailable: browser file protocol blocked"
+  },
+  "screenshots": [
+    "D:\\py\\HealthAssistant\\output\\playwright\\agent-closeout\\waiting.png",
+    "D:\\py\\HealthAssistant\\output\\playwright\\agent-closeout\\evidence-final.png",
+    "D:\\py\\HealthAssistant\\output\\playwright\\agent-closeout\\summary-final.png"
+  ],
+  "html_download": "D:\\py\\HealthAssistant\\output\\playwright\\agent-closeout\\visit-summary.html",
+  "html_sha256": "bfe46ed10aefb652add49760f200ad0b191f9fa04828b4fd842ee411b8da0347",
+  "console_errors": [
+    "favicon.ico 404"
+  ],
+  "console_warnings": [
+    "React Router v7 transition flag",
+    "React Router v7 relative splat flag"
+  ]
+}

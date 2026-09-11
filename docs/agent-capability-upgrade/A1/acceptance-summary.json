@@ -1,0 +1,34 @@
+{
+  "protocol": "agent-acceptance@1",
+  "stage": "A1",
+  "generated_at": "2026-09-09",
+  "source_fingerprint": "5c03daffb568217be872c6e16eb74ea326a9b0658bea3f30cfad7c8e2b9de3c2",
+  "dataset_sha256": "477220626b1f31509087ff0feed05f54274348c7b0cfee31e4184be18ffdfed8",
+  "engineering_status": "pass",
+  "real_model_quality": "unavailable",
+  "provider_availability": "unavailable",
+  "independent_held_out": "unavailable",
+  "verification": {
+    "unit_tests": {"command": "python -m unittest stage0.test_agent_investigation -v", "result": "9/9 OK"},
+    "backend_suites": {"command": "python -m unittest stage0.test_live_regressions stage0.test_stage8_agent stage0.test_harness_p0..p3 stage0.test_memory_p0..p2 stage0.test_reliability_p0..p2", "result": "205 OK"},
+    "product_suites": {"command": "python -m unittest stage0.test_product_tasks stage0.test_product_evals stage0.test_product_evidence_quality stage0.test_product_reconciliation stage0.test_frontend_read_models stage0.test_stage10_server stage0.test_product_closeout", "result": "49 OK"},
+    "frontend_build": {"command": "cd frontend && npm run build", "result": "tsc -b && vite build OK (4.27s)"},
+    "eval_replay": {"command": "python -m stage0.agent_evals.run_eval --policy gap --path replay", "result": {"total": 13, "passed": 13}, "artifact": "dev-replay-final.json"},
+    "eval_tools": {"command": "python -m stage0.agent_evals.run_eval --policy gap --path tools", "result": {"total": 13, "passed": 13}, "artifact": "tools-replay-final.json"},
+    "negative_control": {"result": "still fails under gap policy (scorer can fail)"}
+  },
+  "comparison_vs_A0_baseline_replay": {
+    "passed": {"baseline": "0/13", "gap": "13/13"},
+    "tool_calls_total": {"baseline": 30, "gap": 57},
+    "real_model_calls": {"baseline": 0, "gap": 0},
+    "scripted_fault_injection_attempts": {"gap": 4, "note": "model_rate_limit family only; counting metric added after dev-replay.json snapshot; per-task scores identical"},
+    "latency_p50_ms": {"baseline": 66.5, "gap": "66.8 replay / 90.3 tools", "sample_size": 13},
+    "real_tokens": 0
+  },
+  "key_files": ["stage0/investigation.py", "stage0/agent.py", "stage0/graph_runner.py", "stage0/evidence_quality.py", "stage0/agent_evals/run_eval.py", "stage0/test_agent_investigation.py", "frontend/src/features/assistant/InvestigationCard.tsx", "frontend/src/features/assistant/AssistantPage.tsx"],
+  "limitations": [
+    "run artifact only; cross-session open-goal persistence is A2 scope",
+    "development set is author-synthetic; no independent held-out",
+    "no real model run in this stage; scripted planner outcomes are engineering replay"
+  ]
+}

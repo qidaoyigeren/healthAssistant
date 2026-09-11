@@ -1,0 +1,67 @@
+{
+  "mode": "recorded-proposal-replay",
+  "remote_calls": 0,
+  "source_fingerprint": "6b9dcdb5b76c152715cbacaf5acc2fd06ca49c3521759e1027ba339ccf56a495",
+  "runs": [
+    {
+      "raw_artifact": "docs\\agent-capability-upgrade\\closeout-2026-09-10\\live-final-1.json",
+      "mode": "recorded-proposal-replay",
+      "remote_calls": 0,
+      "proposals_consumed": 5,
+      "proposals_recorded": 7,
+      "goal_status": "completed",
+      "execution_status": "degraded",
+      "coverage": {
+        "consolidated": true,
+        "response_source": "template",
+        "degraded_reason": "planner_circuit_break:safety_rejections",
+        "planner_fallback_reasons": [
+          "provider_error",
+          "planner_circuit_break"
+        ],
+        "research": []
+      },
+      "passed": false
+    },
+    {
+      "raw_artifact": "docs\\agent-capability-upgrade\\closeout-2026-09-10\\live-final-2.json",
+      "mode": "recorded-proposal-replay",
+      "remote_calls": 0,
+      "proposals_consumed": 3,
+      "proposals_recorded": 7,
+      "goal_status": "completed",
+      "execution_status": "degraded",
+      "coverage": {
+        "consolidated": true,
+        "response_source": "template",
+        "degraded_reason": "planner_circuit_break:safety_rejections",
+        "planner_fallback_reasons": [
+          "provider_error",
+          "planner_circuit_break"
+        ],
+        "research": []
+      },
+      "passed": false
+    },
+    {
+      "raw_artifact": "docs\\agent-capability-upgrade\\closeout-2026-09-10\\live-final-3.json",
+      "mode": "recorded-proposal-replay",
+      "remote_calls": 0,
+      "proposals_consumed": 5,
+      "proposals_recorded": 6,
+      "goal_status": "completed",
+      "execution_status": "degraded",
+      "coverage": {
+        "consolidated": true,
+        "response_source": "template",
+        "degraded_reason": "planner_fallback:provider_error",
+        "planner_fallback_reasons": [
+          "provider_error"
+        ],
+        "research": []
+      },
+      "passed": false
+    }
+  ],
+  "status": "fail"
+}

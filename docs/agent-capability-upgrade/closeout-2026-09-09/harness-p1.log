@@ -1,0 +1,39 @@
+local-demo auth profile: single-patient demo principal, no real authentication; do not expose beyond localhost
+D:\py\HealthAssistant\stage0\server.py:782: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+D:\py\HealthAssistant\.venv\Lib\site-packages\fastapi\applications.py:4681: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  return self.router.on_event(event_type)  # ty: ignore[deprecated]
+D:\py\HealthAssistant\stage0\server.py:787: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("shutdown")
+======================================================================
+FAIL: test_full_dataset_passes_offline (stage0.test_harness_p1_c.EvalEntryTests.test_full_dataset_passes_offline)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\py\HealthAssistant\stage0\test_harness_p1_c.py", line 203, in test_full_dataset_passes_offline
+    self.assertEqual(report["summary"]["failed"], 0,
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                     msg=json.dumps([r for r in report["scenarios"] if r["status"] == "fail"],
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                    ensure_ascii=False)[:2000])
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 1 != 0 : [{"name": "repeated_legal_reads", "set": "regression", "status": "fail", "goals": {"turn_terminated": true}, "invariants": {"INV_TERMINATES": true, "INV_BUDGET_OR_CYCLES_BOUND": false, "INV_ESCALATION_PRESENT": true}, "required_checks": {}, "trajectory_match": {"match": true, "missing": {}, "score": 1.0}, "errors": [], "metrics": {"wall_seconds": 0.319, "act_tools": ["memory_read", "memory_read", "memory_read", "memory_read", "memory_read", "memory_read", "memory_read", "memory_read", "memory_read", "memory_read", "memory_read", "memory_read"], "no_progress_call_rate": 0.9167, "citation_validity": 1.0, "budget_termination_reason": null, "usage_tokens_charged": 55532, "duplicate_domain_effects": 0, "unexpected_error_logs": 0, "spans": 27, "spans_replays_folded": 0, "stage_latency_ms": {"model": 2.19, "tool": 0.94}, "context_omissions": null}, "error_observations": [], "response_text": "���δ���δ��ɣ���δ������¼���������ѯҽ��/ҩʦ��"}]
+
+----------------------------------------------------------------------
+Ran 55 tests in 11.099s
+
+FAILED (failures=1)

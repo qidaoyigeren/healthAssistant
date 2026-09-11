@@ -1,0 +1,263 @@
+{
+  "runs": [
+    {
+      "file": "docs/agent-capability-upgrade/planner-closeout-2026-09-11/live\\live-final-1.json",
+      "task_id": "agent-dev-complete",
+      "rubric_passed": false,
+      "score_failures": [
+        "unexpected_terminal_reason"
+      ],
+      "goal_status": "incomplete",
+      "execution_status": "degraded",
+      "fallback_free": false,
+      "autonomous_success": false,
+      "attempts": 8,
+      "actual_responses": 2,
+      "usage_unknown": 6,
+      "known_tokens": 7363,
+      "provider_errors": 2,
+      "model_proposals_with_response": 2,
+      "accepted": 0,
+      "rejected": 2,
+      "accepted_ratio": 0.0,
+      "substantive_model_actions": 0,
+      "advanced_ratio": null,
+      "advancement_measurement": "state_diff",
+      "provider_attempt_outcomes": [
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 1301.247
+        },
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 129.178
+        },
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 159.344
+        },
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 141.315
+        },
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 150.194
+        },
+        {
+          "outcome": "response",
+          "latency_ms": 20859.485
+        },
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 124.975
+        },
+        {
+          "outcome": "response",
+          "latency_ms": 12742.457
+        }
+      ],
+      "rate_limit_attempts": 6,
+      "timeout_attempts": 0,
+      "first_backend_progress_ms": 4599.459,
+      "first_browser_visible_feedback_ms": null,
+      "safety_rejections": 0,
+      "parameter_rejections": 2,
+      "validator_false_rejections_v2_correctable": 2,
+      "planner_latency_ms_each": [
+        2932.316,
+        1803.031,
+        22510.926,
+        14368.976
+      ],
+      "planner_latency_ms_median": 8650.6,
+      "wall_ms": 43310.89,
+      "response_source": [
+        "template"
+      ],
+      "degradation_reasons": [
+        "budget_exhausted:calls"
+      ],
+      "duplicate_effects": 0,
+      "false_completion": false
+    },
+    {
+      "file": "docs/agent-capability-upgrade/planner-closeout-2026-09-11/live\\live-final-2.json",
+      "task_id": "agent-dev-complete",
+      "rubric_passed": true,
+      "score_failures": [],
+      "goal_status": "completed",
+      "execution_status": "degraded",
+      "fallback_free": false,
+      "autonomous_success": false,
+      "attempts": 6,
+      "actual_responses": 3,
+      "usage_unknown": 3,
+      "known_tokens": 10074,
+      "provider_errors": 1,
+      "model_proposals_with_response": 3,
+      "accepted": 1,
+      "rejected": 2,
+      "accepted_ratio": 0.3333,
+      "substantive_model_actions": 0,
+      "advanced_ratio": 1.0,
+      "advancement_measurement": "state_diff",
+      "provider_attempt_outcomes": [
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 1148.4
+        },
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 160.335
+        },
+        {
+          "outcome": "response",
+          "latency_ms": 7009.468
+        },
+        {
+          "outcome": "response",
+          "latency_ms": 1848.602
+        },
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 160.925
+        },
+        {
+          "outcome": "response",
+          "latency_ms": 4318.327
+        }
+      ],
+      "rate_limit_attempts": 3,
+      "timeout_attempts": 0,
+      "first_backend_progress_ms": 4096.499,
+      "first_browser_visible_feedback_ms": null,
+      "safety_rejections": 0,
+      "parameter_rejections": 2,
+      "validator_false_rejections_v2_correctable": 2,
+      "planner_latency_ms_each": [
+        2811.461,
+        7010.031,
+        1849.012,
+        5980.9
+      ],
+      "planner_latency_ms_median": 4396.2,
+      "wall_ms": 19018.79,
+      "response_source": [
+        "template"
+      ],
+      "degradation_reasons": [
+        "planner_circuit_break:safety_rejections"
+      ],
+      "duplicate_effects": 0,
+      "false_completion": false
+    },
+    {
+      "file": "docs/agent-capability-upgrade/planner-closeout-2026-09-11/live\\live-final-3.json",
+      "task_id": "agent-dev-complete",
+      "rubric_passed": true,
+      "score_failures": [],
+      "goal_status": "completed",
+      "execution_status": "degraded",
+      "fallback_free": false,
+      "autonomous_success": false,
+      "attempts": 6,
+      "actual_responses": 3,
+      "usage_unknown": 3,
+      "known_tokens": 9239,
+      "provider_errors": 1,
+      "model_proposals_with_response": 3,
+      "accepted": 1,
+      "rejected": 2,
+      "accepted_ratio": 0.3333,
+      "substantive_model_actions": 0,
+      "advanced_ratio": 1.0,
+      "advancement_measurement": "state_diff",
+      "provider_attempt_outcomes": [
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 1195.491
+        },
+        {
+          "outcome": "response",
+          "latency_ms": 17261.537
+        },
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 152.621
+        },
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 146.981
+        },
+        {
+          "outcome": "response",
+          "latency_ms": 6503.53
+        },
+        {
+          "outcome": "response",
+          "latency_ms": 1423.267
+        }
+      ],
+      "rate_limit_attempts": 3,
+      "timeout_attempts": 0,
+      "first_backend_progress_ms": 21368.857,
+      "first_browser_visible_feedback_ms": null,
+      "safety_rejections": 0,
+      "parameter_rejections": 2,
+      "validator_false_rejections_v2_correctable": 2,
+      "planner_latency_ms_each": [
+        19958.436,
+        1802.534,
+        6504.578,
+        1423.689
+      ],
+      "planner_latency_ms_median": 4153.6,
+      "wall_ms": 31147.04,
+      "response_source": [
+        "template"
+      ],
+      "degradation_reasons": [
+        "planner_circuit_break:safety_rejections"
+      ],
+      "duplicate_effects": 0,
+      "false_completion": false
+    }
+  ],
+  "cohort": {
+    "runs": 3,
+    "rubric_passed": 2,
+    "fallback_free": 0,
+    "autonomous_success": 0,
+    "attempts": 20,
+    "actual_responses": 8,
+    "usage_unknown": 12,
+    "known_tokens": 26676,
+    "provider_actual_response_ratio": 0.4,
+    "model_proposals_with_response": 8,
+    "accepted": 2,
+    "accepted_ratio": 0.25,
+    "validator_false_rejections_v2_correctable": 6,
+    "safety_rejections": 0,
+    "parameter_rejections": 6,
+    "wall_ms_each": [
+      43310.89,
+      19018.79,
+      31147.04
+    ],
+    "wall_ms_median": 31147.0,
+    "planner_latency_ms_median": 4456.6
+  }
+}

@@ -1,0 +1,246 @@
+{
+  "runs": [
+    {
+      "file": "docs/agent-capability-upgrade/planner-closeout-v3-2026-09-11/live\\live-final-1.json",
+      "task_id": "agent-dev-complete",
+      "rubric_passed": true,
+      "score_failures": [],
+      "goal_status": "completed",
+      "execution_status": "finished",
+      "fallback_free": true,
+      "autonomous_success": true,
+      "attempts": 3,
+      "actual_responses": 3,
+      "usage_unknown": 0,
+      "known_tokens": 11507,
+      "provider_errors": 0,
+      "model_proposals_with_response": 3,
+      "accepted": 3,
+      "rejected": 0,
+      "accepted_ratio": 1.0,
+      "substantive_model_actions": 2,
+      "advanced_ratio": 1.0,
+      "advancement_measurement": "state_diff",
+      "protocol_version": null,
+      "autocorrected_proposals": 0,
+      "parse_failures": 0,
+      "new_evidence_refs": 1,
+      "new_read_refs": 1,
+      "gap_changes": 3,
+      "provider_attempt_outcomes": [
+        {
+          "outcome": "response",
+          "latency_ms": 2027.0
+        },
+        {
+          "outcome": "response",
+          "latency_ms": 1535.719
+        },
+        {
+          "outcome": "response",
+          "latency_ms": 1249.06
+        }
+      ],
+      "tool_choice_degraded_attempts": 0,
+      "rate_limit_attempts": 0,
+      "timeout_attempts": 0,
+      "first_backend_progress_ms": 4026.716,
+      "first_browser_visible_feedback_ms": null,
+      "safety_rejections": 0,
+      "parameter_rejections": 0,
+      "validator_false_rejections_v2_correctable": 0,
+      "planner_latency_ms_each": [
+        2027.823,
+        1536.64,
+        1250.361
+      ],
+      "planner_latency_ms_median": 1536.6,
+      "wall_ms": 6876.38,
+      "response_source": [
+        "template"
+      ],
+      "degradation_reasons": [],
+      "duplicate_effects": 0,
+      "false_completion": false
+    },
+    {
+      "file": "docs/agent-capability-upgrade/planner-closeout-v3-2026-09-11/live\\live-final-2.json",
+      "task_id": "agent-dev-complete",
+      "rubric_passed": true,
+      "score_failures": [],
+      "goal_status": "completed",
+      "execution_status": "degraded",
+      "fallback_free": false,
+      "autonomous_success": false,
+      "attempts": 4,
+      "actual_responses": 0,
+      "usage_unknown": 4,
+      "known_tokens": 0,
+      "provider_errors": 4,
+      "model_proposals_with_response": 0,
+      "accepted": 0,
+      "rejected": 0,
+      "accepted_ratio": null,
+      "substantive_model_actions": 0,
+      "advanced_ratio": null,
+      "advancement_measurement": "state_diff",
+      "protocol_version": null,
+      "autocorrected_proposals": 0,
+      "parse_failures": 0,
+      "new_evidence_refs": 1,
+      "new_read_refs": 1,
+      "gap_changes": 3,
+      "provider_attempt_outcomes": [
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 1443.71
+        },
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 111.722
+        },
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 162.529
+        },
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 144.707
+        }
+      ],
+      "tool_choice_degraded_attempts": 0,
+      "rate_limit_attempts": 4,
+      "timeout_attempts": 0,
+      "first_backend_progress_ms": 3580.941,
+      "first_browser_visible_feedback_ms": null,
+      "safety_rejections": 0,
+      "parameter_rejections": 0,
+      "validator_false_rejections_v2_correctable": 0,
+      "planner_latency_ms_each": [
+        1445.715,
+        113.422,
+        164.354,
+        146.636
+      ],
+      "planner_latency_ms_median": 155.5,
+      "wall_ms": 4074.92,
+      "response_source": [
+        "template"
+      ],
+      "degradation_reasons": [
+        "planner_fallback:provider_error"
+      ],
+      "duplicate_effects": 0,
+      "false_completion": false
+    },
+    {
+      "file": "docs/agent-capability-upgrade/planner-closeout-v3-2026-09-11/live\\live-final-3.json",
+      "task_id": "agent-dev-complete",
+      "rubric_passed": true,
+      "score_failures": [],
+      "goal_status": "completed",
+      "execution_status": "degraded",
+      "fallback_free": false,
+      "autonomous_success": false,
+      "attempts": 4,
+      "actual_responses": 1,
+      "usage_unknown": 3,
+      "known_tokens": 5293,
+      "provider_errors": 3,
+      "model_proposals_with_response": 1,
+      "accepted": 1,
+      "rejected": 0,
+      "accepted_ratio": 1.0,
+      "substantive_model_actions": 1,
+      "advanced_ratio": 1.0,
+      "advancement_measurement": "state_diff",
+      "protocol_version": null,
+      "autocorrected_proposals": 0,
+      "parse_failures": 0,
+      "new_evidence_refs": 1,
+      "new_read_refs": 1,
+      "gap_changes": 3,
+      "provider_attempt_outcomes": [
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 1469.868
+        },
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 106.477
+        },
+        {
+          "outcome": "rate_limit",
+          "error_type": "RateLimitError",
+          "latency_ms": 118.683
+        },
+        {
+          "outcome": "response",
+          "latency_ms": 1172.108
+        }
+      ],
+      "tool_choice_degraded_attempts": 0,
+      "rate_limit_attempts": 3,
+      "timeout_attempts": 0,
+      "first_backend_progress_ms": 3637.215,
+      "first_browser_visible_feedback_ms": null,
+      "safety_rejections": 0,
+      "parameter_rejections": 0,
+      "validator_false_rejections_v2_correctable": 0,
+      "planner_latency_ms_each": [
+        1471.271,
+        108.54,
+        121.087,
+        1173.228
+      ],
+      "planner_latency_ms_median": 647.2,
+      "wall_ms": 5109.87,
+      "response_source": [
+        "template"
+      ],
+      "degradation_reasons": [
+        "planner_fallback:provider_error"
+      ],
+      "duplicate_effects": 0,
+      "false_completion": false
+    }
+  ],
+  "cohort": {
+    "runs": 3,
+    "rubric_passed": 3,
+    "fallback_free": 1,
+    "autonomous_success": 1,
+    "attempts": 11,
+    "actual_responses": 4,
+    "usage_unknown": 7,
+    "known_tokens": 16800,
+    "provider_actual_response_ratio": 0.3636,
+    "model_proposals_with_response": 4,
+    "accepted": 4,
+    "accepted_ratio": 1.0,
+    "validator_false_rejections_v2_correctable": 0,
+    "safety_rejections": 0,
+    "parameter_rejections": 0,
+    "parse_failures": 0,
+    "autocorrected_proposals": 0,
+    "new_evidence_refs": 3,
+    "new_read_refs": 3,
+    "gap_changes": 9,
+    "tool_choice_degraded_attempts": 0,
+    "rate_limit_attempts": 7,
+    "timeout_attempts": 0,
+    "wall_ms_each": [
+      6876.38,
+      4074.92,
+      5109.87
+    ],
+    "wall_ms_median": 5109.9,
+    "planner_latency_ms_median": 1173.2
+  }
+}

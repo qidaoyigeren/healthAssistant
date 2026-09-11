@@ -1,0 +1,55 @@
+{
+  "started_at": "2026-09-11T11:37:54.742641+00:00",
+  "attempts": [
+    {
+      "attempt": 1,
+      "at": "2026-09-11T11:37:54.742667+00:00",
+      "outcome": "error",
+      "error_type": "RateLimitError",
+      "error": "Error code: 429 - {'error': {'code': '1305', 'message': '该模型当前访问量过大，请您稍后再试'}}",
+      "rate_limited": true
+    },
+    {
+      "attempt": 2,
+      "at": "2026-09-11T11:37:59.874956+00:00",
+      "outcome": "error",
+      "error_type": "RateLimitError",
+      "error": "Error code: 429 - {'error': {'code': '1305', 'message': '该模型当前访问量过大，请您稍后再试'}}",
+      "rate_limited": true
+    },
+    {
+      "attempt": 3,
+      "at": "2026-09-11T11:38:08.016193+00:00",
+      "outcome": "error",
+      "error_type": "RateLimitError",
+      "error": "Error code: 429 - {'error': {'code': '1305', 'message': '该模型当前访问量过大，请您稍后再试'}}",
+      "rate_limited": true
+    },
+    {
+      "attempt": 4,
+      "at": "2026-09-11T11:38:20.267757+00:00",
+      "outcome": "error",
+      "error_type": "RateLimitError",
+      "error": "Error code: 429 - {'error': {'code': '1305', 'message': '该模型当前访问量过大，请您稍后再试'}}",
+      "rate_limited": true
+    }
+  ],
+  "request": {
+    "model": "glm-4.7-flash",
+    "tool_choice": "required",
+    "function_names": [
+      "rag_search",
+      "respond"
+    ],
+    "rag_search_required": [
+      "query",
+      "gap_id",
+      "expected_observation"
+    ]
+  },
+  "accepted_by_provider": false,
+  "returned_functions": null,
+  "raw_arguments": null,
+  "outcome": "error",
+  "completed_at": "2026-09-11T11:38:20.474560+00:00"
+}

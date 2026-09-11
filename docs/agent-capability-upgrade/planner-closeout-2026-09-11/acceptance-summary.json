@@ -1,0 +1,54 @@
+{
+  "engineering": {
+    "status": "pass",
+    "test_executions": 394,
+    "modules": 34,
+    "source_fingerprint": "f8c8c605fccc611e81511894d0a585679fac516e2b2ef0d268a9a275a6fa8d51",
+    "source_unchanged": true,
+    "frontend_build": "pass",
+    "gap_replay": "13/13",
+    "gap_tools": "13/13",
+    "negative_control": "correctly_failed"
+  },
+  "browser": {
+    "status": "pass",
+    "mode": "synthetic_with_5s_retrieval_delay",
+    "first_visible_ms": 101,
+    "waiting_visible_ms": 6152,
+    "refresh_preserved": true
+  },
+  "live": {
+    "collection_status": "complete",
+    "quality_status": "not_accepted",
+    "cohort": {
+      "runs": 3,
+      "rubric_passed": 2,
+      "fallback_free": 0,
+      "autonomous_success": 0,
+      "attempts": 20,
+      "actual_responses": 8,
+      "usage_unknown": 12,
+      "known_tokens": 26676,
+      "provider_actual_response_ratio": 0.4,
+      "model_proposals_with_response": 8,
+      "accepted": 2,
+      "accepted_ratio": 0.25,
+      "validator_false_rejections_v2_correctable": 0,
+      "safety_rejections": 0,
+      "parameter_rejections": 6,
+      "wall_ms_each": [
+        43310.89,
+        19018.79,
+        31147.04
+      ],
+      "wall_ms_median": 31147.0,
+      "planner_latency_ms_median": 4456.6
+    },
+    "rate_limit_attempts": 12,
+    "last_schema_fix_validated_online": false,
+    "default_retries_0_validated_online": false
+  },
+  "independent_held_out": "unavailable",
+  "real_retrieval_e2e_retested": "unavailable",
+  "overall": "engineering_accepted_open_agent_quality_not_accepted"
+}

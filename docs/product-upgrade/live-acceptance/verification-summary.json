@@ -1,0 +1,30 @@
+{
+  "engineering_regression": "pass",
+  "live_acceptance": "fail",
+  "unit": {
+    "tests": 331,
+    "failures": 0,
+    "errors": 0,
+    "skipped": [],
+    "successful": true
+  },
+  "development": {
+    "total": 30,
+    "passed": 30,
+    "failed": 0,
+    "unavailable": 0
+  },
+  "usage": {
+    "model_attempts": 32,
+    "actual_tokens_reported": 99856,
+    "unknown_attempts": 5,
+    "failed_estimate_attempts": 1,
+    "network_attempts": 9,
+    "billing_cost": "unavailable",
+    "note": "Actual-token subtotal excludes unknown remote usage; not a complete bill or quality metric. Diagnostic and failed calls included."
+  },
+  "live_report": "../../../output/product-live-20260908/live-summary.json",
+  "frontend_build": "passed; see frontend-build.log",
+  "materials_browser_checks": 19,
+  "ui_dedup_checks": 4
+}

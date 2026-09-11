@@ -1,0 +1,563 @@
+{
+  "started_at": "2026-09-11T11:07:51.988102+00:00",
+  "source_fingerprint": "179de405882fff10eb8f712de05a2b19812fde2be93c6f694aa172d3e7019ced",
+  "suites": [
+    {
+      "name": "test_agent_adaptive",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_agent_adaptive",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 8
+    },
+    {
+      "name": "test_agent_closeout",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_agent_closeout",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 17
+    },
+    {
+      "name": "test_agent_investigation",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_agent_investigation",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 9
+    },
+    {
+      "name": "test_agent_open_tasks",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_agent_open_tasks",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 6
+    },
+    {
+      "name": "test_frontend_read_models",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_frontend_read_models",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 13
+    },
+    {
+      "name": "test_harness_acceptance",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_harness_acceptance",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 13
+    },
+    {
+      "name": "test_harness_p0",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_harness_p0",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 25
+    },
+    {
+      "name": "test_harness_p1_a",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_harness_p1_a",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 15
+    },
+    {
+      "name": "test_harness_p1_b",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_harness_p1_b",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 16
+    },
+    {
+      "name": "test_harness_p1_c",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_harness_p1_c",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 11
+    },
+    {
+      "name": "test_harness_p2",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_harness_p2",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 16
+    },
+    {
+      "name": "test_harness_p3",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_harness_p3",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 22
+    },
+    {
+      "name": "test_live_regressions",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_live_regressions",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 8
+    },
+    {
+      "name": "test_memory_p0",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_memory_p0",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 16
+    },
+    {
+      "name": "test_memory_p1",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_memory_p1",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 14
+    },
+    {
+      "name": "test_memory_p2",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_memory_p2",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 15
+    },
+    {
+      "name": "test_multi_agent_review",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_multi_agent_review",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 6
+    },
+    {
+      "name": "test_planner_reliability",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_planner_reliability",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 15
+    },
+    {
+      "name": "test_product_closeout",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_product_closeout",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 10
+    },
+    {
+      "name": "test_product_evals",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_product_evals",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 3
+    },
+    {
+      "name": "test_product_evidence_quality",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_product_evidence_quality",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 3
+    },
+    {
+      "name": "test_product_full_flow",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_product_full_flow",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 4
+    },
+    {
+      "name": "test_product_ocr",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_product_ocr",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 4
+    },
+    {
+      "name": "test_product_p1",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_product_p1",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 10
+    },
+    {
+      "name": "test_product_reconciliation",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_product_reconciliation",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 5
+    },
+    {
+      "name": "test_product_tasks",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_product_tasks",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 4
+    },
+    {
+      "name": "test_reliability_p0",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_reliability_p0",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 14
+    },
+    {
+      "name": "test_reliability_p1",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_reliability_p1",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 9
+    },
+    {
+      "name": "test_reliability_p2",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_reliability_p2",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 10
+    },
+    {
+      "name": "test_stage10_server",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_stage10_server",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 11
+    },
+    {
+      "name": "test_stage3",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_stage3",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 3
+    },
+    {
+      "name": "test_stage5",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_stage5",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 18
+    },
+    {
+      "name": "test_stage6",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_stage6",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 26
+    },
+    {
+      "name": "test_stage8_agent",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "unittest",
+        "stage0.test_stage8_agent",
+        "-q"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": 14
+    }
+  ],
+  "evals": [
+    {
+      "name": "baseline-replay",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "stage0.agent_evals.run_eval",
+        "--policy",
+        "baseline",
+        "--path",
+        "replay",
+        "--out",
+        "D:\\py\\HealthAssistant\\docs\\agent-capability-upgrade\\planner-closeout-2026-09-11\\engineering\\baseline-replay.json"
+      ],
+      "exit_code": 1,
+      "expected_exit": 1,
+      "passed": true,
+      "tests": null
+    },
+    {
+      "name": "gap-replay",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "stage0.agent_evals.run_eval",
+        "--policy",
+        "gap",
+        "--path",
+        "replay",
+        "--out",
+        "D:\\py\\HealthAssistant\\docs\\agent-capability-upgrade\\planner-closeout-2026-09-11\\engineering\\gap-replay.json"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": null
+    },
+    {
+      "name": "gap-tools",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "stage0.agent_evals.run_eval",
+        "--policy",
+        "gap",
+        "--path",
+        "tools",
+        "--out",
+        "D:\\py\\HealthAssistant\\docs\\agent-capability-upgrade\\planner-closeout-2026-09-11\\engineering\\gap-tools.json"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": null
+    },
+    {
+      "name": "gap-replay-negative",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "stage0.agent_evals.run_eval",
+        "--policy",
+        "gap",
+        "--path",
+        "replay",
+        "--out",
+        "D:\\py\\HealthAssistant\\docs\\agent-capability-upgrade\\planner-closeout-2026-09-11\\engineering\\gap-replay-negative.json",
+        "--negative-control"
+      ],
+      "exit_code": 1,
+      "expected_exit": 1,
+      "passed": true,
+      "tests": null
+    }
+  ],
+  "live": [],
+  "independent_held_out": "unavailable",
+  "source_unchanged": true,
+  "status": "pass",
+  "tests_executed": 393,
+  "completed_at": "2026-09-11T11:10:54.844811+00:00"
+}

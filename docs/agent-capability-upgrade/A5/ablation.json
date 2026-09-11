@@ -1,0 +1,46 @@
+{
+  "protocol": "agent-acceptance@1",
+  "stage": "A5",
+  "kind": "engineering_ablation",
+  "real_model_quality": "unavailable",
+  "provider_availability": "unavailable",
+  "independent_held_out": "unavailable",
+  "runs": [
+    {
+      "name": "baseline",
+      "exit_code": 1,
+      "summary": {
+        "total": 13,
+        "passed": 0
+      },
+      "artifact": "docs\\agent-capability-upgrade\\A5\\ablation-baseline.json"
+    },
+    {
+      "name": "gap",
+      "exit_code": 0,
+      "summary": {
+        "total": 13,
+        "passed": 13
+      },
+      "artifact": "docs\\agent-capability-upgrade\\A5\\ablation-gap.json"
+    },
+    {
+      "name": "gap_tools",
+      "exit_code": 0,
+      "summary": {
+        "total": 13,
+        "passed": 13
+      },
+      "artifact": "docs\\agent-capability-upgrade\\A5\\ablation-gap_tools.json"
+    },
+    {
+      "name": "gap_tight_budget",
+      "exit_code": 1,
+      "summary": {
+        "total": 13,
+        "passed": 5
+      },
+      "artifact": "docs\\agent-capability-upgrade\\A5\\ablation-gap_tight_budget.json"
+    }
+  ]
+}

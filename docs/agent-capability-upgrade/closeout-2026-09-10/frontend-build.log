@@ -1,0 +1,18 @@
+
+> medication-coordinator-frontend@0.1.0 build
+> tsc -b && vite build
+
+vite v6.4.3 building for production...
+transforming...
+✓ 1719 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.45 kB │ gzip:   0.30 kB
+dist/assets/index-D07KcNTa.css   24.28 kB │ gzip:   5.64 kB
+dist/assets/index-NxpsnsSV.js   516.92 kB │ gzip: 153.75 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 12.76s

@@ -1,0 +1,13 @@
+{
+  "stage": "A0",
+  "baseline_capture": "complete",
+  "baseline_task_quality": "fail",
+  "sample_count": 13,
+  "paths": ["fixed_tool_replay", "real_local_RAG_fallback"],
+  "negative_control": "failed_as_expected",
+  "real_model_quality": "unavailable",
+  "provider_availability": "unavailable",
+  "independent_agent_held_out": "unavailable",
+  "frozen_config": "baseline-config.json",
+  "overall": "engineering_baseline_only"
+}

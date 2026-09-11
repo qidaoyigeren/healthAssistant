@@ -1,0 +1,66 @@
+{
+  "mode": "recorded-proposal-replay",
+  "remote_calls": 0,
+  "source_fingerprint": "e1cfe9899e71aa059dffb07c511825cb4e6198c38758a107c5cb12b25da6c5ff",
+  "runs": [
+    {
+      "raw_artifact": "docs\\agent-capability-upgrade\\closeout-2026-09-10\\live-final-1.json",
+      "mode": "recorded-proposal-replay",
+      "remote_calls": 0,
+      "proposals_consumed": 5,
+      "proposals_recorded": 5,
+      "goal_status": "completed",
+      "execution_status": "degraded",
+      "coverage": {
+        "consolidated": true,
+        "response_source": "template",
+        "degraded_reason": "planner_circuit_break:safety_rejections",
+        "planner_fallback_reasons": [
+          "provider_error",
+          "planner_circuit_break"
+        ],
+        "research": []
+      },
+      "passed": true
+    },
+    {
+      "raw_artifact": "docs\\agent-capability-upgrade\\closeout-2026-09-10\\live-final-2.json",
+      "mode": "recorded-proposal-replay",
+      "remote_calls": 0,
+      "proposals_consumed": 3,
+      "proposals_recorded": 3,
+      "goal_status": "completed",
+      "execution_status": "degraded",
+      "coverage": {
+        "consolidated": true,
+        "response_source": "template",
+        "degraded_reason": "planner_fallback:provider_error",
+        "planner_fallback_reasons": [
+          "provider_error"
+        ],
+        "research": []
+      },
+      "passed": true
+    },
+    {
+      "raw_artifact": "docs\\agent-capability-upgrade\\closeout-2026-09-10\\live-final-3.json",
+      "mode": "recorded-proposal-replay",
+      "remote_calls": 0,
+      "proposals_consumed": 5,
+      "proposals_recorded": 5,
+      "goal_status": "completed",
+      "execution_status": "degraded",
+      "coverage": {
+        "consolidated": true,
+        "response_source": "template",
+        "degraded_reason": "planner_fallback:provider_error",
+        "planner_fallback_reasons": [
+          "provider_error"
+        ],
+        "research": []
+      },
+      "passed": true
+    }
+  ],
+  "status": "pass"
+}

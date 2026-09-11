@@ -1,0 +1,32 @@
+### Result
+{"synthetic":true,"retrievalDelaySeconds":5,"taskId":"task:0a52fa21f30246dcb99390d347ad6873","runId":"care-task:task:0a52fa21f30246dcb99390d347ad6873:1","firstVisibleMs":101,"terminalMs":6152,"refreshPreserved":true,"progress":{"run_id":"care-task:task:0a52fa21f30246dcb99390d347ad6873:1","events":[{"event_id":"pe-8cb7608c1c1c066feb4d","seq":1,"kind":"accepted","cycle":null,"tool":null,"detail":{"task_id":2},"created_at":"2026-09-11T11:13:43+00:00"},{"event_id":"pe-5b9621be9b0815fd0174","seq":2,"kind":"organizing","cycle":0,"tool":"memory_write","detail":{"ok":true,"error_kind":null,"evidence_count":0,"reused":false},"created_at":"2026-09-11T11:13:43+00:00"},{"event_id":"pe-826ab1375b57e6542793","seq":3,"kind":"organizing","cycle":1,"tool":"memory_read","detail":{"ok":true,"error_kind":null,"evidence_count":0,"reused":false},"created_at":"2026-09-11T11:13:43+00:00"},{"event_id":"pe-d22cc45646a3e415fd06","seq":4,"kind":"retrieving","cycle":2,"tool":"rag_search","detail":{"ok":true,"error_kind":null,"evidence_count":2,"reused":false},"created_at":"2026-09-11T11:13:48+00:00"},{"event_id":"pe-64c399d5d3223c0d8ab6","seq":5,"kind":"organizing","cycle":3,"tool":"read_evidence","detail":{"ok":true,"error_kind":null,"evidence_count":0,"reused":false},"created_at":"2026-09-11T11:13:48+00:00"},{"event_id":"pe-afffe19fae372d22118b","seq":6,"kind":"organizing","cycle":4,"tool":"read_evidence","detail":{"ok":true,"error_kind":null,"evidence_count":0,"reused":false},"created_at":"2026-09-11T11:13:48+00:00"},{"event_id":"pe-86ec012b771a85e413eb","seq":7,"kind":"organizing","cycle":5,"tool":"ask_clarification","detail":{"ok":true,"error_kind":null,"evidence_count":0,"reused":false},"created_at":"2026-09-11T11:13:48+00:00"},{"event_id":"pe-e38b81ca36bfe66d2397","seq":8,"kind":"waiting_input","cycle":null,"tool":null,"detail":{"task_id":2},"created_at":"2026-09-11T11:13:48+00:00"}],"latest_seq":8,"snapshot":false,"scope_id":null,"run_status":"succeeded"}}
+### Ran Playwright code
+```js
+await (async page => {
+  const identity = await (await page.request.get('http://127.0.0.1:8039/v1/acceptance-fixture')).json();
+  if (!identity.synthetic) throw new Error('Synthetic fixture required');
+  const goal = '核查当前用药证据与适用条件（进度验收二）';
+  await page.getByRole('textbox', {name: '核查目标'}).fill(goal);
+  const card = page.locator('article').filter({hasText: goal});
+  const started = Date.now();
+  const accepted = page.waitForResponse(r => r.url().includes('/resume') && r.request().method() === 'POST');
+  await page.getByRole('button', {name: '开始核查', exact: true}).click();
+  const receipt = await (await accepted).json();
+  await card.getByRole('status').filter({hasText: /已受理|整理记录/}).first().waitFor({timeout: 10000});
+  const firstVisibleMs = Date.now() - started;
+  await page.screenshot({path: 'D:/py/HealthAssistant/output/playwright/planner-closeout-20260911/running.png', fullPage: true});
+  await card.getByRole('status').filter({hasText: '本轮已暂停，等待补充记录'}).waitFor({timeout: 30000});
+  const terminalMs = Date.now() - started;
+  const progress = await (await page.request.get('http://127.0.0.1:8039/v1/runs/' + encodeURIComponent(receipt.active_run_id) + '/progress')).json();
+  if (progress.events.at(-1).kind !== 'waiting_input') throw new Error('Missing honest waiting state');
+  if (progress.events.some(e => e.kind === 'completed')) throw new Error('False completion event');
+  await page.screenshot({path: 'D:/py/HealthAssistant/output/playwright/planner-closeout-20260911/waiting.png', fullPage: true});
+  await page.reload();
+  await card.getByRole('status').filter({hasText: '本轮已暂停，等待补充记录'}).waitFor({timeout: 15000});
+  return {synthetic: true, retrievalDelaySeconds: 5, taskId: receipt.id, runId: receipt.active_run_id,
+    firstVisibleMs, terminalMs, refreshPreserved: true, progress};
+}
+)(page);
+```
+### Events
+- New console entries: .playwright-cli\console-2026-09-11T11-08-52-102Z.log#L9-L11

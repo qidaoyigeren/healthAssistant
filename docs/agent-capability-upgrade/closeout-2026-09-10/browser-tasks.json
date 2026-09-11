@@ -1,0 +1,420 @@
+{
+  "items": [
+    {
+      "base_revision": {
+        "medications": 2,
+        "semantic": 1
+      },
+      "budget": {
+        "limit": 1,
+        "spent": 1,
+        "unit": "deterministic_steps"
+      },
+      "case_id": null,
+      "contract_version": 1,
+      "created_at": "2026-09-10T21:28:35+08:00",
+      "due_at": null,
+      "effects_retained": true,
+      "goal_type": "visit_summary",
+      "id": "task:c5163b40d52c4c2bb519ad37ba64f9bb",
+      "missing_inputs": [],
+      "required_outputs": [
+        "visit_artifact"
+      ],
+      "resource_budget": {
+        "call_limit": 256,
+        "calls_actual": 0,
+        "calls_reserved": 0,
+        "child_run_ids": [],
+        "token_limit": 1000000,
+        "tokens_actual": 0,
+        "tokens_reserved": 0,
+        "usage_unknown": false
+      },
+      "result_refs": [
+        "summary:b01e034eb5f64eb4a4a1edbc3a7eea10"
+      ],
+      "revision": 2,
+      "runs": [
+        {
+          "finished_at": "2026-09-10T21:28:35+08:00",
+          "input_revision": {
+            "medications": 2,
+            "semantic": 1
+          },
+          "run_id": "0677e1ea-65b3-4c6f-b856-db72d4a3315d",
+          "runner": "deterministic-care-v1",
+          "started_at": "2026-09-10T21:28:35+08:00",
+          "status": "completed"
+        }
+      ],
+      "scope_id": "local-demo",
+      "status": "completed",
+      "subject_id": "local-demo",
+      "waiting_reason": null
+    },
+    {
+      "active_run_id": "care-task:task:8fd1b1169b0e4f589182d62bc361352d:2",
+      "additional_questions": [],
+      "base_revision": {
+        "medications": 2,
+        "semantic": 0
+      },
+      "budget": {
+        "limit": 24,
+        "spent": 2,
+        "unit": "deterministic_steps"
+      },
+      "case_id": null,
+      "contract_version": 1,
+      "created_at": "2026-09-09T23:32:10+08:00",
+      "due_at": null,
+      "effects_retained": true,
+      "goal": "核查当前用药相互作用证据与适用条件",
+      "goal_type": "evidence_review",
+      "id": "task:8fd1b1169b0e4f589182d62bc361352d",
+      "input_versions": {
+        "materials": 0,
+        "medications": 2,
+        "semantic": 1
+      },
+      "invalidations": [
+        {
+          "at": "2026-09-09T23:35:03+08:00",
+          "changed": [
+            "semantic"
+          ],
+          "policy": "medications→全量重查；semantic→适用条件重核、材料证据复用；materials→来源重校验"
+        }
+      ],
+      "investigation": {
+        "assessments": {
+          "claim:23cd3ebf4138": {
+            "ev-4ec5cad11deda6d679cd": {
+              "condition_status": "verified",
+              "conditions": {
+                "required_subject": "patient_recorded",
+                "subject": "patient_recorded"
+              },
+              "evidence_refs": [
+                "ev-4ec5cad11deda6d679cd"
+              ],
+              "method": "conservative-lexical-v1",
+              "source_status": "current",
+              "status": "supported",
+              "time_status": "not_required",
+              "unresolved": []
+            },
+            "ev-6cd864426aa9d41485ac": {
+              "condition_status": "verified",
+              "conditions": {
+                "required_subject": null,
+                "subject": null
+              },
+              "evidence_refs": [
+                "ev-6cd864426aa9d41485ac"
+              ],
+              "method": "conservative-lexical-v1",
+              "source_status": "current",
+              "status": "supported",
+              "time_status": "not_required",
+              "unresolved": []
+            }
+          }
+        },
+        "authority_read": true,
+        "candidates": [],
+        "checks": {
+          "applicability": "checked",
+          "authority": "checked",
+          "interaction_evidence": "checked"
+        },
+        "claims": [
+          {
+            "claim_id": "claim:23cd3ebf4138",
+            "condition_status": "verified",
+            "entities": [
+              "合成药甲",
+              "合成药乙"
+            ],
+            "opposing_evidence": [],
+            "source_status": "current",
+            "statement": "合成药甲、合成药乙的标签证据",
+            "status": "supported",
+            "supporting_evidence": [
+              "ev-6cd864426aa9d41485ac",
+              "ev-4ec5cad11deda6d679cd"
+            ]
+          }
+        ],
+        "conflicts": [],
+        "content_hashes": [
+          "650d5a367d92239212b0c1e0a07ef14309d159dfaca48cd9ee7aa1806e7b74ed",
+          "1a97b439e13fa5ff00583dc550b6a789b3c092febb169f3f97a86c58be214968"
+        ],
+        "context_integrity": "full_authority_checked_evidence_body_on_demand",
+        "contract_version": "medication-evidence-review@1",
+        "evidence_refs": [
+          "ev-6cd864426aa9d41485ac",
+          "ev-4ec5cad11deda6d679cd"
+        ],
+        "facts": {
+          "medications": [
+            {
+              "created_at": "2026-09-09T23:26:30+08:00",
+              "display_name": "合成药甲",
+              "dose": "5 mg",
+              "end_at": null,
+              "id": 1,
+              "ingredients": [],
+              "medication_key": "合成药甲",
+              "predecessor_id": null,
+              "ref": "memory:medication:1@v1",
+              "route": null,
+              "schedule": null,
+              "source": "synthetic-fixture",
+              "source_uri": null,
+              "start_at": "2026-09-01T08:00:00+08:00",
+              "start_at_basis": "reported",
+              "status": "active",
+              "version": 1
+            },
+            {
+              "created_at": "2026-09-09T23:26:30+08:00",
+              "display_name": "合成药乙",
+              "dose": "10 mg",
+              "end_at": null,
+              "id": 2,
+              "ingredients": [],
+              "medication_key": "合成药乙",
+              "predecessor_id": null,
+              "ref": "memory:medication:2@v1",
+              "route": null,
+              "schedule": null,
+              "source": "synthetic-fixture",
+              "source_uri": null,
+              "start_at": "2026-09-01T08:00:00+08:00",
+              "start_at_basis": "reported",
+              "status": "active",
+              "version": 1
+            }
+          ],
+          "open_conflicts": [],
+          "semantic": [
+            {
+              "created_at": "2026-09-09T23:35:03+08:00",
+              "extraction_mode": "caregiver_input",
+              "fact_key": "renal_status",
+              "id": 1,
+              "namespace": "renal_function",
+              "ref": "memory:semantic:1@v1",
+              "salience": 0.7,
+              "source": "caregiver-input",
+              "source_uri": null,
+              "status": "active",
+              "updated_at": "2026-09-09T23:35:03+08:00",
+              "valid_from": "2026-09-09T23:35:03+08:00",
+              "valid_to": null,
+              "value": "55 ml/min（合成报告）",
+              "verification_status": "recorded_as_reported",
+              "version": 1
+            }
+          ]
+        },
+        "gaps": [
+          {
+            "description": "读取完整权威药单与关键事实",
+            "gap_id": "authority",
+            "kind": "patient_fact_missing",
+            "status": "resolved"
+          },
+          {
+            "claim_id": "claim:23cd3ebf4138",
+            "description": "核查合成药甲、合成药乙的支持和反对证据",
+            "gap_id": "claim:23cd3ebf4138",
+            "kind": "evidence_missing",
+            "status": "resolved"
+          },
+          {
+            "description": "请补充与材料适用条件相关的肾功能记录；这不是临床审批。",
+            "field": "renal_function",
+            "gap_id": "fact:renal_function",
+            "kind": "patient_fact_missing",
+            "status": "resolved"
+          },
+          {
+            "description": "材料的适用条件尚未核实，保留 insufficient。",
+            "gap_id": "condition:claim:23cd3ebf4138",
+            "kind": "evidence_missing",
+            "status": "resolved"
+          }
+        ],
+        "goal": "核查当前用药相互作用证据与适用条件",
+        "invalidations": [
+          {
+            "after": {
+              "medications": 2,
+              "semantic": 1
+            },
+            "before": {
+              "medications": 2,
+              "semantic": 0
+            },
+            "reason": "semantic_changed_applicability_recheck"
+          }
+        ],
+        "mode": "deterministic",
+        "no_progress_count": 0,
+        "patient_version": {
+          "medications": 2,
+          "semantic": 1
+        },
+        "queries": [
+          "合成药甲 合成药乙 药物相互作用 风险"
+        ],
+        "questions": [
+          {
+            "field": "renal_function",
+            "gap_id": "fact:renal_function",
+            "question": "请补充与材料适用条件相关的肾功能记录；这不是临床审批。"
+          }
+        ],
+        "read_refs": [
+          "ev-6cd864426aa9d41485ac",
+          "ev-4ec5cad11deda6d679cd"
+        ],
+        "scope_id": "local-demo",
+        "termination_reason": "checks_completed",
+        "version": "investigation@1"
+      },
+      "missing_inputs": [],
+      "partial_report_refs": [
+        "investigation:85a24ed042894e6ab84f48ad857f3814"
+      ],
+      "required_outputs": [
+        "investigation_report"
+      ],
+      "resource_budget": {
+        "call_limit": 256,
+        "calls_actual": 0,
+        "calls_reserved": 64,
+        "child_run_ids": [
+          "care-task:task:8fd1b1169b0e4f589182d62bc361352d:1",
+          "care-task:task:8fd1b1169b0e4f589182d62bc361352d:2"
+        ],
+        "token_limit": 1000000,
+        "tokens_actual": 0,
+        "tokens_reserved": 300000,
+        "usage_unknown": false
+      },
+      "result_refs": [
+        "investigation:c5457231ad99449bad2d0a4b734e617c"
+      ],
+      "revision": 6,
+      "runs": [
+        {
+          "finished_at": "2026-09-09T23:32:10+08:00",
+          "input_revision": {
+            "medications": 2,
+            "semantic": 0
+          },
+          "run_id": "a4d40556-2419-420b-8fcb-2891cae10c9e",
+          "runner": "care-task-evidence-review@1",
+          "started_at": "2026-09-09T23:32:10+08:00",
+          "status": "waiting_input",
+          "workflow_run_id": "care-task:task:8fd1b1169b0e4f589182d62bc361352d:1"
+        },
+        {
+          "finished_at": "2026-09-09T23:35:03+08:00",
+          "input_revision": {
+            "medications": 2,
+            "semantic": 1
+          },
+          "run_id": "f3843163-eea6-4b62-9dd2-f6b813840e7e",
+          "runner": "care-task-evidence-review@1",
+          "started_at": "2026-09-09T23:35:03+08:00",
+          "status": "completed",
+          "workflow_run_id": "care-task:task:8fd1b1169b0e4f589182d62bc361352d:2"
+        }
+      ],
+      "scope_id": "local-demo",
+      "status": "completed",
+      "subgoals": [
+        {
+          "depends_on": [],
+          "kind": "authority_read",
+          "result_refs": [],
+          "statement": "读取完整权威药单与关键事实",
+          "status": "completed",
+          "subgoal_id": "authority"
+        },
+        {
+          "depends_on": [
+            "authority"
+          ],
+          "kind": "evidence_check",
+          "result_refs": [
+            "ev-6cd864426aa9d41485ac",
+            "ev-4ec5cad11deda6d679cd"
+          ],
+          "statement": "合成药甲、合成药乙的标签证据",
+          "status": "completed",
+          "subgoal_id": "claim:23cd3ebf4138"
+        }
+      ],
+      "subject_id": "local-demo",
+      "waiting_reason": null
+    }
+  ],
+  "notifications": "in_app_only",
+  "contracts": {
+    "reconcile_material": {
+      "version": 2,
+      "outputs": [
+        "reconciliation",
+        "safety_checks"
+      ],
+      "tools": [
+        "candidate_correct",
+        "reconciliation_read"
+      ],
+      "max_steps": 64
+    },
+    "current_medications": {
+      "version": 1,
+      "outputs": [
+        "medication_snapshot"
+      ],
+      "tools": [
+        "memory_read"
+      ],
+      "max_steps": 1
+    },
+    "visit_summary": {
+      "version": 1,
+      "outputs": [
+        "visit_artifact"
+      ],
+      "tools": [
+        "memory_read",
+        "summary_render"
+      ],
+      "max_steps": 1
+    },
+    "evidence_review": {
+      "version": 1,
+      "outputs": [
+        "investigation_report"
+      ],
+      "tools": [
+        "memory_read",
+        "rag_search",
+        "read_evidence",
+        "ask_clarification",
+        "ddi_check",
+        "memory_write"
+      ],
+      "max_steps": 24
+    }
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "started_at": "2026-09-10T13:22:29.196837+00:00",
+  "source_fingerprint": "860c2e4c94e36b932df353ab96d388e3532afecbd103ad30ff3c42b00b926354",
+  "suites": [],
+  "evals": [],
+  "live": [
+    {
+      "name": "live-final-1",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "stage0.agent_evals.run_eval",
+        "--policy",
+        "gap",
+        "--path",
+        "replay",
+        "--live",
+        "--out",
+        "D:\\py\\HealthAssistant\\docs\\agent-capability-upgrade\\closeout-2026-09-10\\live-final-1.json"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": null
+    },
+    {
+      "name": "live-final-2",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "stage0.agent_evals.run_eval",
+        "--policy",
+        "gap",
+        "--path",
+        "replay",
+        "--live",
+        "--out",
+        "D:\\py\\HealthAssistant\\docs\\agent-capability-upgrade\\closeout-2026-09-10\\live-final-2.json"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": null
+    },
+    {
+      "name": "live-final-3",
+      "command": [
+        "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+        "-m",
+        "stage0.agent_evals.run_eval",
+        "--policy",
+        "gap",
+        "--path",
+        "replay",
+        "--live",
+        "--out",
+        "D:\\py\\HealthAssistant\\docs\\agent-capability-upgrade\\closeout-2026-09-10\\live-final-3.json"
+      ],
+      "exit_code": 0,
+      "expected_exit": 0,
+      "passed": true,
+      "tests": null
+    }
+  ],
+  "independent_held_out": "unavailable",
+  "source_unchanged": true,
+  "status": "pass",
+  "tests_executed": 0,
+  "completed_at": "2026-09-10T13:24:04.906706+00:00"
+}

@@ -1,0 +1,115 @@
+{
+  "round": "planner-closeout-v3-2026-09-11",
+  "planner_protocol_version": "propose-next-action@3",
+  "root_cause": {
+    "defect": "unified propose_next_action exposed an opaque, unrequired `arguments` object",
+    "sample_time_schema": {
+      "properties.arguments": {"type": "object"},
+      "required": ["decision"]
+    },
+    "observed_effect": "8/8 recorded live model proposals omitted `arguments` entirely; 6 rejected for `arguments.query is required`, 2 memory_read proposals hydrated by code",
+    "parsing_not_at_fault": "the traced proposal is the verbatim json.loads of the provider tool_call arguments; _parse_json performs no key filtering",
+    "why_the_followup_fix_was_insufficient": "making `arguments` required with a flat union of every permitted tool's fields still left per-tool requiredness in a Chinese prose description - the same signal class that had already failed 8/8"
+  },
+  "fix": {
+    "design": "one named function per permitted tool; each function's parameters are that tool's own model schema from the executor catalog",
+    "parser": "named call -> existing internal proposal {decision, tool, arguments} + investigation metadata lifted out of arguments; validator/executor/permission/evidence/budget contracts unchanged",
+    "wire_change": {"tools": "named functions", "tool_choice": "required", "degrade": "one-time degrade to auto on a tool_choice 400"},
+    "no_auto_fabrication": "a named call missing a required argument is still rejected; rag_search.query is never invented by code"
+  },
+  "wire_audit": {
+    "probe": "scripts/planner-wire-probe.py (mock transport, no remote calls)",
+    "pre_v3_artifact": "wire-audit/flat-union-protocol-v2.json",
+    "v3_artifact": "wire-audit/named-function-protocol-v3.json",
+    "v3_per_tool_required": {
+      "rag_search": ["gap_id", "expected_observation", "query"],
+      "memory_read": ["gap_id", "expected_observation", "query"],
+      "read_evidence": ["evidence_id", "gap_id", "expected_observation"],
+      "ddi_check": ["gap_id", "expected_observation", "medications"],
+      "memory_write": ["gap_id", "expected_observation", "operation"],
+      "respond": []
+    },
+    "enum_leak_removed": "memory_read.query keeps its view enum; rag_search.query has no enum",
+    "executor_only_fields_absent": ["warnings", "context_refs", "subject_key", "reported_event_ref", "warning_ref", "description"]
+  },
+  "protocol_smoke": {
+    "purpose": "prove the provider accepts the v3 request shape before spending the one-shot cohort",
+    "probe_runs": 3,
+    "probe_attempts_total": 9,
+    "probe_rate_limited": 8,
+    "accepted": true,
+    "succeeded_on_run": 3,
+    "returned_function": "rag_search",
+    "raw_arguments": "{\"query\":\"阿司匹林 布洛芬 相互作用 药物相互作用\",\"gap_id\":\"interaction_check\",\"expected_observation\":\"找到关于阿司匹林和布洛芬相互作用的证据\"}",
+    "note": "minimal two-function probe (rag_search + respond), not the full agent contract; the cohort exercises the full one"
+  },
+  "live": {
+    "collection_status": "complete",
+    "runs": 3,
+    "rubric_passed": 3,
+    "fallback_free": 1,
+    "autonomous_success": 1,
+    "autonomous_threshold": "2/3",
+    "autonomous_threshold_met": false,
+    "provider_actual_response_ratio": 0.3636,
+    "provider_response_threshold": "2/3",
+    "provider_threshold_met": false,
+    "attempts": 11,
+    "actual_responses": 4,
+    "usage_unknown": 7,
+    "known_tokens": 16800,
+    "rate_limit_attempts": 7,
+    "timeout_attempts": 0,
+    "model_proposals_with_response": 4,
+    "accepted": 4,
+    "accepted_ratio": 1.0,
+    "parameter_rejections": 0,
+    "parse_failures": 0,
+    "safety_rejections": 0,
+    "autocorrected_proposals": 0,
+    "validator_false_rejections_v2_correctable": 0,
+    "tool_choice_degraded_attempts": 0,
+    "new_evidence_refs": 3,
+    "new_read_refs": 3,
+    "gap_changes": 9,
+    "duplicate_effects": 0,
+    "false_completion": 0,
+    "unsupported_conclusions": 0,
+    "wall_ms_each": [6876.38, 4074.92, 5109.87],
+    "wall_ms_median": 5109.9,
+    "first_backend_progress_ms_each": [4026.716, 3580.941, 3637.215],
+    "planner_latency_ms_median": 1173.2,
+    "failure_attribution": "all remaining failures are provider 429/1305; no protocol failure remained"
+  },
+  "engineering": {
+    "status": "pass",
+    "test_executions": 405,
+    "modules": 34,
+    "failed": 0,
+    "dev_sets": {"gap-replay": "13/13", "gap-tools": "13/13",
+                 "baseline-replay": "0/13 expected", "gap-replay-negative": "0/1 expected"},
+    "new_protocol_regressions": 11
+  },
+  "source": {
+    "sampled_fingerprint": "19618726cc18156acb78cc652720bdeae2474bcf2a330b240fbef21d34b4267a",
+    "sampled_scope": "stage0/**/*.py + frontend/src/**/*.{ts,tsx} + scripts/*.py",
+    "closeout_fingerprint": "8076f881115e5110f5ca4b2f93c5bbac2654933b0dc7fdc52a396865cecddc7b",
+    "closeout_scope": "stage0/**/*.py + frontend/src/**/*.{ts,tsx}",
+    "fingerprints_directly_comparable": false,
+    "each_scope_recomputes_to_its_recorded_value": true,
+    "source_unchanged_during_batch": true,
+    "final_source_matches_sampled_source": true,
+    "evidence": "final-code/source-identity.json"
+  },
+  "answers": {
+    "final_schema_and_default_retries_validated_by_real_model": "yes",
+    "batch_met_fallback_free_autonomous_threshold": "no"
+  },
+  "known_gaps": [
+    "provider availability (36.4% actual responses) is the binding constraint, not the protocol",
+    "default PLANNER_PROVIDER_RETRIES=0 removes the one bounded 429 retry the previous protocol used",
+    "independent held-out evaluation not executed",
+    "real local retrieval end-to-end not re-tested",
+    "default-OFF review_worker still uses the legacy unified propose_next_action schema"
+  ]
+}

@@ -1,0 +1,319 @@
+{
+  "protocol": "agent-eval@1",
+  "dataset": "author-synthetic-dev@1",
+  "policy": "baseline",
+  "path": "replay",
+  "source_fingerprint": "d4b6661b9c1960ca5e393429bfdd43c806ac0eacadb14d6608d4d79a4a09e9f2",
+  "dataset_sha256": "477220626b1f31509087ff0feed05f54274348c7b0cfee31e4184be18ffdfed8",
+  "engineering_status": "fail",
+  "real_model_quality": "unavailable",
+  "provider_availability": "unavailable",
+  "independent_held_out": "unavailable",
+  "summary": {
+    "total": 1,
+    "passed": 0
+  },
+  "tasks": [
+    {
+      "task_id": "agent-dev-complete",
+      "family_id": "complete",
+      "score": {
+        "passed": false,
+        "failures": [
+          "missing_bounded_report",
+          "intentional_negative_control"
+        ],
+        "necessary_question_recall": {
+          "numerator": 0,
+          "denominator": 0
+        },
+        "invalid_questions": 0,
+        "supported_claim_ratio": {
+          "numerator": 0,
+          "denominator": 0
+        },
+        "false_completion": false,
+        "recovery_success": null,
+        "duplicate_effects": 0
+      },
+      "observed": {
+        "investigation": null,
+        "responses": [
+          {
+            "text": "请说明这是新增、停用、剂量变更、测量记录，还是查询当前用药。",
+            "warnings": [],
+            "conflicts": [],
+            "audit_trail": {
+              "session_id": "synthetic-dev",
+              "turn_id": "t-0",
+              "memory_refs": [
+                "memory:working:1@v1"
+              ],
+              "source_refs": []
+            },
+            "tool_trace": [
+              {
+                "phase": "plan",
+                "cycle": 1,
+                "decision": {
+                  "tool": "memory_write",
+                  "purpose": "consolidate_interaction",
+                  "arguments": {
+                    "operation": "consolidate_event"
+                  },
+                  "rationale": "每次交互先进行结构化事实整合、去重和冲突检测。"
+                },
+                "planner": {
+                  "mode": "deterministic",
+                  "source": "deterministic",
+                  "proposal": {
+                    "tool": "memory_write",
+                    "purpose": "consolidate_interaction",
+                    "arguments": {
+                      "operation": "consolidate_event"
+                    },
+                    "rationale": "每次交互先进行结构化事实整合、去重和冲突检测。"
+                  },
+                  "validation": {
+                    "status": "accepted",
+                    "valid": true,
+                    "errors": []
+                  },
+                  "fallback_reason": null,
+                  "fallback_kind": null,
+                  "argument_corrections": [],
+                  "model": null,
+                  "latency_ms": 0
+                }
+              },
+              {
+                "phase": "act",
+                "cycle": 1,
+                "tool": "memory_write",
+                "purpose": "consolidate_interaction",
+                "arguments": {
+                  "operation": "consolidate_event"
+                },
+                "planner_source": "deterministic"
+              },
+              {
+                "phase": "observe",
+                "cycle": 1,
+                "tool": "memory_write",
+                "purpose": "consolidate_interaction",
+                "ok": true,
+                "summary": {
+                  "keys": [
+                    "audit_attribution_version",
+                    "consolidation",
+                    "medication_change",
+                    "memory_refs",
+                    "operation_replayed"
+                  ]
+                },
+                "observation": {
+                  "tool": "memory_write",
+                  "purpose": "consolidate_interaction",
+                  "arguments": {
+                    "operation": "consolidate_event"
+                  },
+                  "result": {
+                    "consolidation": {
+                      "semantic": [],
+                      "episodic": [],
+                      "working": [
+                        {
+                          "id": 1,
+                          "session_id": "synthetic-dev",
+                          "turn_id": "t-0",
+                          "item_key": "goal",
+                          "status": "open",
+                          "source": "caregiver",
+                          "created_at": "2026-09-09T10:32:33+00:00",
+                          "expires_at": "2026-09-09T11:32:33+00:00",
+                          "value": {
+                            "event_type": "user_message",
+                            "text": "请核查当前用药合用的证据和剩余不确定性"
+                          },
+                          "version": 1,
+                          "ref": "memory:working:1@v1"
+                        }
+                      ],
+                      "conflicts": [],
+                      "extraction_mode": "deterministic",
+                      "extraction_error": null,
+                      "replayed": false,
+                      "semantic_outcomes": []
+                    },
+                    "memory_refs": [
+                      "memory:working:1@v1"
+                    ],
+                    "medication_change": null,
+                    "audit_attribution_version": 1,
+                    "operation_replayed": false
+                  },
+                  "ok": true,
+                  "cycle": 1,
+                  "error_kind": null,
+                  "recoverable": null,
+                  "evidence_refs": [],
+                  "no_progress": false
+                }
+              },
+              {
+                "phase": "reflect",
+                "cycle": 1,
+                "note": "观察结果足以继续规划。"
+              },
+              {
+                "phase": "plan",
+                "cycle": 2,
+                "decision": {
+                  "tool": "ask_clarification",
+                  "purpose": "ambiguous_intent",
+                  "arguments": {
+                    "question": "请说明这是新增、停用、剂量变更、测量记录，还是查询当前用药。"
+                  },
+                  "rationale": "现有事件不足以安全选择下一工具。"
+                },
+                "planner": {
+                  "mode": "deterministic",
+                  "source": "deterministic",
+                  "proposal": {
+                    "tool": "ask_clarification",
+                    "purpose": "ambiguous_intent",
+                    "arguments": {
+                      "question": "请说明这是新增、停用、剂量变更、测量记录，还是查询当前用药。"
+                    },
+                    "rationale": "现有事件不足以安全选择下一工具。"
+                  },
+                  "validation": {
+                    "status": "accepted",
+                    "valid": true,
+                    "errors": []
+                  },
+                  "fallback_reason": null,
+                  "fallback_kind": null,
+                  "argument_corrections": [],
+                  "model": null,
+                  "latency_ms": 0
+                }
+              },
+              {
+                "phase": "act",
+                "cycle": 2,
+                "tool": "ask_clarification",
+                "purpose": "ambiguous_intent",
+                "arguments": {
+                  "question": "请说明这是新增、停用、剂量变更、测量记录，还是查询当前用药。"
+                },
+                "planner_source": "deterministic"
+              },
+              {
+                "phase": "observe",
+                "cycle": 2,
+                "tool": "ask_clarification",
+                "purpose": "ambiguous_intent",
+                "ok": true,
+                "summary": {
+                  "keys": [
+                    "needs_user_input",
+                    "question"
+                  ]
+                },
+                "observation": {
+                  "tool": "ask_clarification",
+                  "purpose": "ambiguous_intent",
+                  "arguments": {
+                    "question": "请说明这是新增、停用、剂量变更、测量记录，还是查询当前用药。"
+                  },
+                  "result": {
+                    "needs_user_input": true,
+                    "question": "请说明这是新增、停用、剂量变更、测量记录，还是查询当前用药。"
+                  },
+                  "ok": true,
+                  "cycle": 2,
+                  "error_kind": null,
+                  "recoverable": null,
+                  "evidence_refs": [],
+                  "no_progress": false
+                }
+              },
+              {
+                "phase": "reflect",
+                "cycle": 2,
+                "note": "观察结果足以继续规划。"
+              },
+              {
+                "phase": "plan",
+                "cycle": 3,
+                "decision": {
+                  "tool": "respond"
+                },
+                "planner": {
+                  "mode": "deterministic",
+                  "source": "deterministic",
+                  "proposal": {
+                    "decision": "respond"
+                  },
+                  "validation": {
+                    "status": "deterministic_terminal",
+                    "valid": true,
+                    "errors": []
+                  },
+                  "fallback_reason": null,
+                  "fallback_kind": null,
+                  "argument_corrections": [],
+                  "model": null,
+                  "latency_ms": 0
+                }
+              }
+            ],
+            "safety_status": "enforced",
+            "operation_outcomes": [],
+            "answer_bundle": {
+              "bundle_version": "answer-bundle@1",
+              "safety_status": "enforced",
+              "claims": [],
+              "fact_refs": [
+                "memory:working:1@v1"
+              ],
+              "evidence_refs": [],
+              "patient_revision": {
+                "medications": 2,
+                "semantic": 0
+              },
+              "unresolved_questions": [],
+              "coverage": {
+                "consolidated": true,
+                "response_source": null,
+                "degraded_reason": null,
+                "research": []
+              }
+            }
+          }
+        ],
+        "execution_status": "finished",
+        "goal_status": "unknown",
+        "answer_status": "template",
+        "tool_calls": 2,
+        "model_calls": 0,
+        "actual_tokens": 0,
+        "unknown_usage": 0,
+        "mode": "deterministic",
+        "degradation_reasons": [
+          null
+        ],
+        "recovery_success": null,
+        "duplicate_effects": 0,
+        "receipts": [
+          {
+            "scope_id": "local-demo",
+            "operation_id": "consolidate:synthetic:t-0"
+          }
+        ],
+        "latency_ms": 69.88
+      }
+    }
+  ]
+}

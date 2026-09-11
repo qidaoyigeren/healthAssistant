@@ -1,0 +1,31 @@
+{
+  "protocol": "agent-acceptance@1",
+  "stage": "A2",
+  "generated_at": "2026-09-09",
+  "source_fingerprint": "6909706e8aa2717bb92dd4cb26cea340f4cbf6b4bcc7be59ad9a83d6ce1ab341",
+  "engineering_status": "pass",
+  "real_model_quality": "unavailable",
+  "provider_availability": "unavailable",
+  "independent_held_out": "unavailable",
+  "verification": {
+    "open_task_tests": {"command": "python -m unittest stage0.test_agent_open_tasks -v", "result": "6/6 OK"},
+    "backend_sweep": {"command": "python -m unittest stage0.test_agent_investigation stage0.test_live_regressions stage0.test_stage8_agent stage0.test_harness_p0..p3 stage0.test_memory_p0..p2 stage0.test_reliability_p0..p2 stage0.test_product_* stage0.test_frontend_read_models", "result": "252 OK"},
+    "server_task_suites": {"command": "python -m unittest stage0.test_stage10_server stage0.test_product_closeout stage0.test_product_tasks stage0.test_agent_open_tasks", "result": "31 OK"},
+    "frontend_build": {"command": "cd frontend && npm run build", "result": "tsc -b && vite build OK"}
+  },
+  "acceptance_demos": [
+    {"name": "wait_persists_restart_supplement_then_completes", "result": "pass"},
+    {"name": "semantic_correction_reuses_evidence_medication_change_rechecks", "result": "pass"},
+    {"name": "duplicate_submit_replays_receipt_and_budget_accumulates", "result": "pass"},
+    {"name": "budget_exhaustion_fails_honestly_keeping_partial_report", "result": "pass"},
+    {"name": "cancel_while_waiting_is_terminal_and_effects_retained", "result": "pass"},
+    {"name": "worker_auto_resume_continues_named_task_only", "result": "pass"}
+  ],
+  "key_files": ["stage0/care_tasks.py", "stage0/agent.py", "stage0/investigation.py", "stage0/server.py", "stage0/product.py", "stage0/test_agent_open_tasks.py", "frontend/src/features/tasks/CareTasksPage.tsx"],
+  "completion_semantics": "completed requires checks_completed + persisted artifact; insufficient-evidence reports are saved but NOT completed (failed/waiting)",
+  "limitations": [
+    "deterministic planner only in this stage; no real model run",
+    "user_question subgoals recorded, never auto-completed by code",
+    "synthetic development demonstrations; no independent held-out"
+  ]
+}

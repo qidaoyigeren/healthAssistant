@@ -1,0 +1,61 @@
+✓ seed_氨氯地平 {"status":"committed"}
+✓ seed_克拉霉素 {"status":"committed"}
+✓ review_started_and_waiting {}
+✓ gaps_found {"questions":["dose_unit:氨氯地平"]}
+✓ partial_report_readable {"partial":true}
+✓ incremental_recheck_finished {"status":"failed","termination":"budget_insufficient","invalidations":[{"after":{"medications":13,"semantic":0},"before":{"medications":12,"semantic":0},"reason":"medications_changed"}],"budget":{"limit":24,"spent":2,"unit":"deterministic_steps"}}
+✓ final_report {"partial":true}
+{
+ "track": "a5-open-review-browser-demo",
+ "passed": true,
+ "steps": [
+  {
+   "name": "seed_氨氯地平",
+   "status": "committed"
+  },
+  {
+   "name": "seed_克拉霉素",
+   "status": "committed"
+  },
+  {
+   "name": "review_started_and_waiting"
+  },
+  {
+   "name": "gaps_found",
+   "questions": [
+    "dose_unit:氨氯地平"
+   ]
+  },
+  {
+   "name": "partial_report_readable",
+   "partial": true
+  },
+  {
+   "name": "incremental_recheck_finished",
+   "status": "failed",
+   "termination": "budget_insufficient",
+   "invalidations": [
+    {
+     "after": {
+      "medications": 13,
+      "semantic": 0
+     },
+     "before": {
+      "medications": 12,
+      "semantic": 0
+     },
+     "reason": "medications_changed"
+    }
+   ],
+   "budget": {
+    "limit": 24,
+    "spent": 2,
+    "unit": "deterministic_steps"
+   }
+  },
+  {
+   "name": "final_report",
+   "partial": true
+  }
+ ]
+}

@@ -1,0 +1,28 @@
+{
+  "checked_at": "2026-09-11T11:50:29.936259+00:00",
+  "note": "The two recorded digests cover DIFFERENT file sets and must never be compared to each other. Identity is established by recomputing each scope and matching its own recorded value; the union scope (which includes scripts/) is the binding one.",
+  "union_scope": {
+    "covers": [
+      "stage0/**/*.py",
+      "frontend/src/**/*.ts",
+      "frontend/src/**/*.tsx",
+      "scripts/*.py"
+    ],
+    "recorded_at_sample": "19618726cc18156acb78cc652720bdeae2474bcf2a330b240fbef21d34b4267a",
+    "recomputed_now": "19618726cc18156acb78cc652720bdeae2474bcf2a330b240fbef21d34b4267a",
+    "match": true,
+    "batch_source_unchanged": true
+  },
+  "closeout_scope": {
+    "covers": [
+      "stage0/**/*.py",
+      "frontend/src/**/*.ts",
+      "frontend/src/**/*.tsx"
+    ],
+    "recorded_at_closeout": "8076f881115e5110f5ca4b2f93c5bbac2654933b0dc7fdc52a396865cecddc7b",
+    "recomputed_now": "8076f881115e5110f5ca4b2f93c5bbac2654933b0dc7fdc52a396865cecddc7b",
+    "match": true,
+    "closeout_source_unchanged": true
+  },
+  "conclusion": "final source is byte-identical to the sampled source"
+}

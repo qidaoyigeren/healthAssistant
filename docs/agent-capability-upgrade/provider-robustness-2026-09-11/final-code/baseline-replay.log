@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 203, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\37859\AppData\Local\Temp\agent-baseline-source-uy0i86z5\stage0\agent_evals\run_eval.py", line 268, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "C:\Users\37859\AppData\Local\Temp\agent-baseline-source-uy0i86z5\stage0\agent_evals\run_eval.py", line 246, in main
+    from stage0.agent import PLANNER_PROTOCOL_VERSION
+ImportError: cannot import name 'PLANNER_PROTOCOL_VERSION' from 'stage0.agent' (C:\Users\37859\AppData\Local\Temp\agent-baseline-source-uy0i86z5\stage0\agent.py)

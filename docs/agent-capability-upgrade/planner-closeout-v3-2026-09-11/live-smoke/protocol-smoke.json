@@ -1,0 +1,21 @@
+{
+  "started_at": "2026-09-11T11:37:31.847413+00:00",
+  "request": {
+    "model": "glm-4.7-flash",
+    "tool_choice": "required",
+    "function_names": [
+      "rag_search",
+      "respond"
+    ],
+    "rag_search_required": [
+      "query",
+      "gap_id",
+      "expected_observation"
+    ]
+  },
+  "outcome": "error",
+  "error_type": "RateLimitError",
+  "error": "Error code: 429 - {'error': {'code': '1305', 'message': '该模型当前访问量过大，请您稍后再试'}}",
+  "accepted_by_provider": false,
+  "completed_at": "2026-09-11T11:37:32.934041+00:00"
+}

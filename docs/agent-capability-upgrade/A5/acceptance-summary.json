@@ -1,0 +1,53 @@
+{
+  "protocol": "agent-acceptance@1",
+  "stage": "A5",
+  "generated_at": "2026-09-09",
+  "source_fingerprint": "see ablation-*.json artifacts (per-run recorded)",
+  "engineering_status": "pass",
+  "real_model_quality": "unavailable",
+  "provider_availability": "unavailable",
+  "independent_held_out": "unavailable",
+  "ablations": [
+    {"name": "baseline", "summary": {"total": 13, "passed": 0}, "artifact": "ablation-baseline.json"},
+    {"name": "gap", "summary": {"total": 13, "passed": 13}, "artifact": "ablation-gap.json"},
+    {"name": "gap_tools", "summary": {"total": 13, "passed": 13}, "artifact": "ablation-gap_tools.json"},
+    {"name": "gap_tight_budget", "summary": {"total": 13, "passed": 5}, "artifact": "ablation-gap_tight_budget.json", "note": "honest budget sensitivity"}
+  ],
+  "repeat_protocol": {"planned_k": 3, "actual_k": "see live-run-*.json in this directory; missing files = run not completed", "per_run_seconds": 180, "per_run_calls": 8, "provider": "official Zhipu glm-4.7-flash free tier (existing authorization)"},
+  "engineering_fault_coverage": [
+    "commit-then-crash recovery (test_agent_investigation)",
+    "budget across recovery/runs (test_agent_investigation, test_agent_open_tasks)",
+    "stale-fact review refusal (harness P2 suites)",
+    "duplicate input (receipt replay, test_agent_open_tasks)",
+    "cancel (test_agent_open_tasks, dev family cancel)",
+    "source invalidation (tamper test)",
+    "no progress (dev family repeat_retrieval, fingerprint guard)",
+    "provider rate limit (dev family model_rate_limit, failure taxonomy)",
+    "wrap-up failure under reserve (test_agent_adaptive)",
+    "unauthorized tool (proposal_errors)",
+    "forged evidence (forged-ref rejection, multi-agent scope revalidation)"
+  ],
+  "evidence_tracks": {
+    "engineering_regression": "pass (228 + 49 batch sweeps + focused suites)",
+    "fixed_evidence_model_eval": "pass on dev set (deterministic planner; scripted fault injection counted as engineering)",
+    "real_tool_end_to_end": "pass (dev tools path over real local RAG adapter)",
+    "provider_availability": "unavailable unless live-run artifacts exist",
+    "human_domain_review": "not performed; no clinical-safety claim"
+  },
+  "browser_demo": {
+    "entry": "scripts/agent-capability-demo.js",
+    "result": "pass (see demo-result.json and output/a5-demo-1-waiting.png, output/a5-demo-2-final.png)",
+    "flow": "seed → UI open review → dose-unit gap wait → partial report → UI supplement → incremental recheck with medications_changed invalidation and budget accumulation → honest terminal state with retained report",
+    "completion_semantics": "task completed only when every check passed; the real-corpus claim that could not be established within the bounded lexical searches is an honest FAILED task, not a pass"
+  },
+  "summary_claims": [
+    {"claim": "gap-driven planning turns clarification-only into deliverable bounded review (0/13 → 13/13)", "code": "stage0/investigation.py", "evidence": "ablation-baseline.json vs ablation-gap.json"},
+    {"claim": "open review tasks persist across restart and re-plan incrementally with selective invalidation", "code": "stage0/care_tasks.py", "evidence": "test_agent_open_tasks.py, demo-result.json"},
+    {"claim": "routing, wrap-up reserve and failure taxonomy are recorded and verifiable", "code": "stage0/router.py", "evidence": "test_agent_adaptive.py"}
+  ],
+  "limitations": [
+    "no independently collected held-out; dev set is author-synthetic",
+    "live model repeats depend on provider availability; absent artifacts mean unavailable",
+    "engineering measurements on synthetic data only; no clinical validation"
+  ]
+}
