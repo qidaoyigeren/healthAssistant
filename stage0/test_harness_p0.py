@@ -253,6 +253,12 @@ def reply(content='{}', tokens=None):
               usage=None if tokens is None else NS(total_tokens=tokens))
 
 
+def negative_extraction_reply():
+    response = reply()
+    response.choices[0].message.tool_calls = [NS(function=NS(arguments='{"triples":[]}'))]
+    return response
+
+
 class FakeClient:
     def __init__(self, replies):
         self.replies, self.calls = list(replies), []
@@ -295,7 +301,7 @@ class ResourceLedgerTests(unittest.TestCase):
         from stage0 import extract_ddi
         client = FakeClient([reply(''), reply(json.dumps(_repeat_read_provider({}))),
                              reply('建议咨询医生/药师。'), reply('{"verdict":"pass","findings":[]}'),
-                             reply('{"semantic":[],"episodic":[],"working":[]}'), reply()])
+                             reply('{"semantic":[],"episodic":[],"working":[]}'), negative_extraction_reply()])
         state = AgentState(session_id='s', turn_id='r', event=CareEvent('query_current_medications', '查询'))
         with budget_scope(self.store, 'r') as budget:
             LLMPlanner(client=client, model='fake').propose(state)
@@ -435,7 +441,7 @@ class ResourceLedgerTests(unittest.TestCase):
         from stage0 import ddi_engine
         from stage0.turn_budget import CURRENT
         self.assertIs(ddi_engine.extract_ddi.CURRENT, CURRENT)
-        client = FakeClient([reply()])
+        client = FakeClient([negative_extraction_reply()])
         with budget_scope(self.store, 'r') as budget:
             ddi_engine.extract_ddi._production_call(client, 'fake', '药物', '说明书')
             http = mock.MagicMock()

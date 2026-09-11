@@ -1002,6 +1002,11 @@ class MemoryStore:
         self.connection.execute("PRAGMA journal_mode=WAL")
         self.connection.execute("PRAGMA foreign_keys=ON")
         self.connection.executescript(SCHEMA)
+        # A1 additive provenance migration. A legacy timestamp does not prove
+        # that the patient supplied a start date. Never backfill that certainty.
+        if 'start_at_basis' not in {r[1] for r in self.connection.execute('PRAGMA table_info(medications)')}:
+            self.connection.execute("ALTER TABLE medications ADD COLUMN start_at_basis TEXT NOT NULL DEFAULT 'legacy_unknown'")
+        self.connection.execute("INSERT OR IGNORE INTO schema_meta(key,value) VALUES('medication_time_provenance_version','1')")
         migrated = _ensure_p0_columns(self.connection)
         migrated = _ensure_p1_schema(self.connection) or migrated
         migrated = _ensure_p2_schema(self.connection) or migrated
@@ -1704,6 +1709,8 @@ class MemoryStore:
                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (med_key, name, _json(list(ingredients or [])), dose, route, schedule, "active", when, None, source, source_uri, version, predecessor_id, now),
             )
+            self.connection.execute('UPDATE medications SET start_at_basis=? WHERE id=?',
+                                    ('reported' if occurred_at else 'recorded_time', cursor.lastrowid))
             medication = self._medication_row(self.connection.execute("SELECT * FROM medications WHERE id=?", (cursor.lastrowid,)).fetchone())
             self._audit(action, "medication", medication["id"], {"ref": medication["ref"], "name": name}, source)
         else:

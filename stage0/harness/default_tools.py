@@ -272,6 +272,8 @@ def build_default_executor(agent: Any, *, hooks: Any = None,
         ctx = request.ctx
         revision = ctx.patient_revision
         if kind == "rag":
+            if getattr(request.state, 'investigation', None) is not None and not result.get('corpus_version') and corpus_version_fn:
+                result = dict(result, corpus_version=corpus_version_fn())
             view = capture_from_rag_result(evidence_store, result, run_id=ctx.run_id,
                                            query=str(request.arguments.get("query", "")),
                                            patient_revision=revision)
@@ -328,6 +330,7 @@ def build_default_executor(agent: Any, *, hooks: Any = None,
     if evidence_store is not None:
         executor.register(READ_EVIDENCE_SPEC, lambda request: evidence_store.read(
             request.arguments["evidence_id"],
+            scope_id=request.ctx.principal.scope_id,
             offset=request.arguments.get("offset", 0),
             limit=request.arguments.get("limit", 2000)))
 

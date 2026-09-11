@@ -806,8 +806,20 @@ class Stage6ResponseTests(unittest.TestCase):
 
     def test_canonical_schema_is_shared(self) -> None:
         planner = LLMPlanner(proposal_provider=lambda _: respond_proposal())
+        # Protocol v3: the planner payload advertises the same named functions
+        # the provider is sent, built from the shared executor catalog.
+        payload = planner.prompt_payload(AgentState("s", "t", CareEvent("user_message", "hello")))
+        functions = {entry['function']['name']: entry['function']['parameters']
+                     for entry in payload['tool_functions']}
+        self.assertEqual(set(functions), set(planner.tool_schemas) | {'respond'})
+        for name, parameters in functions.items():
+            if name == 'respond':
+                continue
+            for key, value in planner.tool_schemas[name].get('properties', {}).items():
+                self.assertEqual(value, parameters['properties'][key])
+        self.assertIn('respond', functions)
+        # Retained only for the default-OFF review_worker contract.
         self.assertEqual(planner.function_schema()["function"]["parameters"], CANONICAL_PROPOSAL_SCHEMA)
-        self.assertEqual(planner.prompt_payload(AgentState("s", "t", CareEvent("user_message", "hello")))["canonical_proposal_schema"], CANONICAL_PROPOSAL_SCHEMA)
 
     def _state_with_warning(self) -> AgentState:
         warning = warning_fixture()

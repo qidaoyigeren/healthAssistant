@@ -119,6 +119,10 @@ class WorkflowState(TypedDict, total=False):
     # line of defence in record_turn_trace).
     trace_flushed: int
     reflection_notes: list[str]
+    investigation: dict[str, Any] | None
+    investigation_policy: str | None
+    route_info: dict[str, Any] | None
+    pending_correction: dict[str, Any] | None
     cycle: int
     degraded_reason: str | None
     route: str
@@ -249,6 +253,8 @@ def build_workflow_state(*, event: CareEvent, session_id: str, turn_id: str,
         "trace": [],
         "trace_flushed": 0,
         "reflection_notes": [],
+        "investigation": None,
+        "investigation_policy": None,
         "cycle": 0,
         "degraded_reason": None,
         "route": "plan",
@@ -390,6 +396,8 @@ class LangGraphAgentRunner:
         # at the next scheduling point of the resumed graph.
         from .harness.progress import cancel_event_for
         ctx.cancel_event = cancel_event_for(wf["run_id"])
+        from .investigation import InvestigationState
+        inv = wf.get('investigation')
         return AgentState(
             session_id=wf["session_id"], turn_id=wf["turn_id"], event=event,
             client_event_id=wf.get("client_event_id"),
@@ -403,6 +411,10 @@ class LangGraphAgentRunner:
             # checkpoint projection (principal re-resolved from configuration,
             # never from the checkpoint).
             ctx=ctx,
+            investigation=InvestigationState.restore(inv, ctx.principal.scope_id) if inv else None,
+            investigation_policy=wf.get('investigation_policy', 'legacy'),
+            route_info=wf.get('route_info'),
+            pending_correction=wf.get('pending_correction'),
         )
 
     def _write_back(self, wf: dict[str, Any], state: AgentState,
@@ -411,6 +423,10 @@ class LangGraphAgentRunner:
         wf["trace"] = state.trace
         wf["trace_flushed"] = state.trace_flushed
         wf["reflection_notes"] = state.reflection_notes
+        wf['investigation'] = state.investigation.to_dict() if state.investigation else None
+        wf['investigation_policy'] = state.investigation_policy
+        wf['route_info'] = state.route_info
+        wf['pending_correction'] = state.pending_correction
         wf["cycle"] = state.cycle
         wf["degraded_reason"] = state.degraded_reason
         wf["budget"] = CURRENT.get().sync()
@@ -478,18 +494,21 @@ class LangGraphAgentRunner:
             planner_trace = getattr(agent.planner, "last_decision_trace", None)
         else:
             try:
-                action = agent.planner.decide(state)
+                action = agent._decide(state)
                 breaker["consecutive_rejections"] = 0
             except BudgetExceeded:
                 budget.gate(state)
                 return _finish("compose")
             except PlanningRejected:
+                previous = (state.pending_correction or {}).get('previous_proposal_was_rejected')
+                state.pending_correction = agent.planner.correction_for(state)
+                repeated = previous is not None and previous == (state.pending_correction or {}).get('previous_proposal_was_rejected')
                 breaker["consecutive_rejections"] = int(breaker.get("consecutive_rejections") or 0) + 1
                 state.trace.append({
                     "phase": "plan", "cycle": state.cycle, "decision": {"tool": "replan"},
                     "planner": agent.planner.last_decision_trace,
                 })
-                if breaker["consecutive_rejections"] >= self._rejection_limit():
+                if repeated or breaker["consecutive_rejections"] >= self._rejection_limit():
                     breaker["broken"] = True
                     state.degraded_reason = "planner_circuit_break:safety_rejections"
                     state.trace.append({
@@ -514,6 +533,9 @@ class LangGraphAgentRunner:
             "decision": asdict(action) if action else {"tool": "respond"},
             "planner": planner_trace,
         })
+        if action is not None and agent._hits_wrap_up_reserve(state, action):
+            state.degraded_reason = 'budget_reserved_for_wrapup'
+            return _finish('compose')
         return _finish("compose" if action is None else "execute", action=action)
 
     def _node_execute(self, wf: dict[str, Any]) -> dict[str, Any]:
@@ -526,7 +548,8 @@ class LangGraphAgentRunner:
         action_dict = wf.get("pending_action") or {}
         action = ToolAction(tool=action_dict["tool"], purpose=action_dict.get("purpose", ""),
                             arguments=action_dict.get("arguments") or {},
-                            rationale=action_dict.get("rationale", ""))
+                            rationale=action_dict.get("rationale", ""),
+                            gap_id=action_dict.get('gap_id'), expected_observation=action_dict.get('expected_observation'))
         observation = agent._act(state, action)
         observation.cycle = state.cycle
         state.observations.append(observation)

@@ -48,8 +48,13 @@ class TurnBudget:
 
 
 LIMITS = ('max_cycles', 'wall_clock_seconds', 'token_budget', 'call_budget')
+# ``refused_calls`` counts attempts a provider definitively refused BEFORE
+# executing (see ``call(refund_if=...)``).  It only ever advances, so the
+# monotonic ``merge_budget`` contract is preserved across checkpoints and
+# restarts; the refund is expressed as an offset in ``exhausted()`` rather
+# than by decrementing ``calls_attempted``.
 COUNTERS = ('consumed_seconds', 'tokens_estimated', 'tokens_actual', 'tokens_charged',
-            'calls_attempted', 'cycles_consumed')
+            'calls_attempted', 'refused_calls', 'cycles_consumed')
 CURRENT = ContextVar('turn_budget', default=None)
 LEASE = ContextVar('turn_lease', default=None)
 
@@ -125,7 +130,13 @@ class BudgetSession:
             return 'wall_clock'
         if self.data['tokens_charged'] >= self.data['token_budget']:
             return 'tokens'
-        if self.data['calls_attempted'] >= self.data['call_budget']:
+        # Definitive refusals ran no model, so they do not consume the model
+        # call budget.  ``refused_calls`` is capped at one call budget when it
+        # is granted (see ``call``), which keeps the budget a hard ceiling:
+        # total attempts never exceed twice it, however saturated the provider
+        # is.  The min() only defends against pre-existing stored values.
+        refunded = min(self.data.get('refused_calls', 0), self.data['call_budget'])
+        if self.data['calls_attempted'] - refunded >= self.data['call_budget']:
             return 'calls'
         if cycle is not None and max(cycle, self.data['cycles_consumed']) >= self.data['max_cycles']:
             return 'cycles'
@@ -148,13 +159,17 @@ class BudgetSession:
         self.data['cycles_consumed'] = state.cycle
         self.sync()
 
-    def call(self, kind, callback, payload, timeout=60., output_limit=4096, *, token_metered=True):
+    def call(self, kind, callback, payload, timeout=60., output_limit=4096, *,
+             token_metered=True, refund_if=None):
         reason = self.exhausted()
         if reason:
             self.reason = reason
             raise BudgetExceeded(reason)
         check_lease()
         remaining = self.data['wall_clock_seconds'] - self.data['consumed_seconds']
+        planning_phase = kind not in {'composer', 'response_composer', 'verifier', 'response_verifier'}
+        if planning_phase:
+            remaining -= self.data.get('wrap_up_seconds_reserved', 0)
         # Reserve a bounded local safety/template margin, never for extra LLMs.
         margin = min(0.05, self.data['wall_clock_seconds'] * .05)
         allowed = min(timeout, remaining - margin)
@@ -164,6 +179,12 @@ class BudgetSession:
         tokens_left = self.data['token_budget'] - self.data['tokens_charged']
         cap = min(output_limit, tokens_left)
         estimate = max(1, math.ceil(len(json.dumps(payload, ensure_ascii=False, default=str)) / 1.5)) if token_metered else 0
+        reserved_tokens = self.data.get('wrap_up_tokens_reserved', 0) if planning_phase else 0
+        if reserved_tokens and token_metered:
+            cap = min(cap, max(0, tokens_left - estimate - reserved_tokens))
+            if cap <= 0:
+                self.reason = 'tokens_reserved_for_wrapup'
+                raise BudgetExceeded(self.reason)
         attempt_id = uuid.uuid4().hex
         self.data['calls_attempted'] += 1
         self.sync()
@@ -179,11 +200,24 @@ class BudgetSession:
         try:
             result = callback(allowed, cap)
         except Exception as exc:
-            # Provider rejection still costs an attempt and estimated input.
             # Transport uncertainty is retained; no automatic remote retry.
             uncertain = isinstance(exc, (TimeoutError, ConnectionError)) or type(exc).__name__ in {
                 'APITimeoutError', 'APIConnectionError'}
-            self._settle(attempt_id, estimate, None, 'unknown' if uncertain else 'failed_estimate')
+            # A *definitive* refusal (the caller supplies the predicate) was
+            # rejected before running, so it is not charged against the call
+            # budget.  The ledger row is still written: rate-limit history is
+            # evidence and must not be lost.
+            refused = (not uncertain) and refund_if is not None and bool(refund_if(exc))
+            # ``refused_calls`` counts REFUNDS GRANTED, not refusals seen (the
+            # ledger row below records every refusal).  Capping it at one call
+            # budget keeps the budget a hard ceiling, so a provider that always
+            # refuses still exhausts the turn instead of retrying forever.
+            refunded = refused and self.data.get('refused_calls', 0) < self.data['call_budget']
+            if refunded:
+                self.data['refused_calls'] = self.data.get('refused_calls', 0) + 1
+            self._settle(attempt_id, estimate, None,
+                         'refused' if refused else ('unknown' if uncertain else 'failed_estimate'),
+                         refund=refunded)
             if uncertain:
                 self.reason = 'usage_unknown'
                 self.data['usage_unknown'] = True
@@ -204,14 +238,19 @@ class BudgetSession:
             raise BudgetExceeded(self.reason)
         return result
 
-    def _settle(self, attempt_id, estimated, actual, status):
+    def _settle(self, attempt_id, estimated, actual, status, *, refund=False):
+        # The estimate is always OBSERVED (it describes what we tried to send);
+        # a refunded refusal simply does not CHARGE it.  Nothing is ever
+        # decremented, so the durable counters stay monotonic across
+        # checkpoints and restarts.
         self.data['tokens_estimated'] += estimated
         if actual is not None:
             self.data['tokens_actual'] += actual
-        self.data['tokens_charged'] += actual if actual is not None else estimated
-        quality = 'actual' if actual is not None else 'estimate'
-        previous = self.data.get('usage_quality')
-        self.data['usage_quality'] = quality if previous in (None, quality) else 'mixed'
+        if not refund:
+            self.data['tokens_charged'] += actual if actual is not None else estimated
+            quality = 'actual' if actual is not None else 'estimate'
+            previous = self.data.get('usage_quality')
+            self.data['usage_quality'] = quality if previous in (None, quality) else 'mixed'
         self.sync()
         self.memory.settle_llm_attempt(attempt_id, status, actual, estimated, self.data)
 
@@ -249,6 +288,8 @@ def provider_call(kind, provider, payload, timeout=60.):
 
 
 def completion_call(kind, client, **kwargs):
+    # ``refund_if`` is our own policy knob, never a provider parameter.
+    refund_if = kwargs.pop('refund_if', None)
     session = CURRENT.get()
     if session is None:
         return client.chat.completions.create(**kwargs)
@@ -263,7 +304,8 @@ def completion_call(kind, client, **kwargs):
     timeout = kwargs.pop('timeout', configured_timeout)
     timeout = 60. if timeout is None else float(timeout)
     return session.call(kind, invoke, kwargs, timeout,
-                        kwargs.get('max_completion_tokens', kwargs.get('max_tokens', 4096)))
+                        kwargs.get('max_completion_tokens', kwargs.get('max_tokens', 4096)),
+                        refund_if=refund_if)
 
 
 def network_call(kind, callback, *, timeout=30.):

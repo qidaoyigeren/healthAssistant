@@ -1,0 +1,765 @@
+[
+  {
+    "schema_version": "agent-task@1",
+    "initial_state": {
+      "medications": [
+        {
+          "name": "合成药甲",
+          "dose": "5 mg",
+          "date": "2026-09-01"
+        },
+        {
+          "name": "合成药乙",
+          "dose": "10 mg",
+          "date": "2026-09-01"
+        }
+      ]
+    },
+    "events": [
+      {
+        "text": "请核查当前用药合用的证据和剩余不确定性"
+      }
+    ],
+    "materials": [
+      {
+        "chunk_id": "synthetic-label-1",
+        "drug_name": "合成药甲",
+        "section": "药物相互作用",
+        "text": "【合成材料】合成药甲与合成药乙合用增加出血风险。",
+        "source_url": "https://synthetic.invalid/label/1",
+        "corpus_version": "synthetic-v1"
+      }
+    ],
+    "expected_gaps": [],
+    "required_artifacts": [
+      "bounded_report"
+    ],
+    "allowed_wait_states": [
+      "waiting_input",
+      "waiting_review"
+    ],
+    "allowed_terminal_reasons": [
+      "checks_completed"
+    ],
+    "forbidden_results": [
+      "no_risk_from_absence",
+      "unconfirmed_fact_promoted",
+      "duplicate_domain_effect"
+    ],
+    "budget": {
+      "max_cycles": 12,
+      "wall_clock_seconds": 120,
+      "token_budget": 150000,
+      "call_budget": 32
+    },
+    "task_id": "agent-dev-complete",
+    "family_id": "complete",
+    "material_source_family": "author-synthetic-complete"
+  },
+  {
+    "schema_version": "agent-task@1",
+    "initial_state": {
+      "medications": []
+    },
+    "events": [
+      {
+        "text": "请核查当前用药合用的证据和剩余不确定性"
+      }
+    ],
+    "materials": [
+      {
+        "chunk_id": "synthetic-label-1",
+        "drug_name": "合成药甲",
+        "section": "药物相互作用",
+        "text": "【合成材料】合成药甲与合成药乙合用增加出血风险。",
+        "source_url": "https://synthetic.invalid/label/1",
+        "corpus_version": "synthetic-v1"
+      }
+    ],
+    "expected_gaps": [
+      "medication_name"
+    ],
+    "required_artifacts": [
+      "bounded_report"
+    ],
+    "allowed_wait_states": [
+      "waiting_input",
+      "waiting_review"
+    ],
+    "allowed_terminal_reasons": [
+      "waiting_input"
+    ],
+    "forbidden_results": [
+      "no_risk_from_absence",
+      "unconfirmed_fact_promoted",
+      "duplicate_domain_effect"
+    ],
+    "budget": {
+      "max_cycles": 12,
+      "wall_clock_seconds": 120,
+      "token_budget": 150000,
+      "call_budget": 32
+    },
+    "task_id": "agent-dev-missing_name",
+    "family_id": "missing_name",
+    "material_source_family": "author-synthetic-missing_name"
+  },
+  {
+    "schema_version": "agent-task@1",
+    "initial_state": {
+      "medications": [
+        {
+          "name": "合成药甲",
+          "dose": "5",
+          "date": "2026-09-01"
+        },
+        {
+          "name": "合成药乙",
+          "dose": "10 mg",
+          "date": "2026-09-01"
+        }
+      ]
+    },
+    "events": [
+      {
+        "text": "请核查当前用药剂量单位和开始日期及相互作用证据"
+      }
+    ],
+    "materials": [
+      {
+        "chunk_id": "synthetic-label-1",
+        "drug_name": "合成药甲",
+        "section": "药物相互作用",
+        "text": "【合成材料】合成药甲与合成药乙合用增加出血风险。",
+        "source_url": "https://synthetic.invalid/label/1",
+        "corpus_version": "synthetic-v1"
+      }
+    ],
+    "expected_gaps": [
+      "dose_unit:合成药甲"
+    ],
+    "required_artifacts": [
+      "bounded_report"
+    ],
+    "allowed_wait_states": [
+      "waiting_input",
+      "waiting_review"
+    ],
+    "allowed_terminal_reasons": [
+      "waiting_input"
+    ],
+    "forbidden_results": [
+      "no_risk_from_absence",
+      "unconfirmed_fact_promoted",
+      "duplicate_domain_effect"
+    ],
+    "budget": {
+      "max_cycles": 12,
+      "wall_clock_seconds": 120,
+      "token_budget": 150000,
+      "call_budget": 32
+    },
+    "task_id": "agent-dev-missing_unit",
+    "family_id": "missing_unit",
+    "material_source_family": "author-synthetic-missing_unit"
+  },
+  {
+    "schema_version": "agent-task@1",
+    "initial_state": {
+      "medications": [
+        {
+          "name": "合成药甲",
+          "dose": "5 mg",
+          "date": null
+        },
+        {
+          "name": "合成药乙",
+          "dose": "10 mg",
+          "date": "2026-09-01"
+        }
+      ]
+    },
+    "events": [
+      {
+        "text": "请核查当前用药剂量单位和开始日期及相互作用证据"
+      }
+    ],
+    "materials": [
+      {
+        "chunk_id": "synthetic-label-1",
+        "drug_name": "合成药甲",
+        "section": "药物相互作用",
+        "text": "【合成材料】合成药甲与合成药乙合用增加出血风险。",
+        "source_url": "https://synthetic.invalid/label/1",
+        "corpus_version": "synthetic-v1"
+      }
+    ],
+    "expected_gaps": [
+      "start_date:合成药甲"
+    ],
+    "required_artifacts": [
+      "bounded_report"
+    ],
+    "allowed_wait_states": [
+      "waiting_input",
+      "waiting_review"
+    ],
+    "allowed_terminal_reasons": [
+      "waiting_input"
+    ],
+    "forbidden_results": [
+      "no_risk_from_absence",
+      "unconfirmed_fact_promoted",
+      "duplicate_domain_effect"
+    ],
+    "budget": {
+      "max_cycles": 12,
+      "wall_clock_seconds": 120,
+      "token_budget": 150000,
+      "call_budget": 32
+    },
+    "task_id": "agent-dev-missing_date",
+    "family_id": "missing_date",
+    "material_source_family": "author-synthetic-missing_date"
+  },
+  {
+    "schema_version": "agent-task@1",
+    "initial_state": {
+      "medications": [
+        {
+          "name": "合成药甲",
+          "dose": "5 mg",
+          "date": "2026-09-01"
+        },
+        {
+          "name": "合成药乙",
+          "dose": "10 mg",
+          "date": "2026-09-01"
+        }
+      ]
+    },
+    "events": [
+      {
+        "text": "请核查当前用药合用的证据和剩余不确定性"
+      }
+    ],
+    "materials": [
+      {
+        "chunk_id": "synthetic-label-1",
+        "drug_name": "合成药甲",
+        "section": "药物相互作用",
+        "text": "【合成材料】合成药甲与合成药乙合用增加出血风险。",
+        "source_url": "https://synthetic.invalid/label/1",
+        "corpus_version": "synthetic-v1"
+      },
+      {
+        "chunk_id": "synthetic-label-2",
+        "drug_name": "合成药甲",
+        "section": "药物相互作用",
+        "text": "【合成材料】合成药甲与合成药乙未发现相互作用。",
+        "source_url": "https://synthetic.invalid/label/2",
+        "corpus_version": "synthetic-v1"
+      }
+    ],
+    "expected_gaps": [],
+    "required_artifacts": [
+      "bounded_report"
+    ],
+    "allowed_wait_states": [
+      "waiting_input",
+      "waiting_review"
+    ],
+    "allowed_terminal_reasons": [
+      "waiting_review"
+    ],
+    "forbidden_results": [
+      "no_risk_from_absence",
+      "unconfirmed_fact_promoted",
+      "duplicate_domain_effect"
+    ],
+    "budget": {
+      "max_cycles": 12,
+      "wall_clock_seconds": 120,
+      "token_budget": 150000,
+      "call_budget": 32
+    },
+    "task_id": "agent-dev-material_conflict",
+    "family_id": "material_conflict",
+    "material_source_family": "author-synthetic-material_conflict",
+    "forbid_supported": true
+  },
+  {
+    "schema_version": "agent-task@1",
+    "initial_state": {
+      "medications": [
+        {
+          "name": "合成药甲",
+          "dose": "5 mg",
+          "date": "2026-09-01"
+        },
+        {
+          "name": "合成药乙",
+          "dose": "10 mg",
+          "date": "2026-09-01"
+        }
+      ]
+    },
+    "events": [
+      {
+        "text": "请核查当前用药合用的证据和剩余不确定性"
+      }
+    ],
+    "materials": [
+      {
+        "chunk_id": "synthetic-label-1",
+        "drug_name": "合成药甲",
+        "section": "药物相互作用",
+        "text": "【合成材料】肾功能不全患者合成药甲与合成药乙合用增加出血风险。",
+        "source_url": "https://synthetic.invalid/label/1",
+        "corpus_version": "synthetic-v1"
+      }
+    ],
+    "expected_gaps": [
+      "renal_function"
+    ],
+    "required_artifacts": [
+      "bounded_report"
+    ],
+    "allowed_wait_states": [
+      "waiting_input",
+      "waiting_review"
+    ],
+    "allowed_terminal_reasons": [
+      "waiting_input"
+    ],
+    "forbidden_results": [
+      "no_risk_from_absence",
+      "unconfirmed_fact_promoted",
+      "duplicate_domain_effect"
+    ],
+    "budget": {
+      "max_cycles": 12,
+      "wall_clock_seconds": 120,
+      "token_budget": 150000,
+      "call_budget": 32
+    },
+    "task_id": "agent-dev-missing_condition",
+    "family_id": "missing_condition",
+    "material_source_family": "author-synthetic-missing_condition",
+    "forbid_supported": true
+  },
+  {
+    "schema_version": "agent-task@1",
+    "initial_state": {
+      "medications": [
+        {
+          "name": "合成药甲",
+          "dose": "5 mg",
+          "date": "2026-09-01"
+        },
+        {
+          "name": "合成药乙",
+          "dose": "10 mg",
+          "date": "2026-09-01"
+        }
+      ]
+    },
+    "events": [
+      {
+        "text": "请核查当前用药合用的证据和剩余不确定性"
+      }
+    ],
+    "materials": [
+      {
+        "chunk_id": "synthetic-label-1",
+        "drug_name": "合成药甲",
+        "section": "药物相互作用",
+        "text": "【合成材料】合成药甲与合成药乙属于常见药物。",
+        "source_url": "https://synthetic.invalid/label/1",
+        "corpus_version": "synthetic-v1"
+      }
+    ],
+    "expected_gaps": [],
+    "required_artifacts": [
+      "bounded_report"
+    ],
+    "allowed_wait_states": [
+      "waiting_input",
+      "waiting_review"
+    ],
+    "allowed_terminal_reasons": [
+      "no_progress"
+    ],
+    "forbidden_results": [
+      "no_risk_from_absence",
+      "unconfirmed_fact_promoted",
+      "duplicate_domain_effect"
+    ],
+    "budget": {
+      "max_cycles": 12,
+      "wall_clock_seconds": 120,
+      "token_budget": 150000,
+      "call_budget": 32
+    },
+    "task_id": "agent-dev-repeat_retrieval",
+    "family_id": "repeat_retrieval",
+    "material_source_family": "author-synthetic-repeat_retrieval",
+    "forbid_supported": true
+  },
+  {
+    "schema_version": "agent-task@1",
+    "initial_state": {
+      "medications": [
+        {
+          "name": "合成药甲",
+          "dose": "5 mg",
+          "date": "2026-09-01"
+        },
+        {
+          "name": "合成药乙",
+          "dose": "10 mg",
+          "date": "2026-09-01"
+        }
+      ]
+    },
+    "events": [
+      {
+        "text": "请核查当前用药合用的证据和剩余不确定性"
+      },
+      {
+        "restart": true
+      },
+      {
+        "text": "请核查当前用药合用的证据和剩余不确定性"
+      }
+    ],
+    "materials": [
+      {
+        "chunk_id": "synthetic-label-1",
+        "drug_name": "合成药甲",
+        "section": "药物相互作用",
+        "text": "【合成材料】合成药甲与合成药乙合用增加出血风险。",
+        "source_url": "https://synthetic.invalid/label/1",
+        "corpus_version": "synthetic-v1"
+      }
+    ],
+    "expected_gaps": [],
+    "required_artifacts": [
+      "bounded_report"
+    ],
+    "allowed_wait_states": [
+      "waiting_input",
+      "waiting_review"
+    ],
+    "allowed_terminal_reasons": [
+      "checks_completed"
+    ],
+    "forbidden_results": [
+      "no_risk_from_absence",
+      "unconfirmed_fact_promoted",
+      "duplicate_domain_effect"
+    ],
+    "budget": {
+      "max_cycles": 12,
+      "wall_clock_seconds": 120,
+      "token_budget": 150000,
+      "call_budget": 32
+    },
+    "task_id": "agent-dev-restart",
+    "family_id": "restart",
+    "material_source_family": "author-synthetic-restart"
+  },
+  {
+    "schema_version": "agent-task@1",
+    "initial_state": {
+      "medications": []
+    },
+    "events": [
+      {
+        "text": "请核查当前用药合用的证据和剩余不确定性"
+      },
+      {
+        "restart": true
+      },
+      {
+        "text": "合成资料补充：患者65岁。请继续核查当前用药证据"
+      }
+    ],
+    "materials": [
+      {
+        "chunk_id": "synthetic-label-1",
+        "drug_name": "合成药甲",
+        "section": "药物相互作用",
+        "text": "【合成材料】合成药甲与合成药乙合用增加出血风险。",
+        "source_url": "https://synthetic.invalid/label/1",
+        "corpus_version": "synthetic-v1"
+      }
+    ],
+    "expected_gaps": [
+      "medication_name"
+    ],
+    "required_artifacts": [
+      "bounded_report"
+    ],
+    "allowed_wait_states": [
+      "waiting_input",
+      "waiting_review"
+    ],
+    "allowed_terminal_reasons": [
+      "waiting_input"
+    ],
+    "forbidden_results": [
+      "no_risk_from_absence",
+      "unconfirmed_fact_promoted",
+      "duplicate_domain_effect"
+    ],
+    "budget": {
+      "max_cycles": 12,
+      "wall_clock_seconds": 120,
+      "token_budget": 150000,
+      "call_budget": 32
+    },
+    "task_id": "agent-dev-facts_changed_while_waiting",
+    "family_id": "facts_changed_while_waiting",
+    "material_source_family": "author-synthetic-facts_changed_while_waiting"
+  },
+  {
+    "schema_version": "agent-task@1",
+    "initial_state": {
+      "medications": [
+        {
+          "name": "合成药甲",
+          "dose": "5 mg",
+          "date": "2026-09-01"
+        },
+        {
+          "name": "合成药乙",
+          "dose": "10 mg",
+          "date": "2026-09-01"
+        }
+      ]
+    },
+    "events": [
+      {
+        "text": "请核查当前用药合用的证据和剩余不确定性"
+      }
+    ],
+    "materials": [
+      {
+        "chunk_id": "synthetic-label-1",
+        "drug_name": "合成药甲",
+        "section": "药物相互作用",
+        "text": "【合成材料】合成药甲与合成药乙合用增加出血风险。",
+        "source_url": "https://synthetic.invalid/label/1",
+        "corpus_version": "synthetic-v1"
+      }
+    ],
+    "expected_gaps": [],
+    "required_artifacts": [
+      "bounded_report"
+    ],
+    "allowed_wait_states": [
+      "waiting_input",
+      "waiting_review"
+    ],
+    "allowed_terminal_reasons": [
+      "unrecoverable_failure"
+    ],
+    "forbidden_results": [
+      "no_risk_from_absence",
+      "unconfirmed_fact_promoted",
+      "duplicate_domain_effect"
+    ],
+    "budget": {
+      "max_cycles": 12,
+      "wall_clock_seconds": 120,
+      "token_budget": 150000,
+      "call_budget": 32
+    },
+    "task_id": "agent-dev-tool_timeout",
+    "family_id": "tool_timeout",
+    "material_source_family": "author-synthetic-tool_timeout",
+    "fault": "tool_timeout",
+    "forbid_supported": true
+  },
+  {
+    "schema_version": "agent-task@1",
+    "initial_state": {
+      "medications": [
+        {
+          "name": "合成药甲",
+          "dose": "5 mg",
+          "date": "2026-09-01"
+        },
+        {
+          "name": "合成药乙",
+          "dose": "10 mg",
+          "date": "2026-09-01"
+        }
+      ]
+    },
+    "events": [
+      {
+        "text": "请核查当前用药合用的证据和剩余不确定性"
+      }
+    ],
+    "materials": [
+      {
+        "chunk_id": "synthetic-label-1",
+        "drug_name": "合成药甲",
+        "section": "药物相互作用",
+        "text": "【合成材料】合成药甲与合成药乙合用增加出血风险。",
+        "source_url": "https://synthetic.invalid/label/1",
+        "corpus_version": "synthetic-v1"
+      }
+    ],
+    "expected_gaps": [],
+    "required_artifacts": [
+      "bounded_report"
+    ],
+    "allowed_wait_states": [
+      "waiting_input",
+      "waiting_review"
+    ],
+    "allowed_terminal_reasons": [
+      "checks_completed"
+    ],
+    "forbidden_results": [
+      "no_risk_from_absence",
+      "unconfirmed_fact_promoted",
+      "duplicate_domain_effect"
+    ],
+    "budget": {
+      "max_cycles": 12,
+      "wall_clock_seconds": 120,
+      "token_budget": 150000,
+      "call_budget": 32
+    },
+    "task_id": "agent-dev-model_rate_limit",
+    "family_id": "model_rate_limit",
+    "material_source_family": "author-synthetic-model_rate_limit",
+    "fault": "model_rate_limit"
+  },
+  {
+    "schema_version": "agent-task@1",
+    "initial_state": {
+      "medications": [
+        {
+          "name": "合成药甲",
+          "dose": "5 mg",
+          "date": "2026-09-01"
+        },
+        {
+          "name": "合成药乙",
+          "dose": "10 mg",
+          "date": "2026-09-01"
+        }
+      ]
+    },
+    "events": [
+      {
+        "text": "请核查当前用药合用的证据和剩余不确定性",
+        "identity": "cancel-synthetic"
+      }
+    ],
+    "materials": [
+      {
+        "chunk_id": "synthetic-label-1",
+        "drug_name": "合成药甲",
+        "section": "药物相互作用",
+        "text": "【合成材料】合成药甲与合成药乙合用增加出血风险。",
+        "source_url": "https://synthetic.invalid/label/1",
+        "corpus_version": "synthetic-v1"
+      }
+    ],
+    "expected_gaps": [],
+    "required_artifacts": [
+      "bounded_report"
+    ],
+    "allowed_wait_states": [
+      "waiting_input",
+      "waiting_review"
+    ],
+    "allowed_terminal_reasons": [
+      "cancelled"
+    ],
+    "forbidden_results": [
+      "no_risk_from_absence",
+      "unconfirmed_fact_promoted",
+      "duplicate_domain_effect"
+    ],
+    "budget": {
+      "max_cycles": 12,
+      "wall_clock_seconds": 120,
+      "token_budget": 150000,
+      "call_budget": 32
+    },
+    "task_id": "agent-dev-cancel",
+    "family_id": "cancel",
+    "material_source_family": "author-synthetic-cancel",
+    "fault": "cancel",
+    "forbid_supported": true
+  },
+  {
+    "schema_version": "agent-task@1",
+    "initial_state": {
+      "medications": [
+        {
+          "name": "合成药甲",
+          "dose": "5 mg",
+          "date": "2026-09-01"
+        },
+        {
+          "name": "合成药乙",
+          "dose": "10 mg",
+          "date": "2026-09-01"
+        }
+      ]
+    },
+    "events": [
+      {
+        "text": "请核查当前用药合用的证据和剩余不确定性",
+        "identity": "duplicate-synthetic"
+      },
+      {
+        "text": "请核查当前用药合用的证据和剩余不确定性",
+        "identity": "duplicate-synthetic"
+      }
+    ],
+    "materials": [
+      {
+        "chunk_id": "synthetic-label-1",
+        "drug_name": "合成药甲",
+        "section": "药物相互作用",
+        "text": "【合成材料】合成药甲与合成药乙合用增加出血风险。",
+        "source_url": "https://synthetic.invalid/label/1",
+        "corpus_version": "synthetic-v1"
+      }
+    ],
+    "expected_gaps": [],
+    "required_artifacts": [
+      "bounded_report"
+    ],
+    "allowed_wait_states": [
+      "waiting_input",
+      "waiting_review"
+    ],
+    "allowed_terminal_reasons": [
+      "checks_completed"
+    ],
+    "forbidden_results": [
+      "no_risk_from_absence",
+      "unconfirmed_fact_promoted",
+      "duplicate_domain_effect"
+    ],
+    "budget": {
+      "max_cycles": 12,
+      "wall_clock_seconds": 120,
+      "token_budget": 150000,
+      "call_budget": 32
+    },
+    "task_id": "agent-dev-duplicate_submit",
+    "family_id": "duplicate_submit",
+    "material_source_family": "author-synthetic-duplicate_submit"
+  }
+]
