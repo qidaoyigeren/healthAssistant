@@ -1,4 +1,16 @@
-"""Explicit, immutable k=3 live cohort under the existing frozen protocol."""
+"""SUPERSEDED — reproduces the 2026-09-10 protocol cohort only.
+
+This entry pins a configuration the product no longer ships
+(``official_zhipu`` / ``glm-4.7-flash`` / ``PLANNER_PROVIDER_RETRIES=1``).  Its
+artifacts are valid for reproducing THAT cohort and nothing else; reading them
+as a current result is the failure mode this guard exists to prevent.
+
+Use ``run-planner-live-acceptance-v3.py`` for a current cohort.  See
+``docs/agent-capability-upgrade/ENTRY-POINTS.md``.
+
+Requires ``--reproduce-superseded-protocol`` in addition to ``--enable-live``:
+being explicit about wanting a historical result is the point.
+"""
 import argparse
 from datetime import datetime, timezone
 import hashlib
@@ -22,15 +34,29 @@ def fingerprint():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--enable-live', action='store_true')
+    parser.add_argument('--reproduce-superseded-protocol', action='store_true')
     parser.add_argument('--out', required=True)
     args = parser.parse_args()
     if not args.enable_live:
         parser.error('Remote calls disabled. Explicit --enable-live is required.')
+    if not args.reproduce_superseded_protocol:
+        parser.error(
+            'This entry is SUPERSEDED: it pins official_zhipu/glm-4.7-flash/'
+            'PLANNER_PROVIDER_RETRIES=1, which is not what the product ships. '
+            'For a current cohort use run-planner-live-acceptance-v3.py. To '
+            'reproduce the historical cohort deliberately, also pass '
+            '--reproduce-superseded-protocol.')
     out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=False)  # Including partial cohorts: never reuse.
     manifest = {'started_at': datetime.now(timezone.utc).isoformat(), 'planned_k': 3, 'actual_k': 0,
         'source_fingerprint': fingerprint(), 'protocol_sha256': hashlib.sha256(PROTOCOL.read_bytes()).hexdigest(),
         'dataset_sha256': hashlib.sha256((ROOT / 'stage0/agent_evals/dev.json').read_bytes()).hexdigest(),
+        # Self-identifying so an artifact can never be mistaken for a current
+        # result by someone who only reads the numbers.
+        'superseded': True,
+        'superseded_by': 'scripts/run-planner-live-acceptance-v3.py',
+        'superseded_reason': 'pins official_zhipu/glm-4.7-flash/retries=1; the product '
+                             'now resolves tokendance/glm-5.3-flash',
         'configuration': {'provider': 'official_zhipu', 'model': 'glm-4.7-flash',
             'path': 'replay', 'seconds_per_run': 180, 'calls_per_run': 8,
             'planner_provider_retries': 1, 'independent_held_out': 'unavailable'}, 'runs': []}

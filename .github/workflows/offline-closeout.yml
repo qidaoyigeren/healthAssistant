@@ -1,0 +1,63 @@
+name: Offline closeout
+
+# The project's "everything passes" claim currently holds only at the moment
+# someone remembers to run scripts/verify-agent-closeout.py by hand. This pins
+# it to every push instead.
+#
+# Deliberately NOT run here:
+#   * any --live path (needs credentials, hits a real provider, costs quota);
+#   * the frontend build (separate concern; add a job when the frontend is
+#     touched routinely rather than on every backend push).
+#
+# UNVERIFIED: this workflow has never been executed on GitHub. The project is
+# developed on Windows, so windows-latest is chosen to avoid introducing an
+# unverified platform variable -- a first run on ubuntu may well work but has
+# not been checked. If this fails on first run, fix the workflow, not the tests.
+#
+# The install is heavier than it needs to be: sentence-transformers, faiss,
+# onnxruntime and rapidocr are all imported lazily inside functions, so a
+# trimmed requirements set would very likely suffice. Trimming is a follow-up,
+# not a correctness issue -- a too-heavy install still passes.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  closeout:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-harness-observability.txt
+          pip install -r requirements-product-ocr.txt
+          pip install -r stage0/requirements-stage1.txt
+          pip install -r stage0/requirements-stage10.txt
+          pip install -r stage0/requirements-graph.txt
+
+      - name: Offline closeout (34 modules, dev sets)
+        # No .env is present in CI and none is needed: the suite is verified to
+        # pass with every provider credential absent. The script exits non-zero
+        # unless status == pass, and refuses to reuse an existing output dir.
+        run: python scripts/verify-agent-closeout.py --out output/ci-closeout
+
+      - name: Show summary
+        if: always()
+        run: python -c "import json;d=json.load(open('output/ci-closeout/engineering.json',encoding='utf-8'));print('status',d['status'],'tests',d['tests_executed'],'suites',len(d['suites']));print('failed',[s['name'] for s in d['suites'] if not s['passed']] or 'none')"
+
+      - name: Upload closeout report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-closeout
+          path: output/ci-closeout/
+          retention-days: 14
