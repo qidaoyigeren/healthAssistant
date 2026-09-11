@@ -66,7 +66,8 @@ class ExactCoverageReranker:
             -int(item[0].get('section') == '药物相互作用'), item[0].get('chunk_id', '')))
 
 
-def assess_claim(*, quote, text, entities, evidence_id, subject=None, required_subject=None, conditions_known=True):
+def assess_claim(*, quote, text, entities, evidence_id, subject=None, required_subject=None, conditions_known=True,
+                 source_status='current', evidence_date=None, required_date=None, content_complete=True):
     """Lexical interaction-claim screen, not a model or clinical entailment judge.
 
     A real citation is necessary but not sufficient. Unknown population or
@@ -74,10 +75,16 @@ def assess_claim(*, quote, text, entities, evidence_id, subject=None, required_s
     interaction claim only, never a medical all-clear.
     """
     result = {'status': 'insufficient', 'evidence_refs': [], 'method': 'conservative-lexical-v1',
-              'conditions': {'subject': subject, 'required_subject': required_subject}, 'unresolved': []}
+              'conditions': {'subject': subject, 'required_subject': required_subject}, 'unresolved': [],
+              'source_status': source_status, 'condition_status': 'unknown', 'time_status': 'not_required'}
     if not isinstance(quote, str) or not quote or quote not in text or not evidence_id:
         result['unresolved'] = ['unreadable_or_inexact_citation']
-    elif not all(entity in quote for entity in entities):
+    elif source_status != 'current' or not content_complete:
+        result['unresolved'] = ['source_not_current_or_incomplete']
+    elif required_date and (not evidence_date or evidence_date[:10] != required_date[:10]):
+        result['time_status'] = 'unknown_or_mismatch'
+        result['unresolved'] = ['date_not_verified']
+    elif not entities or not all(entity and entity in quote for entity in entities):
         result['unresolved'] = ['wrong_or_missing_entity']
     elif not conditions_known or (required_subject and subject != required_subject):
         result['unresolved'] = ['unknown_or_wrong_applicability']
@@ -91,6 +98,8 @@ def assess_claim(*, quote, text, entities, evidence_id, subject=None, required_s
         result.update(status='supported', evidence_refs=[evidence_id])
     else:
         result['unresolved'] = ['citation_does_not_establish_claim']
+    if result['status'] in {'supported', 'contradicted'}:
+        result['condition_status'] = 'verified'
     return result
 
 

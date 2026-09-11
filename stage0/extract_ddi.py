@@ -3,8 +3,8 @@
 No model is silently invoked. With ``--llm``, an OpenAI-compatible provider key
 must be set, or a ``.env`` file next to this script may provide it; otherwise the
 bundled source-grounded labeled set is copied to the structured output and
-accuracy is explicitly reported as not measured. TokenDance is the preferred
-provider when ``TOKENDANCE_API_KEY`` is present; the older DeepSeek/OpenAI
+accuracy is explicitly reported as not measured. Zhipu is preferred when
+``ZHIPU_API_KEY`` is present, followed by TokenDance; the older DeepSeek/OpenAI
 variables remain supported for reproducibility of Stage 0/1 artifacts.
 """
 from __future__ import annotations
@@ -207,51 +207,96 @@ def _load_dotenv() -> None:
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
+# Live/remote evaluation is an outward-facing action against a real endpoint,
+# so it is restricted to explicitly listed targets.  Adding one is a deliberate,
+# reviewable act, and anything unlisted fails closed.
+AUTHORIZED_LIVE_TARGETS = (
+    ("zhipu", "glm-4.7-flash", "https://open.bigmodel.cn/api/paas/v4"),
+    ("tokendance", "glm-5.3-flash", "https://tokendance.space/gateway/v1"),
+)
+
+
+def assert_live_authorized(config: dict[str, str]) -> None:
+    """Fail closed unless (provider, model, base_url) is explicitly listed."""
+    target = (config["provider"], config["model"], config["base_url"].rstrip("/"))
+    if target not in AUTHORIZED_LIVE_TARGETS:
+        raise RuntimeError(
+            "Live authorization does not cover %s/%s at %s. Authorized targets: %s"
+            % (target[0], target[1], target[2], list(AUTHORIZED_LIVE_TARGETS))
+        )
+
+
 def resolve_llm_config(model: str | None = None, require_key: bool = True) -> dict[str, str]:
     """Resolve one OpenAI-compatible provider without exposing credentials.
 
-    TokenDance-specific variables take precedence so a stale DeepSeek key in an
-    existing local ``.env`` cannot accidentally select the old provider. Generic
-    and legacy variables are retained as explicit compatibility fallbacks.
+    ``LLM_PROVIDER`` selects a provider EXPLICITLY when set.  Otherwise the
+    historical auto-detection applies unchanged: Zhipu-specific variables take
+    precedence, followed by TokenDance, so a stale DeepSeek key in an existing
+    local ``.env`` cannot accidentally select the old provider.
+
+    The explicit selector exists because switching the endpoint that handles
+    patient-derived context is a deliberate decision — it must not be a side
+    effect of which key happens to be present in someone's ``.env``.
     """
     _load_dotenv()
+    zhipu_key = os.getenv("ZHIPU_API_KEY", "").strip()
     tokendance_key = os.getenv("TOKENDANCE_API_KEY", "").strip()
     generic_key = os.getenv("LLM_API_KEY", "").strip()
     legacy_key = (os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip()
 
-    if tokendance_key:
-        provider = "tokendance"
-        api_key = tokendance_key
-        base_url = os.getenv("TOKENDANCE_BASE_URL", TOKENDANCE_BASE_URL).strip()
-        default_model = os.getenv("TOKENDANCE_MODEL", TOKENDANCE_DEFAULT_MODEL).strip()
-    elif generic_key:
-        provider = "openai_compatible"
-        api_key = generic_key
-        base_url = (os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1").strip()
-        default_model = (os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-4o-mini").strip()
+    candidates = {
+        "zhipu": lambda: {
+            "provider": "zhipu", "api_key": zhipu_key,
+            "base_url": os.getenv("ZHIPU_BASE_URL", "https://open.bigmodel.cn/api/paas/v4/").strip(),
+            "model": os.getenv("ZHIPU_MODEL", "glm-4.7-flash").strip()},
+        "tokendance": lambda: {
+            "provider": "tokendance", "api_key": tokendance_key,
+            "base_url": os.getenv("TOKENDANCE_BASE_URL", TOKENDANCE_BASE_URL).strip(),
+            "model": os.getenv("TOKENDANCE_MODEL", TOKENDANCE_DEFAULT_MODEL).strip()},
+        "openai_compatible": lambda: {
+            "provider": "openai_compatible", "api_key": generic_key,
+            "base_url": (os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1").strip(),
+            "model": (os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-4o-mini").strip()},
+        "deepseek_legacy": lambda: {
+            "provider": "deepseek_legacy", "api_key": legacy_key,
+            "base_url": os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").strip(),
+            "model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat").strip()},
+    }
+    selected = os.getenv("LLM_PROVIDER", "").strip().lower()
+    if selected:
+        if selected not in candidates:
+            raise RuntimeError(
+                "LLM_PROVIDER must be one of %s" % sorted(candidates))
+        resolved = candidates[selected]()
+        if not resolved["api_key"]:
+            raise RuntimeError(
+                "LLM_PROVIDER=%s but its API key is not configured" % selected)
     else:
-        provider = "deepseek_legacy"
-        api_key = legacy_key
-        base_url = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").strip()
-        default_model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat").strip()
+        for name in ("zhipu", "tokendance", "openai_compatible", "deepseek_legacy"):
+            resolved = candidates[name]()
+            if resolved["api_key"]:
+                break
 
-    if require_key and not api_key:
+    if require_key and not resolved["api_key"]:
         raise RuntimeError(
-            "No LLM API key configured; set TOKENDANCE_API_KEY, LLM_API_KEY, "
+            "No LLM API key configured; set ZHIPU_API_KEY, TOKENDANCE_API_KEY, LLM_API_KEY, "
             "DEEPSEEK_API_KEY, or OPENAI_API_KEY"
         )
     return {
-        "provider": provider,
-        "api_key": api_key,
-        "base_url": base_url,
-        "model": (model or default_model).strip(),
+        "provider": resolved["provider"],
+        "api_key": resolved["api_key"],
+        "base_url": resolved["base_url"],
+        "model": (model or resolved["model"]).strip(),
     }
 
 
 def llm_completion_options() -> dict[str, object]:
     """Return provider options shared by every extraction/evaluation call."""
     config = resolve_llm_config(require_key=False)
-    if config["provider"] == "tokendance":
+    if config["provider"] == "zhipu":
+        thinking = os.getenv("ZHIPU_THINKING", "disabled").strip().lower()
+        max_tokens_raw = os.getenv("ZHIPU_MAX_TOKENS", "4096")
+    elif config["provider"] == "tokendance":
         thinking = os.getenv("TOKENDANCE_THINKING", "disabled").strip().lower()
         max_tokens_raw = os.getenv("TOKENDANCE_MAX_TOKENS", "1024")
     else:
@@ -339,6 +384,10 @@ def _canonicalize_production_triple(triple: dict, source_drug: str) -> dict:
     return out
 
 
+class ExtractionResponseError(ValueError):
+    """The provider returned no complete forced-tool result, not a negative."""
+
+
 def _production_call(client, model: str, source_drug: str, text: str, delay: float = 1.0) -> list[dict]:
     last_error: Exception | None = None
     for attempt in range(3):
@@ -354,13 +403,15 @@ def _production_call(client, model: str, source_drug: str, text: str, delay: flo
                 temperature=0,
                 **llm_completion_options(),
             )
-            calls = response.choices[0].message.tool_calls or []
+            choice = response.choices[0]
+            if getattr(choice, 'finish_reason', None) in {'length', 'content_filter'}:
+                raise ExtractionResponseError('incomplete_extraction:' + choice.finish_reason)
+            calls = choice.message.tool_calls or []
             if not calls:
-                # A successful response that abstains from the forced tool is
-                # a model-level negative, not a transport failure. Retrying it
-                # would sample repeatedly until a possible false positive
-                # appears and would inflate live-evaluation recall.
-                return []
+                # Only a complete record_ddi_triples(triples=[]) is a valid
+                # negative. Missing/truncated output must not poison a negative
+                # cache, nor be repeatedly sampled until a positive appears.
+                raise ExtractionResponseError('missing_forced_extraction_tool')
             triples: list[dict] = []
             for call in calls:
                 triples.extend(
@@ -372,7 +423,7 @@ def _production_call(client, model: str, source_drug: str, text: str, delay: flo
             # Retrying that deterministic negative wastes provider calls and
             # can turn a clean result into a sampling-induced false positive.
             return triples
-        except BudgetExceeded:
+        except (BudgetExceeded, ExtractionResponseError):
             raise
         except Exception as exc:
             last_error = exc

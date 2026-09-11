@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "pairs": {
     "克拉霉素 | 奥美拉唑": {
       "status": "matched",
@@ -72,6 +72,38 @@
       "errors": [],
       "cached_at": "2026-08-27T10:53:56.038679+00:00",
       "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)"
+    },
+    "dd0095e917915ae00b5c0c543723d9223ce1a2c46b977ba58516a6873717d8d1": {
+      "evidence": [],
+      "attempted_chunk_ids": [
+        "R5c097caa5a25b642",
+        "Rce70d0bc5e843ed1"
+      ],
+      "errors": [
+        "RuntimeError: production extraction failed after three attempts: Error code: 429 - {'error': {'code': '1305', 'message': '该模型当前访问量过大，请您稍后再试'}}"
+      ],
+      "parse_errors": [],
+      "entities": [
+        "布洛芬",
+        "阿司匹林"
+      ],
+      "cached_at": "2026-09-09T13:15:24.051778+00:00",
+      "prompt": "extract_ddi.PROMPT (Stage 1b hardened six-gate prompt)",
+      "status": "provider_error",
+      "versions": {
+        "corpus": "21718622cae9ead3bbeaba710e45055f05b7492f5a2ff546f47830d6cad2aab3",
+        "index": "273807d12d848b1ed71fcf118cc42719a073efa75696647a591a9f9106cc7c25",
+        "extractor": "b6ad573e606b01a618d87f164eaf9b34f0d89baa65176f2b4493d91763bb3700",
+        "prompt": "d675d6e1ed280d41a882b12a506bbf38c98b41d5c5355e0fb4f47ff3bad58bc0",
+        "model": "glm-4.7-flash",
+        "provider": "zhipu",
+        "endpoint_hash": "01466612b7ca82b51dedceae43a791f41ed88b493388654d352d4e37203eaad1",
+        "policy": "ddi-cache-v2",
+        "candidate_selection": "entity-text-dedup-v1",
+        "reranker": "baseline"
+      },
+      "cached_epoch": 1788959724.0518064,
+      "expires_at": 1788959754.051807
     }
   }
 }

@@ -196,12 +196,34 @@ def classify_error(exc: BaseException) -> str:
     if name in {"TimeoutError", "ConnectionError", "APITimeoutError",
                 "APIConnectionError", "SocketTimeoutError"}:
         return "retryable"
+    if name == 'RateLimitError' or (name == 'APIStatusError' and '429' in str(exc)):
+        # A3: provider rate limiting is transient — bounded app-level backoff
+        # (the SDK client runs with max_retries=0 by default, so the two retry
+        # layers never multiply).
+        return "retryable"
     if name == 'EffectUnknownError':
         return 'effect_unknown'
     if name == 'ReviewFactsMovedError':
         return 'retryable'
     # Programming errors do not heal by replaying a whole turn.
     return "permanent"
+
+
+def error_detail(exc: BaseException) -> dict[str, str]:
+    """A3: finer reporting taxonomy on top of the retry decision — 429 and
+    timeouts are both retryable but are reported (and counted) separately."""
+    name = type(exc).__name__
+    if name == 'RateLimitError' or (name == 'APIStatusError' and '429' in str(exc)):
+        return {'class': 'rate_limit', 'retryable': 'true'}
+    if name in {"TimeoutError", "APITimeoutError", "SocketTimeoutError"}:
+        return {'class': 'timeout', 'retryable': 'true'}
+    if name in {"ConnectionError", "APIConnectionError"}:
+        return {'class': 'transient', 'retryable': 'true'}
+    if name == 'EffectUnknownError':
+        return {'class': 'effect_unknown', 'retryable': 'false'}
+    if isinstance(exc, MemoryPolicyErrorBase) or (isinstance(exc, RuntimeError) and 'safety boundary' in str(exc)):
+        return {'class': 'permanent', 'retryable': 'false'}
+    return {'class': 'validation', 'retryable': 'false'}
 
 
 # MemoryPolicyError is imported lazily to keep the try/except import block
@@ -224,6 +246,9 @@ class EventIn(BaseModel):
     source: str = "caregiver"
     occurred_at: str | None = None
     session_id: str = "default"
+    # A2: optional explicit continuation of a waiting evidence_review task.
+    # Attribution is never guessed: the caller names the task.
+    task_id: str | None = None
 
 
 class ConflictActionIn(BaseModel):
@@ -389,6 +414,11 @@ class OutboxWorker:
         # was already claimed when the cancel landed.
         if run['status'] == 'cancelled':
             raise MemoryPolicyError('run is cancelled; a late review decision cannot revive it')
+        if run['graph_version'] == 'care-task-evidence-review@1':
+            from .care_tasks import CareTasks
+            from .product import ProductStore
+            result = CareTasks(ProductStore(self.store), agent_factory=lambda: self.agent).apply_review_decision(record, run)
+            return {'task_id': task['id'], 'status': 'resumed', 'care_task_status': result['status']}
         # Even an applied receipt needs graph/checkpoint/publication convergence.
         # Do not consume early just because a domain effect was committed.
         if run['status'] not in {'waiting_review', 'running', 'succeeded', 'degraded'}:
@@ -403,6 +433,39 @@ class OutboxWorker:
         return {'task_id': task['id'], 'status': 'resumed', 'decision_id': record['decision_id']}
 
     def _run_claimed(self, task: dict[str, Any]) -> dict[str, Any]:
+        if (task.get('payload') or {}).get('operation') == 'care-task-evidence-review@1':
+            from .care_tasks import CareTasks
+            from .product import ProductStore
+            from .turn_budget import lease_scope
+            # Care-task runs previously emitted only tool-level progress; the
+            # queued→executing→finished milestones were invisible to the
+            # frontend, which rendered a static "queued" note instead.
+            care_run_id = (task.get('payload') or {}).get('run_id')
+            self._emit_progress(care_run_id, EVENT_ACCEPTED, detail={"task_id": task['id']})
+            try:
+                service = CareTasks(ProductStore(self.store), agent_factory=lambda: self.agent)
+                with _Heartbeat(self.store, task['id'], task['lease_token'], self.lease_ttl_seconds), lease_scope(
+                        lambda: self.store.assert_outbox_lease(task['id'], task['lease_token'])):
+                    result = service.execute_queued(task)
+                terminal_kind = {'completed': EVENT_COMPLETED, 'cancelled': EVENT_CANCELLED,
+                    'waiting_input': 'waiting_input', 'waiting_review': EVENT_WAITING_REVIEW,
+                    'ready': 'recheck_required', 'failed': EVENT_FAILED}.get(result.get('care_task_status'), 'recheck_required')
+                self._emit_progress(care_run_id, terminal_kind, detail={"task_id": task['id']})
+                return result
+            except LeaseRejected:
+                return {'task_id': task['id'], 'status': 'lease_lost'}
+            except Exception as exc:
+                self._emit_progress(care_run_id, EVENT_FAILED,
+                                    detail={"task_id": task['id'], "error_kind": type(exc).__name__})
+                result = self._fail_claimed(task, exc, 'care-task')
+                queued = self.store.outbox_task_for(task['dedup_key'])
+                if queued and queued['status'] == 'failed':
+                    with service.p.transaction():
+                        current = service.p.get(task['payload']['care_task_id'])
+                        if current['status'] == 'running' and current.get('active_run_id') == task['payload']['run_id']:
+                            current.update(status='failed', waiting_reason='核查执行失败；已有记录保留', revision=current['revision'] + 1)
+                            service.p.save('care_task', current)
+                return result
         payload = task["payload"] or {}
         trace_id = payload.get("trace_id") or "unknown"
         run_id = payload.get("run_id") or payload.get("turn_id")
@@ -469,9 +532,40 @@ class OutboxWorker:
             self._emit_progress(run_id, EVENT_COMPLETED,
                                 detail={"run_status": result.get("run_status")})
         release_cancel_event(run_id)
+        resume_request = payload.get("task_resume")
+        if resume_request and not is_cancel_requested(self.store, run_id):
+            self._auto_resume_care_task(resume_request, idempotency_key)
         logger.info("outbox task done task_id=%s trace_id=%s event_id=%s run_id=%s",
                     task["id"], trace_id, payload.get("event_id"), payload.get("run_id"))
         return {"task_id": task["id"], "status": "done"}
+
+    def _auto_resume_care_task(self, request: dict[str, Any],
+                               idempotency_key: str | None) -> None:
+        """A2: after a turn that explicitly carried a task_id and may have
+        recorded new input, continue the SAME waiting task once.  Never
+        guesses among multiple waiting tasks (the caller names the task and
+        the expected revision) and never resets the task budget — the resume
+        path re-checks revision and spend like any manual continue."""
+        from .product import ProductStore
+        from .care_tasks import CareTasks, ProductError as TaskProductError
+        task_id = request.get("task_id")
+        try:
+            product = ProductStore(self.store)
+            tasks = CareTasks(product, agent_factory=lambda: self.runner.agent)
+            task = product.get(task_id, "care_task")
+            if task["goal_type"] != "evidence_review" or task["status"] != "waiting_input":
+                return
+            expected = request.get("expected_revision")
+            if expected is not None and task["revision"] != expected:
+                logger.info("auto resume skipped task_id=%s: task changed meanwhile", task_id)
+                return
+            tasks.resume(task_id, key=f"auto-resume:{idempotency_key}",
+                         revision=task["revision"], action="continue")
+            logger.info("auto resumed evidence review task_id=%s", task_id)
+        except TaskProductError:
+            logger.info("auto resume skipped task_id=%s", task_id, exc_info=True)
+        except Exception:
+            logger.error("auto resume failed task_id=%s", task_id, exc_info=True)
 
     def _fail_claimed(self, task: dict[str, Any], exc: BaseException,
                       trace_id: str) -> dict[str, Any]:
@@ -512,8 +606,10 @@ class OutboxWorker:
             raise RuntimeError(f"unsupported outbox task type: {task['task_type']}")
         payload = task["payload"]
         event_fields = dict(payload["event"])
-        # session_id routes the turn; it is not part of the CareEvent itself.
+        # session_id routes the turn; task_id is A2 continuation metadata —
+        # neither is part of the CareEvent itself.
         session_id = event_fields.pop("session_id", payload.get("session_id", "default"))
+        event_fields.pop("task_id", None)
         event = CareEvent(**event_fields)
         response = self.runner.run(
             event=event, session_id=session_id,
@@ -624,6 +720,7 @@ def create_app(*, db_path: str | Path | None = None,
                               "(async-first events; NOT a medical device).")
     app.state.store = store
     app.state.worker = worker
+    app.state.agent_factory = agent_factory or default_agent_factory
     app.state.auth_mode = resolved_auth_mode
     started_at = time.time()
 
@@ -728,13 +825,27 @@ def create_app(*, db_path: str | Path | None = None,
         run_id = uuid.uuid4().hex
         event_key = f"api:{idempotency_key}"
         trace_id = getattr(request.state, "trace_id", uuid.uuid4().hex[:12])
+        task_resume = None
+        if body.get("task_id"):
+            from .product import ProductStore
+            from .care_tasks import ProductError as TaskProductError
+            try:
+                task = ProductStore(store).get(body["task_id"], "care_task")
+            except TaskProductError:
+                raise ApiError(404, "care_task_not_found", "validation",
+                               "task_id 不存在或不属于当前患者")
+            if task.get("goal_type") != "evidence_review" or task.get("status") != "waiting_input":
+                raise ApiError(409, "care_task_not_waiting", "validation",
+                               "此待办当前不在等待补充输入状态")
+            task_resume = {"task_id": body["task_id"], "expected_revision": task["revision"]}
         claim = store.accept_api_event(
             idempotency_key=idempotency_key, request_hash=request_hash,
             event_id=event_id, run_id=run_id,
             task_payload={"event": body, "session_id": body["session_id"],
                           "turn_id": run_id, "idempotency_key": idempotency_key,
                           "event_key": event_key, "event_id": event_id,
-                          "run_id": run_id, "trace_id": trace_id})
+                          "run_id": run_id, "trace_id": trace_id,
+                          "task_resume": task_resume})
         acceptance = {"event_key": event_key, "event_id": event_id, "run_id": run_id,
                       "status": "queued",
                       "status_url": f"/v1/events/{idempotency_key}"}
@@ -847,6 +958,13 @@ def create_app(*, db_path: str | Path | None = None,
         _authorize_scope(principal, "local-demo")
         run = store.workflow_run_get(run_id)
         if run is None:
+            queued = store.outbox_task_for(run_id)
+            if queued and (queued.get('payload') or {}).get('operation') == 'care-task-evidence-review@1':
+                # Queue admission is durable before a worker creates the
+                # workflow row. Report the actual queued state without 404.
+                return JSONResponse(status_code=200, content={'run_id': run_id,
+                    'run_status': 'queued' if queued['status'] in {'open', 'processing'} else queued['status'],
+                    'events': [], 'latest_seq': 0, 'snapshot': True})
             raise ApiError(404, "unknown_run", "validation", "no run for this id")
         if not _progress_events_enabled():
             return JSONResponse(status_code=200, content={

@@ -419,7 +419,7 @@ def register_product_routes(app, store, principal, authorize_scope, require_role
         return invoke(lambda: product.decide(case_id, item_id, body.get('key'), body.get('expected_revision'), body.get('action'), body.get('corrections', {}), body.get('task_context')))
 
     from .care_tasks import register_task_routes
-    register_task_routes(app, product, access, invoke)
+    register_task_routes(app, product, access, invoke, agent_factory=getattr(app.state, 'agent_factory', None))
     from .document_parser import register_document_routes
     register_document_routes(app, product, access, invoke)
     from .evidence_quality import register_quality_routes

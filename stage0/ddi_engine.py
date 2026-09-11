@@ -92,7 +92,8 @@ def _cache_versions():
     return {'corpus': file_fingerprint(rag.CORPUS_PATH), 'index': hashlib.sha256(json.dumps(index_parts).encode()).hexdigest(),
             'extractor': file_fingerprint(Path(extract_ddi.__file__)), 'prompt': hashlib.sha256(extract_ddi.PROMPT.encode()).hexdigest(),
             'model': config['model'], 'provider': config['provider'], 'endpoint_hash': hashlib.sha256(config['base_url'].encode()).hexdigest(),
-            'policy': 'ddi-cache-v2', 'reranker': os.getenv('DDI_RERANKER', 'baseline')}
+            'policy': 'ddi-cache-v2', 'candidate_selection': 'entity-text-dedup-v1',
+            'reranker': os.getenv('DDI_RERANKER', 'baseline')}
 
 DATA = ROOT / "data"
 STRUCTURED = DATA / "structured"
@@ -580,6 +581,8 @@ def _rag_candidates(a: dict, b: dict) -> list[tuple[dict, dict, dict]]:
         return []
     candidates: list[tuple[dict, dict, dict]] = []
     seen: set[str] = set()
+    extraction_inputs = {}
+    duplicate_chunks = []
     for result in results:
         chunk = result
         if chunk["chunk_id"] in seen:
@@ -588,9 +591,22 @@ def _rag_candidates(a: dict, b: dict) -> list[tuple[dict, dict, dict]]:
         label = chunk.get("drug_name", "")
         text = chunk.get("text", "")
         if _mentions(label, a) and _mentions(text, b):
-            candidates.append((chunk, a, b))
+            source, partner = a, b
         elif _mentions(label, b) and _mentions(text, a):
-            candidates.append((chunk, b, a))
+            source, partner = b, a
+        else:
+            continue
+        # Different approval numbers often contain identical label text. Do
+        # not pay for the same source/partner/text twice; keep alternate source
+        # metadata in the trace and quote the unchanged retained original.
+        input_key = (_ingredient_key(source), _ingredient_key(partner), re.sub(r'\s+', '', text))
+        if input_key in extraction_inputs:
+            duplicate_chunks.append({'chunk_id': chunk['chunk_id'], 'source_url': chunk.get('source_url'),
+                                     'retained_chunk_id': extraction_inputs[input_key]})
+            continue
+        extraction_inputs[input_key] = chunk['chunk_id']
+        candidates.append((chunk, source, partner))
+    EVIDENCE_TRACE.set({**(EVIDENCE_TRACE.get() or {}), 'duplicate_extraction_inputs': duplicate_chunks})
     # Two independently retrieved exact-mention chunks balance evidence
     # redundancy against live-provider cost. Additional chunks were dominated
     # by duplicate label versions in the held-out pilot.
