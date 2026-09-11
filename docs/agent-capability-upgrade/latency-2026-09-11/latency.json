@@ -1,0 +1,145 @@
+{
+  "started_at": "2026-09-11T15:30:51.471972+00:00",
+  "note": "synthetic content only; latency decomposition",
+  "captured_cycles": 3,
+  "records": [
+    {
+      "provider": "zhipu",
+      "model": "glm-4.7-flash",
+      "label": "tiny_prompt",
+      "thinking": "disabled",
+      "payload_chars": 54,
+      "calls": [
+        {
+          "call": 1,
+          "latency_ms": 747,
+          "outcome": "error",
+          "error_type": "RateLimitError",
+          "error": "Error code: 429 - {'error': {'code': '1305', 'message': '该模型当前访问量过大，请您稍后再试'}}"
+        },
+        {
+          "call": 2,
+          "latency_ms": 151,
+          "outcome": "error",
+          "error_type": "RateLimitError",
+          "error": "Error code: 429 - {'error': {'code': '1305', 'message': '该模型当前访问量过大，请您稍后再试'}}"
+        }
+      ]
+    },
+    {
+      "provider": "zhipu",
+      "model": "glm-4.7-flash",
+      "label": "real_payload",
+      "thinking": "disabled",
+      "payload_chars": 12241,
+      "calls": [
+        {
+          "call": 1,
+          "latency_ms": 248,
+          "outcome": "error",
+          "error_type": "RateLimitError",
+          "error": "Error code: 429 - {'error': {'code': '1305', 'message': '该模型当前访问量过大，请您稍后再试'}}"
+        },
+        {
+          "call": 2,
+          "latency_ms": 1475,
+          "prompt_tokens": 4224,
+          "completion_tokens": 49,
+          "total_tokens": 4273,
+          "outcome": "response"
+        }
+      ],
+      "median_latency_ms": 1475,
+      "median_prompt_tokens": 4224,
+      "median_completion_tokens": 49,
+      "median_total_tokens": 4273
+    },
+    {
+      "provider": "tokendance",
+      "model": "glm-5.3-flash",
+      "label": "tiny_prompt",
+      "thinking": "disabled",
+      "payload_chars": 54,
+      "calls": [
+        {
+          "call": 1,
+          "latency_ms": 25502,
+          "prompt_tokens": 437,
+          "completion_tokens": 683,
+          "total_tokens": 1120,
+          "outcome": "response"
+        },
+        {
+          "call": 2,
+          "latency_ms": 40399,
+          "prompt_tokens": 437,
+          "completion_tokens": 1451,
+          "total_tokens": 1888,
+          "outcome": "response"
+        }
+      ],
+      "median_latency_ms": 40399,
+      "median_prompt_tokens": 437,
+      "median_completion_tokens": 1451,
+      "median_total_tokens": 1888
+    },
+    {
+      "provider": "tokendance",
+      "model": "glm-5.3-flash",
+      "label": "real_payload",
+      "thinking": "disabled",
+      "payload_chars": 12241,
+      "calls": [
+        {
+          "call": 1,
+          "latency_ms": 31574,
+          "prompt_tokens": 4219,
+          "completion_tokens": 1162,
+          "total_tokens": 5381,
+          "outcome": "response"
+        },
+        {
+          "call": 2,
+          "latency_ms": 60018,
+          "outcome": "error",
+          "error_type": "APITimeoutError",
+          "error": "Request timed out."
+        }
+      ],
+      "median_latency_ms": 31574,
+      "median_prompt_tokens": 4219,
+      "median_completion_tokens": 1162,
+      "median_total_tokens": 5381
+    },
+    {
+      "provider": "tokendance",
+      "model": "glm-5.3-flash",
+      "label": "real_payload_encoding_default",
+      "thinking": null,
+      "payload_chars": 12241,
+      "calls": [
+        {
+          "call": 1,
+          "latency_ms": 21285,
+          "prompt_tokens": 4219,
+          "completion_tokens": 823,
+          "total_tokens": 5042,
+          "outcome": "response"
+        },
+        {
+          "call": 2,
+          "latency_ms": 55934,
+          "prompt_tokens": 4219,
+          "completion_tokens": 2440,
+          "total_tokens": 6659,
+          "outcome": "response"
+        }
+      ],
+      "median_latency_ms": 55934,
+      "median_prompt_tokens": 4219,
+      "median_completion_tokens": 2440,
+      "median_total_tokens": 6659
+    }
+  ],
+  "completed_at": "2026-09-11T15:30:51.471988+00:00"
+}
