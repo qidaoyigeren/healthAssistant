@@ -1,0 +1,60 @@
+{
+  "started_at": "2026-09-11T15:17:50.232642+00:00",
+  "protocol_version": "propose-next-action@3",
+  "planned_k": 3,
+  "actual_k": 3,
+  "source_fingerprint": "c2616b858a476ce801d009e1d85dcd917ccfbeb98288a2b8078e55c8cda3c7ed",
+  "protocol_sha256": "34aafcb04aefaa997863b0af07f3ff82c6400433b0886298598698ed3dfb7e74",
+  "dataset_sha256": "477220626b1f31509087ff0feed05f54274348c7b0cfee31e4184be18ffdfed8",
+  "configuration": {
+    "provider": "tokendance",
+    "base_url": "https://tokendance.space/gateway/v1",
+    "model": "glm-5.3-flash",
+    "planner_provider_retries": 1,
+    "planner_arg_autocorrect": "1",
+    "planner_tool_choice": "required",
+    "max_cycles": 12,
+    "seconds_per_run": 180,
+    "calls_per_run": 8,
+    "planned_k": 3,
+    "registered_tools": [
+      "ask_clarification",
+      "ddi_check",
+      "memory_read",
+      "memory_write",
+      "rag_search"
+    ],
+    "effective_env": {
+      "PYTHONIOENCODING": "utf-8",
+      "LLM_PROVIDER": "tokendance",
+      "MEMORY_ENABLE_LLM": "0",
+      "AGENT_MULTI_REVIEW_MODEL_ENABLED": "0",
+      "PLANNER_PROVIDER_RETRIES": "1",
+      "PLANNER_ARG_AUTOCORRECT": "1",
+      "PLANNER_SAFETY_REJECTION_LIMIT": "2",
+      "AGENT_EVAL_MAX_CYCLES": "12"
+    },
+    "ambient_overridden": {}
+  },
+  "runs": [
+    {
+      "index": 1,
+      "exit_code": 0,
+      "artifact_present": true
+    },
+    {
+      "index": 2,
+      "exit_code": 0,
+      "artifact_present": true
+    },
+    {
+      "index": 3,
+      "exit_code": 0,
+      "artifact_present": true
+    }
+  ],
+  "source_unchanged": true,
+  "completed_at": "2026-09-11T15:21:40.085350+00:00",
+  "collection_status": "complete",
+  "quality_status": "requires_metrics_and_protocol_evaluation"
+}
