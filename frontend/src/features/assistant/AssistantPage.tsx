@@ -19,6 +19,7 @@ import { ConflictCard, WarningCard } from '../../components/evidence';
 import { SafeMarkdown } from '../../components/safeMarkdown';
 import { TaskStatusChip, TaskTray } from '../shared/submission';
 import { CareTaskLink } from '../tasks/CareTasksPage';
+import { InvestigationCard } from './InvestigationCard';
 
 const QUICK_PROMPTS = [
   { label: '现在吃什么药?', eventType: 'query_current_medications' as const },
@@ -41,6 +42,11 @@ export function AssistantPage(): React.ReactElement {
   });
 
   const sessionTasks = tasks.filter((t) => t.sessionId === sessionId);
+  const historyEvents = (historyQuery.data?.items ?? []).filter((event) => event.session_id === sessionId);
+  const restoredKeys = new Set(historyEvents.filter((event) => event.response).map((event) => event.idempotency_key));
+  const visibleTasks = sessionTasks.filter((task) => !restoredKeys.has(task.key));
+  const liveKeys = new Set(visibleTasks.map((task) => task.key));
+  const visibleHistory = historyEvents.filter((event) => !event.idempotency_key || !liveKeys.has(event.idempotency_key));
   const activeCount = sessionTasks.filter((t) =>
     ['submitting', 'queued', 'processing', 'unknown'].includes(t.status)).length;
 
@@ -90,12 +96,12 @@ export function AssistantPage(): React.ReactElement {
           )}
 
           {/* 服务端恢复的历史(旧 → 新) */}
-          {historyQuery.data && [...historyQuery.data.items].reverse().map((event) => (
+          {[...visibleHistory].reverse().map((event) => (
             <RestoredExchange key={event.id} event={event} onOpenTrace={setTraceTurn} />
           ))}
 
           {/* 本标签页的任务(处理中 / 已完成) */}
-          {sessionTasks.map((task) => (
+          {visibleTasks.map((task) => (
             <LiveExchange key={task.key} task={task} onOpenTrace={setTraceTurn} />
           ))}
           <div ref={bottomRef} />
@@ -158,6 +164,7 @@ function RestoredExchange({ event, onOpenTrace }: {
         {result ? (
           <>
             <SafeMarkdown text={result.text} />
+            <InvestigationCard bundle={result.answer_bundle} />
             {result.warnings.length > 0 && (
               <div className="mt-2 space-y-2">
                 {result.warnings.map((warning, index) => <WarningCard key={index} warning={warning} />)}
@@ -195,6 +202,7 @@ function LiveExchange({ task, onOpenTrace }: {
         {task.status === 'committed' && task.result ? (
           <>
             <SafeMarkdown text={task.result.text} />
+            <InvestigationCard bundle={task.result.answer_bundle} />
             {task.result.safety_status !== 'enforced' && (
               <p className="mt-1 text-xs text-caution">安全状态:{task.result.safety_status}</p>
             )}

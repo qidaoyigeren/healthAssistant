@@ -103,12 +103,17 @@ export function SubmissionResultView({ task, onClose }: {
   if (!result) return null;
   const outcomes = result.operation_outcomes ?? [];
   const cancelled = result.run_status === 'cancelled' || task.cancelState === 'cancelled';
+  // A degraded planner run must not be presented as an ordinary completed one:
+  // the rules finished the work because the model service never answered.
+  const degradedReason = result.answer_bundle?.coverage?.degraded_reason ?? null;
+  const outage = !!degradedReason && /provider_error|usage_unknown/.test(degradedReason);
   return (
     <Card className="mt-3">
       <div className="flex items-center gap-2 px-4 pt-3">
-        <Badge tone={cancelled ? 'neutral' : 'primary'}
-          icon={cancelled ? <Ban size={13} aria-hidden /> : <CheckCircle2 size={13} aria-hidden />}>
-          {cancelled ? '任务已取消' : '记录完成'}
+        <Badge tone={cancelled ? 'neutral' : outage ? 'caution' : 'primary'}
+          icon={cancelled ? <Ban size={13} aria-hidden /> : outage ? <OctagonAlert size={13} aria-hidden />
+            : <CheckCircle2 size={13} aria-hidden />}>
+          {cancelled ? '任务已取消' : outage ? '未经模型核查' : '记录完成'}
         </Badge>
         <span className="text-xs text-ink-muted">
           提交于 <TimeText iso={task.startedAt} />
@@ -126,6 +131,9 @@ export function SubmissionResultView({ task, onClose }: {
             {outcomes.map((outcome, index) => <OutcomeRow key={index} outcome={outcome} />)}
           </ul>
         )}
+        {outage && <p className="mb-2 text-sm text-caution" role="status">
+          模型服务暂时不可用，本轮未经模型核查：以下为依据已保存记录整理的部分结果，可稍后重新提交。
+        </p>}
         <SafeMarkdown text={result.text} />
         {result.warnings.length > 0 && (
           <div className="mt-3 space-y-2">

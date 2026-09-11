@@ -333,7 +333,25 @@ export interface ChangeImpactDto {
 }
 
 // Product P1: 最小 AnswerBundle（附加在事件响应上；旧客户端可忽略）
+export interface MultiReviewDto {
+  status?: 'completed' | 'incomplete' | 'unavailable';
+  reason?: string;
+  review_version: string;
+  trigger: string;
+  workers: { claim_id: string; status: string; worker_kind?: string | null; reason?: string }[];
+  divergences: { claim_id: string; kind: string; refs: string[] }[];
+  usage: { cycles: number; calls: number; usage_unknown: boolean };
+  note?: string;
+}
+
 export interface AnswerBundleDto {
+  execution_status?: string;
+  goal_status?: string;
+  answer_status?: string;
+  investigation?: InvestigationDto | null;
+  multi_review?: MultiReviewDto | null;
+  route?: string | null;
+  route_basis?: string | null;
   bundle_version: string;
   safety_status: string;
   claims: {
@@ -352,6 +370,20 @@ export interface AnswerBundleDto {
     response_source?: string | null;
     degraded_reason?: string | null;
   };
+}
+
+export interface InvestigationDto {
+  version: string;
+  contract_version: string;
+  goal: string;
+  mode: 'deterministic' | 'scripted' | 'llm';
+  checks: Record<string, string>;
+  gaps: { gap_id: string; kind: string; description: string; status: string }[];
+  questions: { gap_id: string; field: string; question: string }[];
+  claims: { claim_id: string; statement: string; status: string; supporting_evidence: string[]; opposing_evidence: string[] }[];
+  evidence_refs: string[];
+  termination_reason: string | null;
+  patient_version: { medications: number; semantic: number };
 }
 
 export interface ConclusionChainDto {
