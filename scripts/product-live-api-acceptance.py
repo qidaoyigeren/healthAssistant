@@ -50,7 +50,7 @@ for key, kind, text, payload in scenarios:
     record = {'key':key, 'http_status':code, 'seconds':round(time.monotonic()-start,3), 'response':result}
     (args.out / (key + '.json')).write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding='utf-8')
     results.append(record)
-    print(json.dumps({'key':key,'status':result.get('status'),'run_status':result.get('result',{}).get('run_status'),'seconds':record['seconds']}, ensure_ascii=False), flush=True)
+    print(json.dumps({'key':key,'status':result.get('status'),'run_status':result.get('response',{}).get('run_status'),'seconds':record['seconds']}, ensure_ascii=False), flush=True)
     if result.get('status') != 'committed':
         raise RuntimeError(f'Event did not commit: {key}')
 (args.out / (args.phase + '-api.json')).write_text(json.dumps(results,ensure_ascii=False,indent=2),encoding='utf-8')

@@ -20,6 +20,11 @@ stage0/exports/
 frontend/node_modules/
 frontend/dist/
 
+# Browser-automation deps installed at the repo ROOT by the acceptance rounds
+# (playwright + playwright-core, ~19MB).  Only frontend/node_modules was
+# ignored, so a root-level `git add -A` would have committed them.
+node_modules/
+
 # IDE
 .idea/
 
