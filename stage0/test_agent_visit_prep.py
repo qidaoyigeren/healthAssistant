@@ -754,6 +754,31 @@ class VisitPrepDatasetTest(unittest.TestCase):
             self.assertTrue(expected['allowed_terminal_reasons'], task['task_id'])
             self.assertLessEqual(task['budget']['max_cycles'], 12, task['task_id'])
 
+    def test_every_declared_rubric_key_is_actually_read_by_the_evaluator(self):
+        """数据集里不得出现"声明了却没人执行"的键。
+
+        `search_budget` 曾经如此：两个任务声明了它，评分与执行都只读全局常量，
+        于是那句声明没有任何约束力——一条**不可证伪**的规则，只是它证伪的方向
+        是"看起来更严"。新增键必须同时接线，否则这个测试会失败。
+        """
+        from stage0.agent_evals.scoring import READ_EXPECTED_KEYS
+        for task in self._tasks():
+            unread = set(task['expected']) - set(READ_EXPECTED_KEYS)
+            self.assertEqual(unread, set(),
+                             f"{task['task_id']} 声明了没人读的评分键：{sorted(unread)}")
+
+    def test_a_declared_search_budget_reaches_the_state_machine(self):
+        """声明了就必须生效：上限由任务给出，而不是被全局常量吃掉。"""
+        from stage0.investigation import InvestigationState, MAX_SEARCHES
+        inv = InvestigationState('g', 'local-demo')
+        self.assertEqual(inv.search_limit(), MAX_SEARCHES)
+        inv.search_budget = 1
+        self.assertEqual(inv.search_limit(), 1)
+        inv.queries = ['q']
+        inv.checks = {key: 'checked' for key in inv.checks}
+        inv.termination_reason = None
+        self.assertEqual(inv.forced_stop(), 'budget_insufficient')
+
     def test_the_arms_cover_the_two_factor_grid(self):
         """材料可见性 × 谁来规划，四格必须都有臂——否则差额无法归因。"""
         from stage0.agent_evals.run_visitprep import ARMS
@@ -926,6 +951,50 @@ class ReportEvidenceTest(unittest.TestCase):
                        'source': 'model'}]
         self.assertEqual(inv.verify_statements(), [])
         self.assertIn('氨氯地平的标签证据', inv.report_text().split('## 4', 1)[0])
+
+    def test_a_contradicted_claim_is_not_rendered_as_a_supported_fact(self):
+        """第 2 节叫"有来源支持的事实"，被反对的断言不得挂在它底下。"""
+        inv = _finished_investigation()
+        inv.claims = [{'claim_id': 'claim:a', 'statement': '某个被反对的断言',
+                       'entities': ['氨氯地平'], 'status': 'contradicted',
+                       'supporting_evidence': [], 'opposing_evidence': ['ev-1'],
+                       'source_status': 'current', 'condition_status': 'verified',
+                       'source': 'model', 'support_status': 'unknown'}]
+        text = inv.report_text()
+        section_two = text.split('## 2', 1)[1].split('## 3', 1)[0]
+        self.assertNotIn('某个被反对的断言', section_two)
+        self.assertIn('某个被反对的断言', text.split('## 3', 1)[1],
+                      '降级不等于消失：它必须仍然出现在报告里')
+
+    def test_a_model_subquestion_is_a_question_not_a_fact(self):
+        """模型提出的子问题是**问句**，只能出现在第 5 节。
+
+        改造前 `plan_questions` 的 statement 会变成 claim，一旦被判 supported
+        就以**事实**身份写进第 2 节——调查问题被当成了结论输出。
+        """
+        inv = _finished_investigation()
+        inv.questions = [{'gap_id': 'g', 'field': 'f',
+                          'question': '材料里的维生素D是否需要核对？'}]
+        text = inv.report_text()
+        section_two = text.split('## 2', 1)[1].split('## 3', 1)[0]
+        self.assertNotIn('维生素D是否需要核对', section_two)
+        section_five = text.split('## 5', 1)[1]
+        self.assertIn('维生素D是否需要核对', section_five)
+
+    def test_an_unsupported_model_statement_becomes_a_question_to_ask(self):
+        """D5：模型自己提的问题不得只在降级路径才出现。
+
+        未获支持的模型断言在报告里是**待确认项**；它同时也是就诊时该问出口的
+        问题，所以要一并出现在第 5 节。
+        """
+        inv = _finished_investigation()
+        inv.claims = [{'claim_id': 'claim:a', 'statement': '材料里的维生素D是否需要核对',
+                       'entities': ['维生素D'], 'status': 'insufficient',
+                       'supporting_evidence': [], 'opposing_evidence': [],
+                       'source_status': 'unknown', 'condition_status': 'unknown',
+                       'source': 'model', 'support_status': 'unknown'}]
+        section_five = inv.report_text().split('## 5', 1)[1]
+        self.assertIn('材料里的维生素D是否需要核对', section_five)
 
     def test_material_reads_join_the_citation_set_through_observation(self):
         from stage0.agent import Observation

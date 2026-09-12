@@ -12,6 +12,22 @@ import re
 
 PROTOCOL = 'visitprep-eval@2'
 
+# 评分链路**实际读取**的 ``expected`` 键。数据集里出现这个集合之外的键，就
+# 等于**声明了一条没有任何东西执行的规则**——``search_budget`` 曾经如此：
+# 两个任务声明了它，代码却只读全局常量，于是那句声明毫无约束力。测试据此
+# 断言数据集的键全在这个集合里，新增键而没有接线会立刻失败。
+READ_EXPECTED_KEYS = frozenset({
+    'expected_diff_kind',
+    'must_report_diff_issue',
+    'required_report_sections',
+    'must_report_conflict',
+    'must_ask_fields',
+    'forbid_supported_when_absent',
+    'forbid_supported_entities',
+    'allowed_terminal_reasons',
+    'search_budget',          # 由 run_visitprep 下发给 investigation.search_limit()
+})
+
 # 终态分类。``allowed_terminal_reasons`` 说明"允许停在哪"，
 # 但"完整完成"只能由 completed 与 waiting 取得——预算耗尽与 provider
 # 失败不得自动算完整完成。

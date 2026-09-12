@@ -36,6 +36,9 @@ DATA = Path(__file__).with_name('visitprep_dev.json')
 # 单任务在**没有**批次约束时的调用预算。批次约束下这个值由剩余额度取代。
 STANDALONE_CALL_BUDGET = 32
 
+# 数据集协议版本：终态、分歧与证据支持都从"写在 expected 里"变成"真的执行"。
+DATASET_SCHEMA = 'visitprep-task@2'
+
 
 def _budget_env(call_budget, allowance):
     """Turn-budget environment for one task.
@@ -227,7 +230,13 @@ def run_task(task, arm, live=False, allowance=None):
         # 常量：额度由此进入真实请求入口（``BudgetSession.call`` 每次发送前
         # 取额，重试各取一次），上限才成为真上限。
         call_budget = STANDALONE_CALL_BUDGET if allowance is None else allowance.remaining()
+        # 任务声明的检索预算必须真的下发：`first_search_empty` 族用它把可用检索
+        # 压到 1 次，考察的正是"首搜无果后改写查询"而不是"换个说法再搜"。
+        # 只写在数据集里而不执行，这个键就是一句没有约束力的声明。
+        declared_searches = (task.get('expected') or {}).get('search_budget')
         env = {**_budget_env(call_budget, allowance),
+               **({'AGENT_INVESTIGATION_SEARCH_BUDGET': str(declared_searches)}
+                  if declared_searches else {}),
                'AGENT_INVESTIGATION_ENABLED': config['investigation'],
                'LLM_MAX_RETRIES': '0',
                'MEMORY_ENABLE_LLM': '0', 'AGENT_LLM_VERIFIER': '0',
@@ -423,10 +432,17 @@ def main():
         results.append(result)
     spent = allowance.spent if allowance is not None else 0
 
+    from . import scoring as _scoring
     report = {
-        'protocol': 'visitprep-eval@1',
+        # 取自评分模块本身，不再是一个写死的字符串：产物自报的协议版本与
+        # 实际判它的评分器必须是同一个值，否则重评时无从判断可比性。
+        'protocol': _scoring.PROTOCOL,
         'arm': args.arm,
         'dataset': 'author-synthetic-visitprep@1',
+        # 数据集协议升到 @2：终态、分歧与证据支持从"声明"变成"执行"。
+        'dataset_schema': DATASET_SCHEMA,
+        # 与旧产物不可逐格比较：口径变了，通过率变化是口径的真实结果。
+        'not_comparable_to': 'visitprep-eval@1',
         'source_fingerprint': _fingerprint(),
         'dataset_sha256': _sha(DATA.read_bytes()),
         'planner_endpoint': endpoint,

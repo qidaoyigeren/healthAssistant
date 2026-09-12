@@ -127,6 +127,10 @@ class InvestigationState:
     # 按 id 去重，而 id 是错误签名的拼接——同样的错误重复多少次都只有一个缺口
     # （上限永远够不到），三种不同的单次错误却会凑够三个（误触发）。
     plan_attempts: int = 0
+    # 本轮的检索次数上限。任务可以声明一个更紧的预算（"首次检索无结果"族用它
+    # 把可用检索压到 1，逼出"改写查询"而不是"换个说法再搜一次"）。0 = 用全局
+    # 常量。声明了却只读全局常量，等于这个键从来没被执行过。
+    search_budget: int = 0
     # 追加式修订历史：每条记下触发原因、实体集的变更与**显式保留**的证据。
     # 追加而非覆盖，因为"计划变过"本身是结论的一部分——哪一轮、因为什么、
     # 哪些证据继续有效，都要能回看。
@@ -276,6 +280,17 @@ class InvestigationState:
         for g in self.gaps:
             if g['gap_id'] == GAP_PLAN:
                 g['status'] = 'resolved'
+
+    def search_limit(self) -> int:
+        """本轮的检索次数上限：实例 > 环境 > 全局常量。"""
+        if self.search_budget:
+            return int(self.search_budget)
+        raw = os.getenv('AGENT_INVESTIGATION_SEARCH_BUDGET', '').strip()
+        try:
+            declared = int(raw)
+        except ValueError:
+            declared = 0
+        return declared if declared > 0 else MAX_SEARCHES
 
     def unsolved_entities(self) -> set[str]:
         """本次调查**尚未解决**的问题所涉及的实体。
@@ -686,7 +701,7 @@ class InvestigationState:
             # Retrieval is not verification; this is the same rule the label
             # path already states as "'搜到' 不等于 '已读取并验证'".
             self.termination_reason = 'checks_completed'
-        elif len(self.queries) >= MAX_SEARCHES:
+        elif len(self.queries) >= self.search_limit():
             self.termination_reason = 'budget_insufficient'
         return self.termination_reason
 
@@ -860,8 +875,13 @@ class InvestigationState:
                 + [self._render_statement(item['statement'], [])
                    + f"（未核实的解释，原因：{item['reason']}，列为待确认问题）"
                    for item in self.pending_statements]),
-            '5. 就诊时可以向医生或药师确认什么': [
-                f"- {question['question']}" for question in self.questions],
+            # 模型的**澄清问题**与**未获支持的断言**都是该当面问出口的话。
+            # 旧口径下第 5 节只由降级路径写入，模型自己提的问题从不出现——
+            # 于是报告缺的恰恰是它最该问的部分。
+            '5. 就诊时可以向医生或药师确认什么': list(dict.fromkeys(
+                [question['question'] for question in self.questions]
+                + [claim['statement'] for claim in self.claims
+                   if claim.get('source') == 'model' and claim['status'] != 'supported'])),
         }
 
     def citable_memory_refs(self) -> list:
