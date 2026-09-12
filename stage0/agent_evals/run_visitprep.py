@@ -34,8 +34,17 @@ DATA = Path(__file__).with_name('visitprep_dev.json')
 ARMS = {
     'fixed': {'investigation': '0', 'llm': False, 'materials': False},
     'det': {'investigation': '1', 'llm': False, 'materials': True},
+    # Control for `det`: same contract and planner, materials withheld.  The
+    # only difference between the two is material visibility.
+    'det-nomat': {'investigation': '1', 'llm': False, 'materials': False},
     'scripted': {'investigation': '1', 'llm': False, 'materials': True, 'script': True},
-    'model': {'investigation': '1', 'llm': True, 'materials': True, 'live_only': True},
+    # The 2x2 that isolates the two factors: whether a planner exists at all,
+    # and whether materials are visible to it.  A single "model vs fixed"
+    # comparison cannot say which half of the difference is the new
+    # CAPABILITY and which is the model CHOOSING to use it.
+    'scripted-nomat': {'investigation': '1', 'llm': False, 'materials': False, 'script': True},
+    'model': {'investigation': '1', 'llm': True, 'materials': True},
+    'model-nomat': {'investigation': '1', 'llm': True, 'materials': False},
 }
 
 
@@ -325,6 +334,13 @@ def run_task(task, arm, live=False):
                                     ((entry.get('planner') or {}).get('validation') or {}).get('errors') or []],
                          'hydrated': (entry.get('planner') or {}).get('hydrated_arguments'),
                          'dropped_calls': (entry.get('planner') or {}).get('dropped_calls') or [],
+                         # The full per-attempt ledger: outcome, exception
+                         # type, latency and token split per call.  Without
+                         # the exception TYPE a provider failure cannot be
+                         # attributed — "provider_error" covers a 60s gateway
+                         # timeout, a 429 and a 5xx alike, and those need
+                         # opposite responses.
+                         'provider_attempts': (entry.get('planner') or {}).get('provider_attempts') or [],
                          'latency_ms': (entry.get('planner') or {}).get('latency_ms')}
                         for entry in response.tool_trace if entry.get('phase') == 'plan'],
                 }
@@ -353,8 +369,8 @@ def main():
     if args.only:
         wanted = {item.strip() for item in args.only.split(',') if item.strip()}
         tasks = [task for task in tasks if task['task_id'] in wanted]
-    if args.live and args.arm != 'model':
-        raise SystemExit('--live 只在 --arm model 下有意义')
+    if args.live and not ARMS[args.arm]['llm']:
+        raise SystemExit('--live 只在启用真实模型规划的臂下有意义')
     endpoint = None
     if args.live:
         from stage0.extract_ddi import _load_dotenv, resolve_llm_config
@@ -393,6 +409,7 @@ def main():
             'passed': sum(1 for item in results if item['score']['passed']),
             'by_family': _by_family(results),
         },
+        'provider_failures': _provider_failures(results),
         'tasks': results,
     }
     out = Path(args.out)
@@ -409,6 +426,44 @@ def _by_family(results):
         entry['total'] += 1
         entry['passed'] += 1 if item['score']['passed'] else 0
     return families
+
+
+def _provider_failures(results):
+    """What actually went wrong at the provider, by exception type and outcome.
+
+    "provider_error" alone cannot be acted on: a gateway timeout, a 429 and a
+    5xx call for opposite responses (the first must NOT be retried — the remote
+    outcome is unknown and a retry may double-bill — while a definitive refusal
+    can be).  This is the breakdown that decides whether the next optimisation
+    belongs to the gateway or to the planner.
+    """
+    outcomes, error_types, latencies = {}, {}, []
+    for item in results:
+        for step in (item['observed'].get('planner_steps') or []):
+            for attempt in step.get('provider_attempts') or []:
+                outcome = attempt.get('outcome')
+                outcomes[outcome] = outcomes.get(outcome, 0) + 1
+                if outcome and outcome != 'response':
+                    error_types[attempt.get('error_type')] = error_types.get(attempt.get('error_type'), 0) + 1
+                if isinstance(attempt.get('latency_ms'), (int, float)):
+                    latencies.append(attempt['latency_ms'])
+    calls = outcomes.get('response', 0)
+    return {
+        'attempts_by_outcome': outcomes,
+        'failures_by_error_type': error_types,
+        'successful_calls': calls,
+        'failed_calls': sum(error_types.values()),
+        # Per-CALL latency, never a turn aggregate: a turn total mixes model
+        # calls with local tool work and cannot be compared across arms.
+        'call_latency_ms': {
+            'min': round(min(latencies), 1) if latencies else None,
+            'max': round(max(latencies), 1) if latencies else None,
+            'median': round(sorted(latencies)[len(latencies) // 2], 1) if latencies else None,
+            'n': len(latencies),
+        },
+        'note': ('按调用记账；失败按异常类型分开。超时类失败在本项目语义下不重试'
+                 '（远端结果未知，重试可能重复计费），429 类才走有界重试。'),
+    }
 
 
 def _sha(payload):

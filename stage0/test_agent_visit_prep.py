@@ -545,6 +545,41 @@ class VisitPrepDatasetTest(unittest.TestCase):
             self.assertTrue(expected['allowed_terminal_reasons'], task['task_id'])
             self.assertLessEqual(task['budget']['max_cycles'], 12, task['task_id'])
 
+    def test_the_arms_cover_the_two_factor_grid(self):
+        """材料可见性 × 谁来规划，四格必须都有臂——否则差额无法归因。"""
+        from stage0.agent_evals.run_visitprep import ARMS
+        grid = {(item['investigation'] == '1', bool(item.get('llm') or item.get('script')),
+                 bool(item['materials'])) for item in ARMS.values()}
+        for planner in (True, False):
+            for materials in (True, False):
+                self.assertIn((True, planner, materials), grid,
+                              f'缺少臂：规划器={planner} 材料={materials}')
+        self.assertTrue(any(item.get('llm') for item in ARMS.values()))
+        self.assertTrue(any(item['investigation'] == '0' for item in ARMS.values()))
+
+    def test_provider_failures_are_broken_down_by_exception_type(self):
+        """provider_error 必须能拆到具体异常类型，否则无法判断该优化网关还是规划。"""
+        from stage0.agent_evals.run_visitprep import _provider_failures
+        results = [{'observed': {'planner_steps': [
+            {'provider_attempts': [
+                {'outcome': 'response', 'latency_ms': 1200.0},
+                {'outcome': 'timeout', 'error_type': 'APITimeoutError', 'latency_ms': 60000.0},
+                {'outcome': 'rate_limit', 'error_type': 'RateLimitError', 'latency_ms': 300.0},
+            ]}]}}]
+        summary = _provider_failures(results)
+        self.assertEqual(summary['attempts_by_outcome'],
+                         {'response': 1, 'timeout': 1, 'rate_limit': 1})
+        self.assertEqual(summary['failures_by_error_type'],
+                         {'APITimeoutError': 1, 'RateLimitError': 1})
+        self.assertEqual(summary['call_latency_ms']['max'], 60000.0)
+
+    def test_provider_summary_is_null_not_zero_when_nothing_was_measured(self):
+        """无测量时必须报 null，不能回填 0——0 会被读成"很快"。"""
+        from stage0.agent_evals.run_visitprep import _provider_failures
+        summary = _provider_failures([{'observed': {}}])
+        self.assertIsNone(summary['call_latency_ms']['median'])
+        self.assertEqual(summary['failed_calls'], 0)
+
     def test_the_evaluator_has_no_per_task_branching(self):
         """评分器不得认识具体任务：只读 expected，不按 id/文件名/族名分支。"""
         source = (Path(__file__).with_name('agent_evals')
