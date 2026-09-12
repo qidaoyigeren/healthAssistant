@@ -28,8 +28,28 @@ import tempfile
 import time
 from unittest.mock import patch
 
+from .batch_budget import BatchAllowance, attempts_sent
+
 ROOT = Path(__file__).resolve().parents[2]
 DATA = Path(__file__).with_name('visitprep_dev.json')
+
+# 单任务在**没有**批次约束时的调用预算。批次约束下这个值由剩余额度取代。
+STANDALONE_CALL_BUDGET = 32
+
+
+def _budget_env(call_budget, allowance):
+    """Turn-budget environment for one task.
+
+    With a batch allowance the task gets exactly what is left of the batch, and
+    429 refunds are turned off: a refund lets the attempt count reach
+    ``2 * call_budget``, which would make the batch cap a cap on BILLED calls
+    rather than on calls actually sent — not the hard limit it is reported as.
+    """
+    env = {'AGENT_TURN_BUDGET_SECONDS': '180', 'AGENT_TURN_TOKEN_BUDGET': '150000',
+           'AGENT_TURN_CALL_BUDGET': str(call_budget)}
+    if allowance is not None:
+        env['PLANNER_PROVIDER_REFUND_REFUSALS'] = '0'
+    return env
 
 ARMS = {
     'fixed': {'investigation': '0', 'llm': False, 'materials': False},
@@ -177,7 +197,7 @@ def _attribution(trace):
     return counts
 
 
-def run_task(task, arm, live=False):
+def run_task(task, arm, live=False, allowance=None):
     from stage0.agent import CareEvent, DDITool, MedicationCoordinatorAgent, RAGTool
     from stage0.memory import MemoryStore
     from stage0.product import MaterialIndex, ProductStore
@@ -203,9 +223,13 @@ def run_task(task, arm, live=False):
         def offline_provider(payload):
             raise RuntimeError('synthetic provider 429 rate_limit')
 
-        env = {'AGENT_INVESTIGATION_ENABLED': config['investigation'],
-               'AGENT_TURN_BUDGET_SECONDS': '180', 'AGENT_TURN_TOKEN_BUDGET': '150000',
-               'AGENT_TURN_CALL_BUDGET': '32', 'LLM_MAX_RETRIES': '0',
+        # 批次约束下，这个任务拿到的正是批次**剩余**额度，而不是一个写死的
+        # 常量：额度由此进入真实请求入口（``BudgetSession.call`` 每次发送前
+        # 取额，重试各取一次），上限才成为真上限。
+        call_budget = STANDALONE_CALL_BUDGET if allowance is None else allowance.remaining()
+        env = {**_budget_env(call_budget, allowance),
+               'AGENT_INVESTIGATION_ENABLED': config['investigation'],
+               'LLM_MAX_RETRIES': '0',
                'MEMORY_ENABLE_LLM': '0', 'AGENT_LLM_VERIFIER': '0',
                # The scripted double is a PLANNER, not a real model: it is
                # opted into the sub-question contract explicitly, and that
@@ -342,6 +366,11 @@ def run_task(task, arm, live=False):
                     'degraded_reason': None, 'attribution': _attribution([]),
                     'invalid_calls': 0, 'planner_calls': 0, 'planner_steps': [],
                 }
+            finally:
+                # 已发生的调用必须留下记录。账本行由 ``reserve_llm_attempt`` 在
+                # dispatch **之前**写入，所以异常退出、甚至进程被杀，这里读到的
+                # 仍是真实发送过的尝试数——从 trace 累加做不到这一点。
+                outcome['provider_attempts_sent'] = attempts_sent(store, 'visitprep')
             store.close()
             if client:
                 client.close()
@@ -378,14 +407,21 @@ def main():
         endpoint = {'provider': resolved['provider'], 'model': resolved['model'],
                     'base_url': resolved.get('base_url')}
 
-    results, spent, not_sampled = [], 0, []
+    # 批次额度只在 live 下生效：离线臂不发起任何远程调用，凭空记一笔账只会
+    # 让离线产物看起来像花掉了额度。
+    allowance = BatchAllowance(args.call_cap) if args.live else None
+    results, not_sampled = [], []
     for task in tasks:
-        if args.live and spent >= args.call_cap:
+        if allowance is not None and allowance.exhausted():
             not_sampled.append(task['task_id'])
             continue
-        result = run_task(task, args.arm, live=args.live)
-        spent += result['observed'].get('planner_calls') or 0
+        result = run_task(task, args.arm, live=args.live, allowance=allowance)
+        if allowance is not None:
+            # 入账读**持久账本**，不是从 trace 累加：异常路径同样执行，所以
+            # 已经真实发生的调用不会被丢掉。
+            allowance.charge(result['observed'].get('provider_attempts_sent'))
         results.append(result)
+    spent = allowance.spent if allowance is not None else 0
 
     report = {
         'protocol': 'visitprep-eval@1',
@@ -395,7 +431,9 @@ def main():
         'dataset_sha256': _sha(DATA.read_bytes()),
         'planner_endpoint': endpoint,
         'call_cap': args.call_cap if args.live else None,
+        # 账本口径：实际**发送**的尝试数（含重试），不是计费调用数。
         'planner_calls_spent': spent,
+        'call_budget': allowance.to_dict() if allowance is not None else None,
         'not_sampled': not_sampled,
         'real_model_quality': ('sampled_within_cap' if args.live else 'unavailable'),
         'independent_held_out': 'unavailable',
