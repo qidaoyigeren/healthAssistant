@@ -891,6 +891,42 @@ class ReportEvidenceTest(unittest.TestCase):
         self.assertNotIn(UNSUPPORTED, text)
         self.assertIn('氨氯地平、克拉霉素', text)
 
+    def test_a_citation_that_does_not_support_the_statement_is_not_a_conclusion(self):
+        """引用真实存在、也确实回读过，但引用体里没有这句断言所说的内容。
+
+        "回读过"与"支持"是两件事：前者旧口径已经判了，后者是本轮新加的。
+        不支持的断言降级为**待确认项**，不用免责声明替代证据校验。
+        """
+        inv = _finished_investigation()
+        inv.evidence_refs = ['ev-1']
+        inv.read_refs = ['ev-1']
+        inv.claims = [{'claim_id': 'claim:a', 'statement': '氨氯地平剂量为10mg',
+                       'entities': ['氨氯地平'], 'status': 'supported',
+                       'supporting_evidence': ['ev-1'], 'opposing_evidence': [],
+                       'source_status': 'current', 'condition_status': 'verified',
+                       'source': 'model', 'support_status': 'no_supporting_span'}]
+        pending = inv.verify_statements()
+        self.assertEqual([item['reason'] for item in pending],
+                         ['citation_does_not_support_statement'])
+        text = inv.report_text()
+        self.assertNotIn('氨氯地平剂量为10mg', text.split('## 4', 1)[0],
+                         '证据不支持的断言不得出现在结论区')
+        self.assertIn('氨氯地平剂量为10mg', text,
+                      '降级不等于删除：它必须以待确认项的身份仍然可见')
+
+    def test_a_legacy_claim_without_the_support_key_is_not_retroactively_denied(self):
+        """缺 ``support_status`` = 口径升级前采集的记录，按不可判定恢复。"""
+        inv = _finished_investigation()
+        inv.evidence_refs = ['ev-1']
+        inv.read_refs = ['ev-1']
+        inv.claims = [{'claim_id': 'claim:a', 'statement': '氨氯地平的标签证据',
+                       'entities': ['氨氯地平'], 'status': 'supported',
+                       'supporting_evidence': ['ev-1'], 'opposing_evidence': [],
+                       'source_status': 'current', 'condition_status': 'verified',
+                       'source': 'model'}]
+        self.assertEqual(inv.verify_statements(), [])
+        self.assertIn('氨氯地平的标签证据', inv.report_text().split('## 4', 1)[0])
+
     def test_material_reads_join_the_citation_set_through_observation(self):
         from stage0.agent import Observation
         inv = _finished_investigation()

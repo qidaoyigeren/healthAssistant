@@ -12,6 +12,7 @@ import json
 import os
 import re
 
+from .claim_support import assess_support
 from .evidence_quality import assess_claim
 from .response_safety import composed_text_prescribes
 
@@ -247,7 +248,8 @@ class InvestigationState:
             return identifier
         self.claims.append({'claim_id': identifier, 'statement': statement, 'entities': list(entities),
             'status': 'insufficient', 'supporting_evidence': [], 'opposing_evidence': [],
-            'source_status': 'unknown', 'condition_status': 'unknown', 'source': source})
+            'source_status': 'unknown', 'condition_status': 'unknown', 'source': source,
+            'support_status': 'unknown'})
         self.gap(identifier, 'evidence_missing',
                  '核查' + '、'.join(entities) + '的支持和反对证据', claim_id=identifier)
         return identifier
@@ -599,6 +601,15 @@ class InvestigationState:
                     source_status='current' if meta.get('corpus_version') else 'unknown',
                     conditions_known=True, evidence_date=meta.get('retrieved_at'),
                     content_complete=not page.get('truncated'))
+                # claim-support@1 叠加在既有判定之上，写在**独立键**里，不覆盖
+                # ``status``：历史 assessments 缺这个键时按 not_applicable 恢复，
+                # 不会因为口径升级而集体失效或自相矛盾。
+                support = assess_support(statement=claim['statement'], quote=text,
+                                         entities=claim['entities'],
+                                         material_item=self.material_items.get(ref))
+                assessment['support_status'] = support['status']
+                assessment['support_scope'] = support['scope']
+                assessment['support_reasons'] = support['reasons']
                 self.assessments.setdefault(claim['claim_id'], {})[ref] = assessment
                 if conditional_namespaces and conditional_namespaces.issubset(namespaces):
                     assessment['unresolved'].append('recorded_context_does_not_verify_applicability')
@@ -619,6 +630,20 @@ class InvestigationState:
                 source_status='current' if assessments and all(a['source_status'] == 'current' for a in assessments.values()) else 'unknown',
                 condition_status='verified' if (support or opposing) else 'unknown')
             claim['status'] = 'insufficient' if support and opposing else 'supported' if support else 'contradicted' if opposing else 'insufficient'
+            # claim-support@1 的 claim 级汇总。"有支持证据"与"支持证据真的
+            # 覆盖了这句断言"是两件事：前者是既有语义，后者决定这句话能不能
+            # 以**结论**的身份出现在报告第 2 节。
+            spans = [assessments[ref].get('support_status') for ref in support]
+            if not support:
+                claim['support_status'] = 'unknown'
+            elif all(span is None for span in spans):
+                # 旧记录：本 scope 之前采集的 assessment。按"不可判定"恢复，
+                # 不当作"不支持"——口径升级不该追溯否定历史结论。
+                claim['support_status'] = 'not_applicable'
+            elif any(span == 'supported_by_span' for span in spans):
+                claim['support_status'] = 'supported_by_span'
+            else:
+                claim['support_status'] = 'no_supporting_span'
             if support and opposing:
                 self.gap('conflict:' + claim['claim_id'], 'evidence_conflict', '支持与反对证据并存，不能以投票或用户选边消除。', evidence_refs=support + opposing)
             for g in self.gaps:
@@ -760,6 +785,11 @@ class InvestigationState:
             elif not refs.issubset(read):
                 pending.append({'claim_id': claim['claim_id'], 'statement': claim['statement'],
                                 'reason': 'citation_not_read_back'})
+            elif claim.get('support_status') == 'no_supporting_span':
+                # 引用真实存在、也确实回读过，但引用体里没有这句断言所说的
+                # 内容。降级为**待确认项**，不用免责声明替代证据校验。
+                pending.append({'claim_id': claim['claim_id'], 'statement': claim['statement'],
+                                'reason': 'citation_does_not_support_statement'})
         self.pending_statements = pending
         return pending
 
@@ -801,7 +831,15 @@ class InvestigationState:
         pending_ids = {item['claim_id'] for item in self.pending_statements}
         concluded = []
         for claim in self.claims:
-            if claim['status'] == 'insufficient' or claim['claim_id'] in pending_ids:
+            # 第 2 节的标题是"有来源支持的事实"，谓词就必须只说 supported：
+            # 旧谓词是"非 insufficient"，于是 ``contradicted``（只有反对证据）
+            # 的断言也挂在"支持的事实"底下——标题与内容互相矛盾。
+            if claim['status'] != 'supported' or claim['claim_id'] in pending_ids:
+                continue
+            # 缺这个键 = 本 scope 之前采集的记录，按 **not_applicable** 恢复：
+            # 口径升级不得追溯否定历史结论（与 ``_assess`` 的汇总同一条规则）。
+            if claim.get('support_status') not in {None, 'supported_by_span', 'not_applicable'}:
+                # 引用被回读过，但引用体里没有这句断言所说的内容。
                 continue
             concluded.append(self._render_statement(claim['statement'], claim.get('entities') or []))
             concluded.append(f"  状态：{claim['status']}。"
@@ -814,6 +852,11 @@ class InvestigationState:
                 if g.get('kind') in {'evidence_conflict', 'material_conflict'}],
             '4. 仍缺少依据的问题（待核实）': (
                 [f"- {g['description']}" for g in self.gaps if g['status'] == 'open']
+                # 被反驳的结论不能从报告里消失：它不再属于"有来源支持的事实"
+                # （那才是标题的意思），但它恰恰是**最**需要当面确认的一条。
+                + [self._render_statement(claim['statement'], claim.get('entities') or [])
+                   + '（现有证据与这一说法相反，列为待确认问题）'
+                   for claim in self.claims if claim['status'] == 'contradicted']
                 + [self._render_statement(item['statement'], [])
                    + f"（未核实的解释，原因：{item['reason']}，列为待确认问题）"
                    for item in self.pending_statements]),
