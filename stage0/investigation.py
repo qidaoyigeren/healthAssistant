@@ -275,6 +275,24 @@ class InvestigationState:
             if g['gap_id'] == GAP_PLAN:
                 g['status'] = 'resolved'
 
+    def unsolved_entities(self) -> set[str]:
+        """本次调查**尚未解决**的问题所涉及的实体。
+
+        一次修订不得把它们丢掉：那会让 ``checks_completed`` 因为**忘记**一个
+        问题而变便宜——把未决项删掉，比把它查清楚省事得多。这是"不得伪造
+        完成"的唯一强制点。
+        """
+        conflict_claims = {g['gap_id'].split(':', 1)[1] for g in self.gaps
+                           if g['kind'] == 'evidence_conflict' and g['status'] == 'open'
+                           and g['gap_id'].startswith('conflict:')}
+        unsolved = set()
+        for claim in self.claims:
+            if claim.get('source') != 'model':
+                continue
+            if claim['status'] == 'insufficient' or claim['claim_id'] in conflict_claims:
+                unsolved.update(claim.get('entities') or [])
+        return unsolved
+
     def revision_trigger(self) -> str | None:
         """为什么当前子问题集**可以**被声明或修订——绝不是"重置计划"。
 
@@ -332,6 +350,12 @@ class InvestigationState:
         required = {str(m['display_name']) for m in self.facts.get('medications', []) if m.get('display_name')}
         if not required.issubset(covered):
             return ['subquestion_coverage_incomplete']
+        if self.claims:
+            # 允许的修订是**增加**或**改写措辞**，不是抹掉未决项。被拒绝时
+            # 什么都不改——否则"拒绝"只是一个返回码。
+            dropped = self.unsolved_entities() - covered
+            if dropped:
+                return ['revision_drops_open_problem']
         trigger = self.revision_trigger()
         before = [claim['claim_id'] for claim in self.claims]
         is_revision = bool(self.claims)

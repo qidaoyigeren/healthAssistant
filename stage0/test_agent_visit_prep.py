@@ -472,6 +472,76 @@ class SubquestionsTest(unittest.TestCase):
         self.assertEqual(inv.plan_revisions[1]['retained'], [],
                          'claim_id 对顺序敏感：换了顺序就是另一个 claim，不得假装保留')
 
+    def _inv_with_material_drug(self):
+        """单药权威药单 + 一个**材料独有**的药名。
+
+        必须用材料独有的药名：权威药名已被覆盖度检查保护，想"丢掉"它必然先
+        撞上 ``subquestion_coverage_incomplete``，测试就会因为**错误的理由**
+        通过。材料药名只受防伪造这条检查保护——那正是要防的口子。
+        """
+        inv = self._inv()
+        inv.facts = {'medications': [{'display_name': '氨氯地平'}],
+                     'semantic': [], 'open_conflicts': []}
+        inv.material_items = {'case:1/item:2': {'name': '维生素D',
+                                                'kind': 'unresolved', 'current': []}}
+        return inv
+
+    def _declare_both(self, inv):
+        return inv.accept_questions([{'statement': '核查氨氯地平', 'entities': ['氨氯地平']},
+                                     {'statement': '核查维生素D', 'entities': ['维生素D']}])
+
+    def _mark_vitamin_unsolved(self, inv):
+        for claim in inv.claims:
+            if '维生素D' in claim['entities']:
+                claim['status'] = 'insufficient'
+
+    def test_a_revision_that_drops_an_unsolved_problem_is_refused(self):
+        """不得通过删除未解决问题伪造完成。"""
+        inv = self._inv_with_material_drug()
+        self.assertEqual(self._declare_both(inv), [])
+        self._mark_vitamin_unsolved(inv)
+        errors = inv.accept_questions([{'statement': '核查氨氯地平', 'entities': ['氨氯地平']}])
+        self.assertEqual(errors, ['revision_drops_open_problem'])
+
+    def test_a_revision_that_keeps_the_problem_is_accepted(self):
+        inv = self._inv_with_material_drug()
+        self._declare_both(inv)
+        self._mark_vitamin_unsolved(inv)
+        self.assertEqual(inv.accept_questions([
+            {'statement': '核查氨氯地平', 'entities': ['氨氯地平']},
+            {'statement': '核查维生素D（含材料差异）', 'entities': ['维生素D']}]), [])
+
+    def test_a_refused_revision_leaves_the_unsolved_problem_intact(self):
+        """拒绝必须真的什么都没改——否则"拒绝"只是一个返回码。"""
+        inv = self._inv_with_material_drug()
+        self._declare_both(inv)
+        self._mark_vitamin_unsolved(inv)
+        before_claims = [claim['claim_id'] for claim in inv.claims]
+        before_revisions = list(inv.plan_revisions)
+        self.assertEqual(inv.accept_questions([{'statement': '核查氨氯地平',
+                                                'entities': ['氨氯地平']}]),
+                         ['revision_drops_open_problem'])
+        self.assertEqual([claim['claim_id'] for claim in inv.claims], before_claims)
+        self.assertEqual(inv.plan_revisions, before_revisions)
+        self.assertIn('维生素D', inv.unsolved_entities())
+
+    def test_a_dropped_problem_keeps_completion_out_of_reach(self):
+        """拒绝的**后果**：那个未解决的问题仍然挡着 checks_completed。
+
+        单看"返回了错误码"还不够——必须证明缺口没有被这次被拒的修订顺手带走。
+        """
+        inv = self._inv_with_material_drug()
+        inv.authority_read = True
+        self._declare_both(inv)
+        self._mark_vitamin_unsolved(inv)
+        inv.checks = {key: 'checked' for key in inv.checks}
+        self.assertEqual(inv.accept_questions([{'statement': '核查氨氯地平',
+                                                'entities': ['氨氯地平']}]),
+                         ['revision_drops_open_problem'])
+        self.assertTrue(any(g['status'] == 'open' for g in inv.gaps),
+                        '被拒的修订不得带走缺口')
+        self.assertNotEqual(inv.forced_stop(), 'checks_completed')
+
     def test_the_gap_list_exposes_plan_questions_only_while_planning_is_open(self):
         from stage0.investigation import allowed_tools
         inv = self._inv()
