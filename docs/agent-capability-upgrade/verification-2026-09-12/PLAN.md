@@ -769,8 +769,17 @@ Expected: FAIL — `AttributeError: module 'stage0.agent_evals.scoring' has no a
 用下面替换 `score_outcome` 的 bucket 段：
 
 ```python
+    degraded = bool(observed.get('degraded_reason')) \
+        or observed.get('subquestion_source') != 'model' \
+        or bool((observed.get('attribution') or {}).get('policy_fallback'))
+
     if observed.get('error'):
         bucket = 'execution_failed_or_not_sampled'
+    elif degraded:
+        # 降级优先于质量：一个由确定性兜底**产出动作**的回合，即使报告好看，
+        # 也不是"自主达成"。把它记进 report_quality_pass 会把降级读成成功。
+        # （T1 的评审发现 policy_fallback 会漏进 report_quality_pass；本条为修正。）
+        bucket = 'degraded_outcome'
     elif quality['ok'] and terminal == 'completed' and autonomous:
         bucket = 'autonomous_without_degradation'
     elif quality['ok'] and terminal in {'completed', 'waiting'}:
@@ -778,8 +787,10 @@ Expected: FAIL — `AttributeError: module 'stage0.agent_evals.scoring' has no a
     elif terminal in {'completed', 'waiting'}:
         bucket = 'terminal_expected'
     else:
-        bucket = 'degraded_outcome' if observed.get('degraded_reason') else 'execution_failed_or_not_sampled'
+        bucket = 'execution_failed_or_not_sampled'
 ```
+
+**配套负向对照**（加进 `NegativeControlTest`）：`attribution={'policy_fallback': 1}` 且报告完美、终态 `checks_completed` 时，bucket 必须是 `degraded_outcome` 而非 `report_quality_pass`。
 
 并在 `scoring.py` 追加 rescore：
 
