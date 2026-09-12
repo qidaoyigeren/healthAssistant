@@ -119,11 +119,18 @@ def evaluate(task, observed):
     """The rubric. Delegates to the versioned scoring protocol."""
     from . import scoring
     outcome = scoring.score_outcome(task, observed)
+    asked = set(observed.get('asked_fields') or [])
+    required_questions = set((task.get('expected') or {}).get('must_ask_fields') or [])
     return {
         **outcome,
         'passed': bool(outcome.get('complete')),
         'failures': (outcome.get('report_quality') or {}).get('failures', []),
         'terminal_reason': observed.get('termination_reason'),
+        'question_recall': {
+            'numerator': len(required_questions & asked),
+            'denominator': len(required_questions),
+        },
+        'unsupported_conclusions': len(observed.get('unsupported_statements') or []),
         'wall_ms': observed.get('wall_ms'),
         'planner_calls': observed.get('planner_calls'),
         'degraded': bool(observed.get('degraded_reason')),
