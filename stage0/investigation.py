@@ -34,6 +34,14 @@ PROTOCOL_VERSION = 'investigation-protocol@2'
 # tool can never be used to sidestep another open gap.
 GAP_PLAN = 'subquestions'
 
+# 只作为**结论**存在的缺口：它们必须出现在报告里，但不是待办，因此不阻塞
+# 完成。产生 material_conflict 的地方写得很清楚——"Recorded as a finding,
+# not a stop: a discrepancy is something to report"。可它**没有任何工具能
+# 关闭**，而完成条件要求"无任何开放缺口"，于是任何读到过材料差异的回合都
+# 只能以 no_progress 收尾：一个被声明为"结论"的东西实际上是一道永久闸门。
+# 清单是**白名单**：未知缺口种类一律照旧阻塞（fail-closed）。
+FINDING_GAPS = frozenset({'material_conflict'})
+
 
 def allowed_tools(inv):
     """Tools the current state may legally use (presentation only).
@@ -58,8 +66,13 @@ def allowed_tools(inv):
         allowed.append('ask_clarification')
     if any(g['kind'] == 'evidence_missing' and g['status'] == 'open' for g in inv.gaps):
         allowed.extend(('rag_search', 'ddi_check'))
-        if any(ref not in inv.read_refs for ref in inv.evidence_refs):
-            allowed.append('read_evidence')
+    # 回读**本身就是完成条件的一部分**：``forced_stop`` 要求
+    # ``not unread_evidence()``。所以只要还有已检索未回读的原文，这个工具就
+    # 必须可用，与"当前有没有开放的证据缺口"无关——缺口已经关闭而原文尚未
+    # 回读是最常见的情形，此时若把工具收走，"还差一次回读"与"没有工具能回读"
+    # 就同时成立，回合只能靠预算耗尽或熔断收尾。
+    if any(ref not in inv.read_refs for ref in inv.evidence_refs):
+        allowed.append('read_evidence')
     return tuple(dict.fromkeys(allowed))
 
 
@@ -108,7 +121,15 @@ class InvestigationState:
     # "found" is not "read and verified".
     material_refs: list = field(default_factory=list)
     material_read_refs: list = field(default_factory=list)
+    # 已"看到"的材料条目，唯一规范形状（ref -> {'name','kind','current'}）。
+    # 写入端与读取端共用这一种形状，所以"材料里的药名能不能被子问题引用"与
+    # "差异该点名哪条当前记录"读的是同一份数据。
+    material_items: dict = field(default_factory=dict)
     pending_statements: list = field(default_factory=list)
+    # 只渲染了空态句的节标题。**派生字段**：每次 ``report_text()`` 重新计算，
+    # 只为让序列化视图能把它带给评分器。默认空列表 = "没有一节是空态"，
+    # 于是渲染失败时评分器按"该写没写"判失败——失败方向是保守的。
+    empty_sections: list = field(default_factory=list)
 
     @classmethod
     def restore(cls, raw, scope):
@@ -402,10 +423,16 @@ class InvestigationState:
                 # stop: a discrepancy is something to report, not something
                 # that ends the review (that is what evidence_conflict is for).
                 issues = [str(item) for item in (detail.get('issues') or [])]
+                # 差异必须**具名双方**：只写"材料 X 有差异"，读者无法去核对
+                # 另一边，质检也就只能退回标题匹配。对方 ref 取自
+                # list_materials 时记下的同一条目（material_items）。
+                counterparts = list((self.material_items.get(ref) or {}).get('current') or [])
                 self.gap('material:' + ref, 'material_conflict',
-                         f"材料 {ref} 与当前记录的差异：{kind}"
+                         f"材料 {ref} 与当前记录"
+                         + ('（' + '、'.join(counterparts) + '）' if counterparts else '')
+                         + f"的差异：{kind}"
                          + ('；未决问题：' + '、'.join(issues) if issues else ''),
-                         material_ref=ref)
+                         material_ref=ref, kind_detail=kind, counterparts=counterparts)
             return
         if observation.tool == 'plan_questions':
             # The sub-question set is adopted by the STATE, from the observed
@@ -526,7 +553,8 @@ class InvestigationState:
         if any(g['kind'] == 'evidence_conflict' and g['status'] == 'open' for g in self.gaps):
             self.termination_reason = 'waiting_review'
         elif (self.claims and all(v == 'checked' for v in self.checks.values())
-              and not any(g['status'] == 'open' for g in self.gaps)
+              and not any(g['status'] == 'open' and g['kind'] not in FINDING_GAPS
+                          for g in self.gaps)
               and not self.unread_evidence()):
             # A captured body that was never read back can carry the OPPOSING
             # source.  Declaring completion with one outstanding would make
@@ -567,8 +595,11 @@ class InvestigationState:
             return action('ask_clarification', missing[0]['gap_id'], {'question': '\n'.join(g['description'] for g in missing)}, '等待补充指定字段；未写入临床审批')
         for ref in self.evidence_refs:
             if ref not in self.read_refs:
+                # 链接到一个**真实存在**的缺口即可：完成条件要求回读所有已
+                # 检索的原文，而那时证据缺口往往已经关闭。
                 claim_id = next((g['gap_id'] for g in self.gaps if g['kind'] == 'evidence_missing' and g['status'] == 'open'),
-                                self.claims[0]['claim_id'] if self.claims else 'authority')
+                                next((g['gap_id'] for g in self.gaps if g['status'] == 'open'),
+                                     self.claims[0]['claim_id'] if self.claims else 'authority'))
                 return action('read_evidence', claim_id, {'evidence_id': ref, 'limit': 2000}, '回读并校验原文、实体、否定和适用条件')
         if self.forced_stop():
             return None
@@ -653,6 +684,54 @@ class InvestigationState:
             return f'- 涉及 {subjects} 的一项说法带有诊断或用药调整措辞，本报告不复述；请与医生或药师核对。'
         return f'- {statement}（仅基于已回读原文并列呈现，不构成诊断）'
 
+    # 空态句：某一节没有实质内容时写的句子。**渲染与评分共用**同一份定义
+    # （评分器读的是同名副本），所以"这一节写了东西没有"只有一个答案。
+    EMPTY_SECTION_SENTENCE = {
+        '2. 有来源支持的事实': '- 本次没有得到可作为结论的事实；证据不足不等于证明绝对安全。',
+        '3. 不同材料之间的差异': '- 本次未在已读取的材料与记录之间发现可记录的差异；未读取的材料不在此列。',
+        '4. 仍缺少依据的问题（待核实）': '- 本契约内没有剩余缺口。',
+        '5. 就诊时可以向医生或药师确认什么': '- 可将本报告的差异与未决项逐条向医生或药师确认。',
+    }
+
+    def section_content(self):
+        """每一节的**实质**条目（不含空态句）。
+
+        渲染与空态判定读同一个集合，于是不会出现"渲染说有内容、评分说没有"
+        的漂移——那种漂移会让评分器判的其实是另一份报告。
+        """
+        self.verify_statements()
+        pending_ids = {item['claim_id'] for item in self.pending_statements}
+        concluded = []
+        for claim in self.claims:
+            if claim['status'] == 'insufficient' or claim['claim_id'] in pending_ids:
+                continue
+            concluded.append(self._render_statement(claim['statement'], claim.get('entities') or []))
+            concluded.append(f"  状态：{claim['status']}。"
+                             f"支持引用：{', '.join(claim['supporting_evidence']) or '无'}；"
+                             f"反对引用：{', '.join(claim['opposing_evidence']) or '无'}。")
+        return {
+            '2. 有来源支持的事实': concluded,
+            '3. 不同材料之间的差异': [
+                f"- {g['description']}" for g in self.gaps
+                if g.get('kind') in {'evidence_conflict', 'material_conflict'}],
+            '4. 仍缺少依据的问题（待核实）': (
+                [f"- {g['description']}" for g in self.gaps if g['status'] == 'open']
+                + [self._render_statement(item['statement'], [])
+                   + f"（未核实的解释，原因：{item['reason']}，列为待确认问题）"
+                   for item in self.pending_statements]),
+            '5. 就诊时可以向医生或药师确认什么': [
+                f"- {question['question']}" for question in self.questions],
+        }
+
+    def empty_report_sections(self) -> list:
+        """只渲染了空态句的节标题。
+
+        评分器据此区分两种"这一节没写东西"：状态**确实为空**时占位句是正确
+        内容（诚实空态），状态非空时才是缺陷。没有这份声明，要求"必须有实质
+        条目"会把"材料本就一致"的任务判成**恒假**——与恒真一样不可证伪。
+        """
+        return [title for title, items in self.section_content().items() if not items]
+
     def report_text(self):
         """The visit-preparation report: five answers, each grounded.
 
@@ -663,7 +742,9 @@ class InvestigationState:
         checked = [key for key, value in self.checks.items() if value == 'checked']
         labels = {'authority': '权威用药及关键事实', 'interaction_evidence': '标签证据',
                   'applicability': '材料适用条件'}
-        pending_ids = {item['claim_id'] for item in self.pending_statements}
+        sections = self.section_content()
+        # 刷新派生字段，使序列化视图与**这份**报告一致。
+        self.empty_sections = [title for title, items in sections.items() if not items]
         # The goal is deliberately NOT echoed here: it is the caregiver's own
         # free text, and the delivered response passes a keyword safety check
         # that a quoted "…风险…" would trip even though nothing is asserted.
@@ -672,33 +753,15 @@ class InvestigationState:
         lines += ['## 1. 本次调查解决了什么', '',
                   '已核查范围：' + ('、'.join(labels[key] for key in checked) or '尚无完成项') + '。',
                   '终止原因：' + str(self.termination_reason) + '。', '']
-        lines += ['## 2. 有来源支持的事实', '']
-        concluded = [claim for claim in self.claims
-                     if claim['status'] != 'insufficient' and claim['claim_id'] not in pending_ids]
-        for claim in concluded:
-            lines.append(self._render_statement(claim['statement'], claim.get('entities') or []))
-            lines.append(f"  状态：{claim['status']}。"
-                         f"支持引用：{', '.join(claim['supporting_evidence']) or '无'}；"
-                         f"反对引用：{', '.join(claim['opposing_evidence']) or '无'}。")
-        if not concluded:
-            lines.append('- 本次没有得到可作为结论的事实；证据不足不等于证明绝对安全。')
-        lines += ['', '## 3. 不同材料之间的差异', '']
-        differences = [g['description'] for g in self.gaps
-                       if g.get('kind') in {'evidence_conflict', 'material_conflict'}]
-        lines += [f'- {item}' for item in differences] or \
-                 ['- 本次未在已读取的材料与记录之间发现可记录的差异；未读取的材料不在此列。']
-        lines += ['', '## 4. 仍缺少依据的问题（待核实）', '']
-        open_gaps = [g['description'] for g in self.gaps if g['status'] == 'open']
-        lines += [f'- {item}' for item in open_gaps] or ['- 本契约内没有剩余缺口。']
-        lines += [self._render_statement(item['statement'], [])
-                  + f"（未核实的解释，原因：{item['reason']}，列为待确认问题）"
-                  for item in self.pending_statements]
-        lines += ['', '## 5. 就诊时可以向医生或药师确认什么', '']
-        lines += [f"- {question['question']}" for question in self.questions] or \
-                 ['- 可将本报告的差异与未决项逐条向医生或药师确认。']
-        lines += ['', '这份报告仅说明有界核查结果；insufficient/unknown 不是无风险，'
-                      '未列药物不代表停药，也不代表已停用。本系统不做诊断、处方或用药调整建议。'
-                      '请携带本报告与医生或药师当面确认；建议咨询医生/药师后再做任何用药决定。']
+        for title in ('2. 有来源支持的事实', '3. 不同材料之间的差异',
+                      '4. 仍缺少依据的问题（待核实）',
+                      '5. 就诊时可以向医生或药师确认什么'):
+            lines += ['## ' + title, '']
+            lines += sections[title] or [self.EMPTY_SECTION_SENTENCE[title]]
+            lines += ['']
+        lines += ['这份报告仅说明有界核查结果；insufficient/unknown 不是无风险，'
+                  '未列药物不代表停药，也不代表已停用。本系统不做诊断、处方或用药调整建议。'
+                  '请携带本报告与医生或药师当面确认；建议咨询医生/药师后再做任何用药决定。']
         return '\n'.join(lines)
 
 
@@ -710,6 +773,16 @@ def proposal_errors(inv, proposal):
     args = proposal.get('arguments') or {}
     if tool == 'memory_write':
         return []  # Existing write policy and receipt guard still apply.
+    if tool == 'read_evidence':
+        # 回读的必要性**先于**它所服务的缺口：完成条件要求把所有已检索的原文
+        # 回读一遍，而"证据缺口已关闭"恰恰是那时最常见的状态。因此这一条只
+        # 要求指向一个真实存在的缺口（开放或已关闭），不像其他工具那样要求
+        # 它仍然开放——否则完成条件与可用工具互相矛盾，形成死锁。
+        if args.get('evidence_id') not in inv.evidence_refs:
+            return ['evidence_not_observed_in_scope']
+        if not any(g['gap_id'] == proposal.get('gap_id') for g in inv.gaps):
+            return ['invalid_gap_link']
+        return []
     gap = next((g for g in inv.gaps if g['gap_id'] == proposal.get('gap_id') and g['status'] == 'open'), None)
     if gap is None or not isinstance(proposal.get('expected_observation'), str) or not proposal['expected_observation'].strip():
         return ['invalid_gap_link']
@@ -727,8 +800,6 @@ def proposal_errors(inv, proposal):
     if tool not in {'memory_read', 'rag_search', 'read_evidence', 'ask_clarification',
                     'ddi_check', 'list_materials'}:
         return ['investigation_tool_not_allowed']
-    if tool == 'read_evidence' and args.get('evidence_id') not in inv.evidence_refs:
-        return ['evidence_not_observed_in_scope']
     if tool == 'ask_clarification' and (not inv.authority_read or gap['kind'] != 'patient_fact_missing' or not gap.get('field')):
         return ['clarification_without_missing_fact']
     # The authority gap accepts only the full snapshot read.  A memory_read

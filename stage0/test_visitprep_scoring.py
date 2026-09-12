@@ -219,6 +219,120 @@ class AutonomyTest(unittest.TestCase):
         self.assertEqual(outcome['bucket'], 'degraded_outcome')
 
 
+class ConflictTest(unittest.TestCase):
+    """第 3 节必须报告**真实观察到**的分歧，且具名双方。
+
+    旧口径只做标题子串匹配，所以"这一节有没有写东西"从不影响结果——一个零
+    结论、`unrecoverable_failure` 的报告照样五节齐全。本类逐条证伪新检查。
+    """
+
+    DIFF_LINE = '- 材料 case:1/item:2（changed）与当前记录 ref:med:7 存在差异\n'
+    CONFLICT = [{'ref': 'case:1/item:2', 'kind': 'changed', 'counterparts': ['ref:med:7']}]
+
+    def _task(self):
+        return _task(must_report_conflict=True)
+
+    def test_a_heading_with_a_placeholder_body_does_not_report_a_conflict(self):
+        report = ('## 3. 不同材料之间的差异\n\n'
+                  '- 本次未在已读取的材料与记录之间发现可记录的差异；未读取的材料不在此列。\n')
+        quality = scoring.score_report_quality(
+            self._task(), _observed(report_markdown=report, material_conflicts=self.CONFLICT))
+        self.assertIn('conflict_not_reported', quality['failures'])
+
+    def test_a_body_that_denies_the_conflict_does_not_count(self):
+        """写了内容、但内容与观察到的分歧相反，不是"报告了分歧"。"""
+        report = ('## 3. 不同材料之间的差异\n\n'
+                  '- 材料 case:1/item:2 与当前记录 ref:med:7 一致，没有差异。\n')
+        quality = scoring.score_report_quality(
+            self._task(), _observed(report_markdown=report, material_conflicts=self.CONFLICT))
+        self.assertIn('conflict_not_reported', quality['failures'])
+
+    def test_reporting_only_one_side_fails(self):
+        report = '## 3. 不同材料之间的差异\n\n- 材料 case:1/item:2 的剂量不同\n'
+        quality = scoring.score_report_quality(
+            self._task(), _observed(report_markdown=report, material_conflicts=self.CONFLICT))
+        self.assertIn('conflict_side_missing', quality['failures'])
+
+    def test_both_sides_named_passes(self):
+        report = '## 3. 不同材料之间的差异\n\n' + self.DIFF_LINE
+        quality = scoring.score_report_quality(
+            self._task(), _observed(report_markdown=report, material_conflicts=self.CONFLICT))
+        self.assertEqual(quality['failures'], [])
+
+    def test_a_conflict_that_was_never_actually_observed_is_not_required(self):
+        """没有真实分歧时，占位句是**合法**内容——否则这条检查恒假。"""
+        report = ('## 3. 不同材料之间的差异\n\n'
+                  '- 本次未在已读取的材料与记录之间发现可记录的差异；未读取的材料不在此列。\n')
+        quality = scoring.score_report_quality(
+            self._task(), _observed(report_markdown=report, material_conflicts=[]))
+        self.assertEqual(quality['failures'], [])
+
+
+class EmptySectionTest(unittest.TestCase):
+    """标题缺失与"该有内容却只有占位句"必须都判失败；状态确实为空时占位句合法。
+
+    这是 Task 1 引入的判据的双向证伪。只要求"必须有非占位条目"，会把
+    `information_complete`（材料本就一致）这类任务变成**恒假**——与恒真一样
+    不可证伪，而且正确答案永远拿不到分。
+    """
+
+    REPORT = ('## 3. 不同材料之间的差异\n\n'
+              '- 本次未在已读取的材料与记录之间发现可记录的差异；未读取的材料不在此列。\n')
+
+    def _task(self):
+        return _task(required_report_sections=['3. 不同材料之间的差异'])
+
+    def test_a_missing_heading_is_a_failure(self):
+        quality = scoring.score_report_quality(self._task(), _observed(report_markdown=''))
+        self.assertEqual(quality['failures'], ['section_missing:3. 不同材料之间的差异'])
+
+    def test_a_placeholder_that_contradicts_the_state_is_a_failure(self):
+        """状态里有分歧，报告却只写占位句——这才是 A3 要修的那种缺陷。"""
+        quality = scoring.score_report_quality(
+            self._task(), _observed(report_markdown=self.REPORT,
+                                    empty_state_sections=[]))
+        self.assertEqual(quality['failures'], ['empty_or_missing_section:3. 不同材料之间的差异'])
+
+    def test_a_placeholder_is_legitimate_when_the_state_really_is_empty(self):
+        quality = scoring.score_report_quality(
+            self._task(), _observed(report_markdown=self.REPORT,
+                                    empty_state_sections=['3. 不同材料之间的差异']))
+        self.assertEqual(quality['failures'], [])
+
+    def test_an_empty_state_never_excuses_a_missing_heading(self):
+        """空态只解释"为什么只有占位句"，不能让整节消失。"""
+        quality = scoring.score_report_quality(
+            self._task(), _observed(report_markdown='',
+                                    empty_state_sections=['3. 不同材料之间的差异']))
+        self.assertEqual(quality['failures'], ['section_missing:3. 不同材料之间的差异'])
+
+    def test_a_declared_name_matches_its_qualified_heading(self):
+        """任务声明"4. 仍缺少依据的问题"，报告写作"…（待核实）"——是同一节。"""
+        report = '## 4. 仍缺少依据的问题（待核实）\n\n- 核查合成药甲的标签证据\n'
+        task = _task(required_report_sections=['4. 仍缺少依据的问题'])
+        self.assertEqual(
+            scoring.score_report_quality(task, _observed(report_markdown=report))['failures'], [])
+
+    def test_a_names_mention_inside_a_body_is_not_a_section(self):
+        """名字只出现在别处的正文里不算"这一节在"——否则这条检查又能被绕过。"""
+        report = '## 3. 别的标题\n\n- 也被要求写 4. 仍缺少依据的问题\n'
+        task = _task(required_report_sections=['4. 仍缺少依据的问题'])
+        self.assertEqual(
+            scoring.score_report_quality(task, _observed(report_markdown=report))['failures'],
+            ['section_missing:4. 仍缺少依据的问题'])
+
+    def test_an_empty_state_declared_by_its_rendered_title_still_excuses_the_section(self):
+        """空态表由渲染端给出，用的是**渲染标题**（带后缀）；要求列表用的是
+        声明名。同一个节的两个名字必须能对上，否则这里会出现假失败。"""
+        report = '## 4. 仍缺少依据的问题（待核实）\n\n- 本契约内没有剩余缺口。\n'
+        task = _task(required_report_sections=['4. 仍缺少依据的问题'])
+        self.assertEqual(
+            scoring.score_report_quality(
+                task, _observed(report_markdown=report,
+                                empty_state_sections=['4. 仍缺少依据的问题（待核实）']))['failures'],
+            [])
+
+
 class DelegationTest(unittest.TestCase):
     """``run_visitprep.evaluate`` 是薄委托，但旧口径的持久化键必须仍在。"""
 

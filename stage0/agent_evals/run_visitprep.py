@@ -89,10 +89,14 @@ def model_double(payload):
     evidence_gap = next((g for g in open_gaps if g['kind'] == 'evidence_missing'), None)
     listed = next((o for o in reversed(observations)
                    if o.get('tool') == 'list_materials' and o.get('ok')), None)
-    if listed is None and 'list_materials' in allowed:
+    if listed is None and 'list_materials' in allowed and evidence_gap is not None:
         return _tool('list_materials', evidence_gap['gap_id'], {})
 
-    read_refs = {f"{o['arguments'].get('case_id')}/{o['arguments'].get('item_id')}"
+    # ``observations`` 里并非每条都带 ``arguments``（拒绝、失败与合成条目都没
+    # 有）。直接下标取值会让**替身自己**抛 KeyError，被记成
+    # ``planner_fallback:provider_error`` —— 那会把替身的缺陷读成一次真实的
+    # 产品降级，把一个可满足的契约报成不可满足。
+    read_refs = {f"{(o.get('arguments') or {}).get('case_id')}/{(o.get('arguments') or {}).get('item_id')}"
                  for o in observations if o.get('tool') == 'read_material_item' and o.get('ok')}
     if listed is not None:
         for material in (listed.get('result') or {}).get('materials') or []:
@@ -100,14 +104,19 @@ def model_double(payload):
                 ref = f"{material['case_id']}/{item['item_id']}"
                 # Only a discrepancy is worth reading back; a matching entry
                 # needs no evidence and must not be turned into one.
-                if item.get('kind') not in (None, 'same') and ref not in read_refs:
+                if item.get('kind') not in (None, 'same') and ref not in read_refs \
+                        and evidence_gap is not None:
                     return _tool('read_material_item', evidence_gap['gap_id'],
                                  {'case_id': material['case_id'], 'item_id': item['item_id']})
 
     unread = investigation.get('evidence_unread') or []
     if unread:
-        return _tool('read_evidence', evidence_gap['gap_id'],
-                     {'evidence_id': unread[0], 'limit': 2000})
+        # 完成条件要求把已检索的原文全部回读，而那时证据缺口通常已经关闭；
+        # 链接到任意一个仍开放的缺口即可（回读的必要性先于它所服务的缺口）。
+        link = evidence_gap['gap_id'] if evidence_gap is not None else \
+            next((g['gap_id'] for g in open_gaps), None)
+        if link is not None:
+            return _tool('read_evidence', link, {'evidence_id': unread[0], 'limit': 2000})
     if evidence_gap is not None:
         names = [m['display_name'] for m in facts.get('medications') or []]
         return _tool('rag_search', evidence_gap['gap_id'],
@@ -278,6 +287,18 @@ def run_task(task, arm, live=False):
                                                  for claim in investigation.get('claims') or []
                                                  if claim.get('status') == 'supported'],
                     'unsupported_statements': investigation.get('pending_statements') or [],
+                    # 本任务**真实观察到**的材料分歧。冲突检查要求报告里出现
+                    # 具名双方的对应条目；没有真实分歧时占位句是合法内容。
+                    'material_conflicts': [
+                        {'ref': gap.get('material_ref'),
+                         'kind': gap.get('kind_detail'),
+                         'counterparts': list(gap.get('counterparts') or [])}
+                        for gap in (investigation.get('gaps') or [])
+                        if gap.get('kind') == 'material_conflict'],
+                    # 只渲染了空态句的节标题（由渲染端按真实集合给出）。评分器
+                    # 据此区分"诚实的空态"与"该写却没写"；不给这份声明，
+                    # 要求每节都有实质条目就会把"材料本就一致"判成恒假。
+                    'empty_state_sections': investigation.get('empty_sections') or [],
                     'degraded_reason': (bundle.get('coverage') or {}).get('degraded_reason')
                         or response.audit_trail.get('response_fallback_reason'),
                     'attribution': _attribution(response.tool_trace),
