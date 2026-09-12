@@ -458,6 +458,53 @@ class MaterialVisibilityTest(unittest.TestCase):
             self.assertIn('list_materials', agent.planner.llm_planner.tool_schemas)
 
 
+class MultiCallSelectionTest(unittest.TestCase):
+    """一个响应里多个工具调用时，不得丢掉模型的新意图去重复旧动作。"""
+
+    @staticmethod
+    def _call(name, arguments):
+        from types import SimpleNamespace as NS
+        return NS(function=NS(name=name, arguments=json.dumps(arguments, ensure_ascii=False)))
+
+    def _state(self, executed):
+        from stage0.agent import AgentState, Observation
+        state = AgentState(session_id='s', turn_id='t', event=CareEvent('user_message', 'x'))
+        state.observations = [Observation(tool=name, purpose='p', arguments=arguments,
+                                          result={}, ok=True)
+                              for name, arguments in executed]
+        return state
+
+    def test_a_redundant_read_does_not_displace_the_models_new_intent(self):
+        from stage0.agent import LLMPlanner
+        state = self._state([('memory_read', {'query': 'current_medications'})])
+        chosen = LLMPlanner._first_unexecuted(
+            [self._call('memory_read', {'query': 'current_medications'}),
+             self._call('list_materials', {})], state)
+        self.assertEqual(chosen.function.name, 'list_materials')
+
+    def test_when_every_call_is_a_repeat_the_first_is_kept(self):
+        from stage0.agent import LLMPlanner
+        state = self._state([('memory_read', {'query': 'snapshot'})])
+        chosen = LLMPlanner._first_unexecuted(
+            [self._call('memory_read', {'query': 'snapshot'}),
+             self._call('memory_read', {'query': 'snapshot'})], state)
+        self.assertEqual(chosen.function.name, 'memory_read')
+
+    def test_without_state_the_first_call_is_kept(self):
+        from stage0.agent import LLMPlanner
+        chosen = LLMPlanner._first_unexecuted(
+            [self._call('memory_read', {'query': 'snapshot'}), self._call('list_materials', {})], None)
+        self.assertEqual(chosen.function.name, 'memory_read')
+
+    def test_proposal_metadata_does_not_defeat_the_repeat_check(self):
+        """gap_id / expected_observation 不参与比较，否则同一动作永远不算重复。"""
+        from stage0.agent import LLMPlanner
+        state = self._state([('memory_read', {'query': 'snapshot'})])
+        call = self._call('memory_read', {'query': 'snapshot', 'gap_id': 'claim:a',
+                                          'expected_observation': '再次确认'})
+        self.assertTrue(LLMPlanner._already_executed(call, state))
+
+
 class VisitPrepDatasetTest(unittest.TestCase):
     """任务集本身的性质：成对、只改证据、评分规则先定。"""
 

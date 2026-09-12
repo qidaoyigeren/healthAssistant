@@ -13,6 +13,7 @@ import os
 import re
 
 from .evidence_quality import assess_claim
+from .response_safety import composed_text_prescribes
 
 VERSION = 'investigation@1'
 CONTRACT = 'medication-evidence-review@1'
@@ -20,6 +21,9 @@ REQUIRED = ('authority', 'interaction_evidence', 'applicability')
 MAX_CLAIMS = 12
 MAX_SEARCHES = 3
 MAX_EVIDENCE = 12
+# How many rejected sub-question declarations before the review stops.  A
+# planner is allowed to revise; it is not allowed to spin.
+MAX_PLAN_ATTEMPTS = 3
 # Protocol v2: state-conditional tool exposure + structured rejection
 # feedback.  The state schema itself is unchanged (restore() still validates
 # VERSION/CONTRACT), so persisted investigations stay loadable.
@@ -251,6 +255,13 @@ class InvestigationState:
             if not isinstance(item, dict) or not isinstance(item.get('statement'), str) \
                     or not item['statement'].strip() or len(item['statement']) > 200:
                 return ['invalid_subquestion_statement']
+            if composed_text_prescribes(item['statement']):
+                # A sub-question is a LABEL for evidence to gather, and the
+                # report renders it.  Text that diagnoses, prescribes or
+                # changes a dose must never enter the review in that role —
+                # rejecting it here is the only place that keeps it out of
+                # every downstream rendering.
+                return ['subquestion_prescribes']
             entities = item.get('entities')
             if not isinstance(entities, list) or not entities \
                     or any(not isinstance(entity, str) or not entity for entity in entities):
@@ -399,12 +410,16 @@ class InvestigationState:
         if observation.tool == 'plan_questions':
             # The sub-question set is adopted by the STATE, from the observed
             # arguments — the executor only echoes what it saw.  A rejected set
-            # is a bounded no-progress stop, never a silent code substitute.
+            # is recorded as a gap the planner can see and revise against; it
+            # is never silently replaced by a code-authored substitute.  Only a
+            # planner that keeps failing is stopped, so one badly worded
+            # statement does not end an otherwise valid review.
             errors = self.accept_questions(observation.arguments.get('questions'))
             if errors:
                 self.gap('plan:' + ','.join(errors), 'plan_missing',
-                         '子问题声明未通过校验：' + ','.join(errors))
-                self.termination_reason = 'no_progress'
+                         '子问题声明未通过校验（' + ','.join(errors) + '），请修订后重新提交。')
+                if sum(1 for g in self.gaps if g['gap_id'].startswith('plan:')) >= MAX_PLAN_ATTEMPTS:
+                    self.termination_reason = 'no_progress'
             return
         if observation.tool in {'rag_search', 'ddi_check'}:
             query = str(observation.arguments.get('query', '')).strip().casefold()
@@ -632,6 +647,10 @@ class InvestigationState:
         subjects = '、'.join(entities) or '相关药物'
         if CONCRETE_HAZARD.search(statement or ''):
             return f'- 涉及 {subjects} 的一项说法包含未经逐字核实的危害描述，本报告不复述；请与医生或药师核对。'
+        if composed_text_prescribes(statement or ''):
+            # Defence in depth: accept_questions already refuses these, so this
+            # only fires for a statement that reached the claim set another way.
+            return f'- 涉及 {subjects} 的一项说法带有诊断或用药调整措辞，本报告不复述；请与医生或药师核对。'
         return f'- {statement}（仅基于已回读原文并列呈现，不构成诊断）'
 
     def report_text(self):

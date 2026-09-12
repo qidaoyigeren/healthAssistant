@@ -312,6 +312,21 @@ def run_task(task, arm, live=False):
                     'attribution': _attribution(response.tool_trace),
                     'invalid_calls': invalid_calls,
                     'planner_calls': planner_calls,
+                    # Every planning step, so a claim about model behaviour can
+                    # be checked against what the model actually proposed.
+                    'planner_steps': [
+                        {'source': (entry.get('planner') or {}).get('source'),
+                         'tool': ((entry.get('planner') or {}).get('proposal') or {}).get('tool'),
+                         'decision': ((entry.get('planner') or {}).get('proposal') or {}).get('decision'),
+                         'arguments': ((entry.get('planner') or {}).get('proposal') or {}).get('arguments'),
+                         'gap_id': ((entry.get('planner') or {}).get('proposal') or {}).get('gap_id'),
+                         'status': ((entry.get('planner') or {}).get('validation') or {}).get('status'),
+                         'errors': [(item.get('code')) for item in
+                                    ((entry.get('planner') or {}).get('validation') or {}).get('errors') or []],
+                         'hydrated': (entry.get('planner') or {}).get('hydrated_arguments'),
+                         'dropped_calls': (entry.get('planner') or {}).get('dropped_calls') or [],
+                         'latency_ms': (entry.get('planner') or {}).get('latency_ms')}
+                        for entry in response.tool_trace if entry.get('phase') == 'plan'],
                 }
             except Exception as exc:
                 outcome = {'error': f'{type(exc).__name__}: {exc}',
@@ -340,11 +355,17 @@ def main():
         tasks = [task for task in tasks if task['task_id'] in wanted]
     if args.live and args.arm != 'model':
         raise SystemExit('--live 只在 --arm model 下有意义')
+    endpoint = None
     if args.live:
-        from stage0.extract_ddi import _load_dotenv
+        from stage0.extract_ddi import _load_dotenv, resolve_llm_config
         _load_dotenv()
         if Path(args.out).exists():
             raise RuntimeError('live 结果已存在：保留它，不要重复采样')
+        # Recorded so a report can always be attributed to the model that
+        # produced it — never the key, and never a restated constant.
+        resolved = resolve_llm_config()
+        endpoint = {'provider': resolved['provider'], 'model': resolved['model'],
+                    'base_url': resolved.get('base_url')}
 
     results, spent, not_sampled = [], 0, []
     for task in tasks:
@@ -361,6 +382,7 @@ def main():
         'dataset': 'author-synthetic-visitprep@1',
         'source_fingerprint': _fingerprint(),
         'dataset_sha256': _sha(DATA.read_bytes()),
+        'planner_endpoint': endpoint,
         'call_cap': args.call_cap if args.live else None,
         'planner_calls_spent': spent,
         'not_sampled': not_sampled,
