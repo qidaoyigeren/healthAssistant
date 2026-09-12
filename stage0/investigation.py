@@ -21,8 +21,9 @@ REQUIRED = ('authority', 'interaction_evidence', 'applicability')
 MAX_CLAIMS = 12
 MAX_SEARCHES = 3
 MAX_EVIDENCE = 12
-# How many rejected sub-question declarations before the review stops.  A
-# planner is allowed to revise; it is not allowed to spin.
+# 连续被拒的子问题声明次数上限。A planner is allowed to revise; it is not
+# allowed to spin. 界是**连续**的：一次成功即归零，所以反复摸索不会累积成
+# 一次停摆，而原地打转很快就会撞上。
 MAX_PLAN_ATTEMPTS = 3
 # Protocol v2: state-conditional tool exposure + structured rejection
 # feedback.  The state schema itself is unchanged (restore() still validates
@@ -116,6 +117,10 @@ class InvestigationState:
     # simply reports 'unset'.  'model' means the model declared the
     # sub-questions; 'code_default' means the degraded policy had to.
     subquestion_source: str = 'unset'
+    # 连续被拒的子问题声明次数。改数这个计数器而不是数 ``plan:*`` 缺口：缺口
+    # 按 id 去重，而 id 是错误签名的拼接——同样的错误重复多少次都只有一个缺口
+    # （上限永远够不到），三种不同的单次错误却会凑够三个（误触发）。
+    plan_attempts: int = 0
     # Materials the model has SEEN (index) versus READ BACK (item).  Only the
     # latter can support a citation, mirroring the label-evidence rule that
     # "found" is not "read and verified".
@@ -301,8 +306,12 @@ class InvestigationState:
         for item in normalised:
             self._new_claim(item['statement'], item['entities'], 'model')
         self.subquestion_source = 'model'
+        self.plan_attempts = 0
         for g in self.gaps:
-            if g['gap_id'] == GAP_PLAN:
+            # 一次成功的声明同时取代 GAP_PLAN 与此前**所有**的 plan:* 错误
+            # 缺口。不关掉它们，"已经被修正的错误"会永久挡住 checks_completed
+            # ——完成条件要求无任何开放缺口，而这些缺口没有任何工具能关。
+            if g['gap_id'] == GAP_PLAN or g['gap_id'].startswith('plan:'):
                 g['status'] = 'resolved'
         return []
 
@@ -453,9 +462,10 @@ class InvestigationState:
             # statement does not end an otherwise valid review.
             errors = self.accept_questions(observation.arguments.get('questions'))
             if errors:
+                self.plan_attempts += 1
                 self.gap('plan:' + ','.join(errors), 'plan_missing',
                          '子问题声明未通过校验（' + ','.join(errors) + '），请修订后重新提交。')
-                if sum(1 for g in self.gaps if g['gap_id'].startswith('plan:')) >= MAX_PLAN_ATTEMPTS:
+                if self.plan_attempts >= MAX_PLAN_ATTEMPTS:
                     self.termination_reason = 'no_progress'
             return
         if observation.tool in {'rag_search', 'ddi_check'}:

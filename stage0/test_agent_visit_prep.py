@@ -352,6 +352,53 @@ class SubquestionsTest(unittest.TestCase):
             # 全部药名，"不许编造药物"就不成立了。
             self.assertNotIn('布洛芬', inv.allowed_entities())
 
+    def test_a_successful_revision_closes_the_leftover_error_gaps(self):
+        """被拒过的声明在后来成功时，其错误缺口必须关闭。
+
+        改造前 ``plan:*`` 缺口一经创建永不解析，而 ``forced_stop()`` 的
+        ``checks_completed`` 要求"无任何开放缺口"——一次被拒之后成功的规划，
+        会让整轮只能以 ``budget_insufficient``/``no_progress`` 收尾：**已经
+        修正的错误永久挡住了完成**。
+        """
+        inv = self._inv()
+        inv.gap('plan:subquestion_coverage_incomplete', 'plan_missing', '旧错误')
+        self.assertEqual(inv.accept_questions(
+            [{'statement': '核查', 'entities': ['氨氯地平', '克拉霉素']}]), [])
+        leftover = [g for g in inv.gaps if g['gap_id'].startswith('plan:') and g['status'] == 'open']
+        self.assertEqual(leftover, [])
+
+    def test_repeated_identical_rejections_do_count_towards_the_limit(self):
+        """重复同样的错误也必须计入——改造前数的是 distinct gap id。
+
+        ``gap()`` 按 id 去重，而 plan 缺口的 id 是错误签名的拼接，所以同样的
+        错误重复多少次都只有一个缺口，上限永远够不到；反过来，三种不同的单次
+        错误又会误触发上限。计数的应当是**连续被拒次数**。
+        """
+        from stage0.agent import Observation
+        inv = self._inv()
+        for _ in range(3):
+            inv.observe(Observation(tool='plan_questions', purpose='声明子问题', ok=True,
+                                    arguments={'questions': [{'statement': 'x',
+                                                              'entities': ['不在药单里的药']}]},
+                                    result={}), None)
+        self.assertEqual(inv.termination_reason, 'no_progress')
+
+    def test_a_successful_declaration_resets_the_rejection_count(self):
+        """一次成功即归零：界是"连续"被拒次数，不是累计。"""
+        from stage0.agent import Observation
+        inv = self._inv()
+        reject = Observation(tool='plan_questions', purpose='声明子问题', ok=True,
+                             arguments={'questions': [{'statement': 'x',
+                                                       'entities': ['不在药单里的药']}]},
+                             result={})
+        inv.observe(reject, None)
+        inv.observe(reject, None)
+        self.assertEqual(inv.plan_attempts, 2)
+        self.assertIsNone(inv.termination_reason)
+        self.assertEqual(inv.accept_questions(
+            [{'statement': '核查', 'entities': ['氨氯地平', '克拉霉素']}]), [])
+        self.assertEqual(inv.plan_attempts, 0)
+
     def test_the_gap_list_exposes_plan_questions_only_while_planning_is_open(self):
         from stage0.investigation import allowed_tools
         inv = self._inv()
