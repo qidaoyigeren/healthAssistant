@@ -458,6 +458,105 @@ class MaterialVisibilityTest(unittest.TestCase):
             self.assertIn('list_materials', agent.planner.llm_planner.tool_schemas)
 
 
+UNSUPPORTED = '两药合用会导致严重出血，必须立即停药'
+
+
+def _finished_investigation():
+    from stage0.investigation import InvestigationState
+    inv = InvestigationState('我下周去看心内科，帮我看看这几份材料', 'local-demo')
+    inv.facts = {'medications': [], 'semantic': [], 'open_conflicts': []}
+    inv.termination_reason = 'checks_completed'
+    inv.checks = {key: 'checked' for key in inv.checks}
+    return inv
+
+
+class ReportEvidenceTest(unittest.TestCase):
+    """模型写的解释必须过证据支持检查：无法核实的降为待确认，不得当结论。"""
+
+    def test_model_statement_without_read_evidence_is_demoted_not_deleted(self):
+        inv = _finished_investigation()
+        inv.claims = [{'claim_id': 'claim:a', 'statement': UNSUPPORTED, 'entities': ['氨氯地平'],
+                       'status': 'supported', 'supporting_evidence': [], 'opposing_evidence': [],
+                       'source_status': 'unknown', 'condition_status': 'unknown', 'source': 'model'}]
+        pending = inv.verify_statements()
+        self.assertEqual([p['claim_id'] for p in pending], ['claim:a'])
+        self.assertEqual(pending[0]['reason'], 'no_read_evidence')
+        text = inv.report_text()
+        self.assertIn('待确认', text)
+        self.assertNotIn(UNSUPPORTED, text.split('待确认', 1)[0],
+                         '未核实的解释不得出现在结论区')
+
+    def test_a_citation_that_was_never_read_back_does_not_count(self):
+        inv = _finished_investigation()
+        inv.evidence_refs = ['ev-1']
+        inv.claims = [{'claim_id': 'claim:a', 'statement': '值得记录的差异', 'entities': ['氨氯地平'],
+                       'status': 'supported', 'supporting_evidence': ['ev-1'], 'opposing_evidence': [],
+                       'source_status': 'unknown', 'condition_status': 'unknown', 'source': 'model'}]
+        pending = inv.verify_statements()
+        self.assertEqual([p['reason'] for p in pending], ['citation_not_read_back'])
+        inv.read_refs = ['ev-1']
+        self.assertEqual(inv.verify_statements(), [])
+
+    def test_material_read_refs_count_as_citations(self):
+        inv = _finished_investigation()
+        inv.material_read_refs = ['case:1/item:1']
+        inv.claims = [{'claim_id': 'claim:a', 'statement': '材料记的剂量与当前记录不一致',
+                       'entities': ['氨氯地平'], 'status': 'supported',
+                       'supporting_evidence': ['case:1/item:1'], 'opposing_evidence': [],
+                       'source_status': 'unknown', 'condition_status': 'unknown', 'source': 'model'}]
+        self.assertEqual(inv.verify_statements(), [])
+
+    def test_code_authored_claims_are_not_treated_as_model_explanations(self):
+        inv = _finished_investigation()
+        inv.claims = [{'claim_id': 'claim:a', 'statement': '合成药甲、合成药乙的标签证据',
+                       'entities': ['合成药甲'], 'status': 'supported', 'supporting_evidence': [],
+                       'opposing_evidence': [], 'source_status': 'unknown',
+                       'condition_status': 'unknown', 'source': 'code_default'}]
+        self.assertEqual(inv.verify_statements(), [])
+
+    def test_the_report_answers_all_five_visit_prep_questions(self):
+        inv = _finished_investigation()
+        text = inv.report_text()
+        for marker in ('解决了什么', '来源支持', '材料', '缺少依据', '医生'):
+            self.assertIn(marker, text, f'报告缺少必答项：{marker}')
+        self.assertIn('不是无风险', text)
+
+    def test_an_absence_of_evidence_is_never_reported_as_no_risk(self):
+        """证据不足是有效结果，但绝不能自动转成"没有风险"。"""
+        inv = _finished_investigation()
+        inv.checks = {key: 'uncovered' for key in inv.checks}
+        inv.termination_reason = 'budget_insufficient'
+        inv.claims = [{'claim_id': 'claim:a', 'statement': '合成药甲的标签证据', 'entities': ['合成药甲'],
+                       'status': 'insufficient', 'supporting_evidence': [], 'opposing_evidence': [],
+                       'source_status': 'unknown', 'condition_status': 'unknown', 'source': 'code_default'}]
+        text = inv.report_text()
+        self.assertIn('尚无完成项', text)
+        self.assertIn('不等于证明绝对安全', text)
+        self.assertNotIn('无法确认风险', text)
+        section2 = text.split('## 2', 1)[1].split('## 3', 1)[0]
+        self.assertNotIn('合成药甲的标签证据', section2,
+                         'insufficient 的 claim 不得出现在"有来源支持的事实"一节')
+
+    def test_a_concrete_harm_sentence_is_reported_by_subjects_not_repeated(self):
+        """交付文本受关键词安全检查约束，模型原文不得被原样复述成结论。"""
+        inv = _finished_investigation()
+        inv.claims = [{'claim_id': 'claim:a', 'statement': UNSUPPORTED, 'entities': ['氨氯地平', '克拉霉素'],
+                       'status': 'supported', 'supporting_evidence': ['ev-1'], 'opposing_evidence': [],
+                       'source_status': 'unknown', 'condition_status': 'unknown', 'source': 'model'}]
+        inv.read_refs = ['ev-1']
+        text = inv.report_text()
+        self.assertNotIn(UNSUPPORTED, text)
+        self.assertIn('氨氯地平、克拉霉素', text)
+
+    def test_material_reads_join_the_citation_set_through_observation(self):
+        from stage0.agent import Observation
+        inv = _finished_investigation()
+        inv.observe(Observation('read_material_item', 'p',
+                                {'case_id': 'case:1', 'item_id': 'item:1'}, {'ok': True}, True),
+                    evidence_store=None)
+        self.assertEqual(inv.material_read_refs, ['case:1/item:1'])
+
+
 WARFARIN_WARNING = {
     'drug_a': '华法林', 'drug_b': '阿司匹林', 'effect': '出血风险增加',
     'source_text': '华法林与阿司匹林合用可增加出血风险，需监测凝血功能。',

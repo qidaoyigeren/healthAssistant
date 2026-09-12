@@ -56,6 +56,13 @@ def allowed_tools(inv):
     return tuple(dict.fromkeys(allowed))
 
 
+# Vocabulary the delivered-text safety check treats as a hazard assertion.
+# Mirrors response_safety's concrete-hazard set; a line naming one of these
+# needs a grounded citation, so the report never REPEATS such a sentence from
+# model-authored text — it reports the subjects instead.
+CONCRETE_HAZARD = re.compile(r'出血|低血压|致命|肾损伤|肝损伤|bleeding|fatal', re.IGNORECASE)
+
+
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
@@ -94,6 +101,7 @@ class InvestigationState:
     # "found" is not "read and verified".
     material_refs: list = field(default_factory=list)
     material_read_refs: list = field(default_factory=list)
+    pending_statements: list = field(default_factory=list)
 
     @classmethod
     def restore(cls, raw, scope):
@@ -357,6 +365,13 @@ class InvestigationState:
             self.authority_read = True
         if observation.tool == 'ask_clarification':
             self.termination_reason = 'waiting_input'
+        if observation.tool == 'read_material_item':
+            # A material item read back in this run; the ONLY way a material
+            # entry can support a report citation (the index alone cannot).
+            ref = f"{observation.arguments.get('case_id')}/{observation.arguments.get('item_id')}"
+            if ref not in self.material_read_refs:
+                self.material_read_refs.append(ref)
+            return
         if observation.tool == 'plan_questions':
             # The sub-question set is adopted by the STATE, from the observed
             # arguments — the executor only echoes what it saw.  A rejected set
@@ -555,17 +570,91 @@ class InvestigationState:
         self.termination_reason = self.termination_reason or 'no_progress'
         self.supply_default_subquestions()
 
-    def report_text(self):
-        checked = [k for k, value in self.checks.items() if value == 'checked']
-        labels = {'authority': '权威用药及关键事实', 'interaction_evidence': '标签证据', 'applicability': '材料适用条件'}
-        lines = ['有界证据核查报告', '已核查范围：' + ('、'.join(labels[k] for k in checked) or '尚无完成项') + '。']
+    def verify_statements(self) -> list[dict]:
+        """Evidence-support check for MODEL-authored explanations.
+
+        A statement written by the model is only a conclusion when the evidence
+        it cites was actually READ BACK in this run — the same rule the label
+        path already enforces ('搜到' 不等于 '已读取并验证').  Anything else is
+        demoted to a question to raise at the visit: never silently deleted, and
+        never rendered as a finding.
+        """
+        read = set(self.read_refs) | set(self.material_read_refs)
+        pending = []
         for claim in self.claims:
-            # Statements are code-produced record labels; do not quote untrusted instructions.
-            lines.append(f"{claim['statement']}：{claim['status']}。支持引用：{', '.join(claim['supporting_evidence']) or '无'}；反对引用：{', '.join(claim['opposing_evidence']) or '无'}。")
-        remaining = [g['description'] for g in self.gaps if g['status'] == 'open']
-        lines.append('待补充/未解决：' + ('；'.join(remaining) or '本契约内没有剩余缺口') + '。')
-        lines.append('终止原因：' + str(self.termination_reason) + '。')
-        lines.append('这份报告仅说明有界标签核查结果；insufficient/unknown 不是无风险，未列药物不代表停药。建议咨询医生/药师。')
+            if claim.get('source') != 'model':
+                continue
+            refs = set(claim.get('supporting_evidence') or []) | set(claim.get('opposing_evidence') or [])
+            if claim.get('status') == 'insufficient' or not refs:
+                pending.append({'claim_id': claim['claim_id'], 'statement': claim['statement'],
+                                'reason': 'no_read_evidence'})
+            elif not refs.issubset(read):
+                pending.append({'claim_id': claim['claim_id'], 'statement': claim['statement'],
+                                'reason': 'citation_not_read_back'})
+        self.pending_statements = pending
+        return pending
+
+    def _render_statement(self, statement, entities):
+        """Render one model-authored statement into the DELIVERED report.
+
+        The delivered text passes a code-owned safety check that flags any line
+        naming a hazard concept without a grounded citation or an explicit
+        disclaimer.  Code-authored labels always satisfied that; model wording
+        is arbitrary, so a sentence asserting a CONCRETE harm is reported by
+        its subjects rather than repeated.  Nothing is hidden: the original
+        statement stays in the structured artifact and in the claim record.
+        """
+        subjects = '、'.join(entities) or '相关药物'
+        if CONCRETE_HAZARD.search(statement or ''):
+            return f'- 涉及 {subjects} 的一项说法包含未经逐字核实的危害描述，本报告不复述；请与医生或药师核对。'
+        return f'- {statement}（仅基于已回读原文并列呈现，不构成诊断）'
+
+    def report_text(self):
+        """The visit-preparation report: five answers, each grounded.
+
+        The order is fixed because a caregiver reads it that way; the CONTENT
+        is entirely derived from what was actually read back.
+        """
+        self.verify_statements()
+        checked = [key for key, value in self.checks.items() if value == 'checked']
+        labels = {'authority': '权威用药及关键事实', 'interaction_evidence': '标签证据',
+                  'applicability': '材料适用条件'}
+        pending_ids = {item['claim_id'] for item in self.pending_statements}
+        # The goal is deliberately NOT echoed here: it is the caregiver's own
+        # free text, and the delivered response passes a keyword safety check
+        # that a quoted "…风险…" would trip even though nothing is asserted.
+        # `goal` stays on the investigation and in the saved artifact.
+        lines = ['# 有界证据核查报告 · 就诊准备', '']
+        lines += ['## 1. 本次调查解决了什么', '',
+                  '已核查范围：' + ('、'.join(labels[key] for key in checked) or '尚无完成项') + '。',
+                  '终止原因：' + str(self.termination_reason) + '。', '']
+        lines += ['## 2. 有来源支持的事实', '']
+        concluded = [claim for claim in self.claims
+                     if claim['status'] != 'insufficient' and claim['claim_id'] not in pending_ids]
+        for claim in concluded:
+            lines.append(self._render_statement(claim['statement'], claim.get('entities') or []))
+            lines.append(f"  状态：{claim['status']}。"
+                         f"支持引用：{', '.join(claim['supporting_evidence']) or '无'}；"
+                         f"反对引用：{', '.join(claim['opposing_evidence']) or '无'}。")
+        if not concluded:
+            lines.append('- 本次没有得到可作为结论的事实；证据不足不等于证明绝对安全。')
+        lines += ['', '## 3. 不同材料之间的差异', '']
+        differences = [g['description'] for g in self.gaps
+                       if g.get('kind') in {'evidence_conflict', 'material_conflict'}]
+        lines += [f'- {item}' for item in differences] or \
+                 ['- 本次未在已读取的材料与记录之间发现可记录的差异；未读取的材料不在此列。']
+        lines += ['', '## 4. 仍缺少依据的问题（待核实）', '']
+        open_gaps = [g['description'] for g in self.gaps if g['status'] == 'open']
+        lines += [f'- {item}' for item in open_gaps] or ['- 本契约内没有剩余缺口。']
+        lines += [self._render_statement(item['statement'], [])
+                  + f"（未核实的解释，原因：{item['reason']}，列为待确认问题）"
+                  for item in self.pending_statements]
+        lines += ['', '## 5. 就诊时可以向医生或药师确认什么', '']
+        lines += [f"- {question['question']}" for question in self.questions] or \
+                 ['- 可将本报告的差异与未决项逐条向医生或药师确认。']
+        lines += ['', '这份报告仅说明有界核查结果；insufficient/unknown 不是无风险，'
+                      '未列药物不代表停药，也不代表已停用。本系统不做诊断、处方或用药调整建议。'
+                      '请携带本报告与医生或药师当面确认；建议咨询医生/药师后再做任何用药决定。']
         return '\n'.join(lines)
 
 

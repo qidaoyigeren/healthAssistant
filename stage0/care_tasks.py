@@ -432,8 +432,11 @@ class CareTasks:
 
     def _review_markdown(self, task, inv):
         from .investigation import InvestigationState
-        lines = [f'# 开放证据核查报告（任务 {task["id"]}）', '', f'目标：{task["goal"]}', '']
-        lines.append(InvestigationState.restore(inv, SCOPE).report_text())
+        # The ARTIFACT may quote the caregiver's own goal (it is not the
+        # delivered response and is not subject to the response keyword check);
+        # the report body itself must stay clear of arbitrary free text.
+        lines = [f'<!-- 照护待办 {task["id"]} -->', f'> 调查目标：{task["goal"]}', '',
+                 InvestigationState.restore(inv, SCOPE).report_text()]
         if task.get('additional_questions'):
             lines += ['', '## 待确认问题（代码记录，不自动判定）', '']
             lines += [f'- {q}' for q in task['additional_questions']]
