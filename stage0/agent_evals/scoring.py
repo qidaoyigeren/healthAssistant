@@ -116,6 +116,17 @@ def classify_terminal(task: dict, observed: dict) -> str:
     return 'stopped'
 
 
+def terminal_is_declared(task: dict, observed: dict) -> bool:
+    """停下的地方是不是任务**声明允许**停的地方。
+
+    ``classify_terminal`` 把"允许但停止"（预算耗尽）与"不在允许集合内"都归成
+    ``stopped``——读终态时够用，但分桶不够用：两者要记的格子完全不同。
+    """
+    reason = observed.get('termination_reason')
+    allowed = set((task.get('expected') or {}).get('allowed_terminal_reasons') or [])
+    return bool(reason and (not allowed or reason in allowed))
+
+
 def score_report_quality(task: dict, observed: dict) -> dict:
     """内容规则。每一条都从 ``expected`` 读出，并随 ``observed`` 可被证伪。
 
@@ -236,6 +247,12 @@ def score_outcome(task: dict, observed: dict) -> dict:
     "根本没执行成功"。三条轴（``report_quality``/``terminal_state``/
     ``autonomy``）始终给出各自的判定，bucket 只是它们的摘要——细节看轴，
     不要从 bucket 反推。
+
+    ``complete`` 与计数 ``autonomous_without_degradation`` 的判据**不同**，
+    这是有意的：DESIGN 允许"完整完成"由 completed 与 waiting 两者取得，而
+    那个计数明确要求分类为 completed。差别落在"未决冲突交给人工复核"这类
+    任务上——它停在该任务**声明允许**的 ``waiting_review``，产品行为正确，
+    却因终态不是 completed 而进不了那个计数。
     """
     if observed.get('undetermined'):
         return {'protocol': PROTOCOL, 'undetermined': True,
@@ -261,11 +278,15 @@ def score_outcome(task: dict, observed: dict) -> dict:
         bucket = 'autonomous_without_degradation'
     elif quality['ok'] and terminal in {'completed', 'waiting'}:
         bucket = 'report_quality_pass'
-    elif terminal in {'completed', 'waiting'}:
+    elif terminal_is_declared(task, observed):
+        # 停在任务**声明允许**的地方，即使那不是 completed/waiting。
+        # `first_search_empty` 族里预算被压到 1 次检索：首搜无果就停在
+        # ``budget_insufficient``，并且**如实交付部分结果**——那是这个任务设计
+        # 里的正确出路，把它记成"执行失败或未采样"会把一条正确路径读成故障。
         bucket = 'terminal_expected'
     else:
-        # 剩下的情形：报告不合格**且**停在不被允许的地方。这个桶读作"这一轮
-        # 不构成一个可用样本"——而不是"进程崩了"。它确实执行了，轴上的
+        # 剩下的情形：报告不合格**且**停在不被允许的地方（或根本没有终态）。
+        # 这个桶读作"这一轮不构成一个可用样本"——而不是"进程崩了"。轴上的
         # ``report_quality`` 与 ``terminal_state`` 记录了它实际是怎么失败的。
         bucket = 'execution_failed_or_not_sampled'
 
@@ -274,7 +295,7 @@ def score_outcome(task: dict, observed: dict) -> dict:
         'report_quality': quality,
         'terminal_state': terminal,
         'autonomy': autonomous,
-        'complete': bool(quality['ok'] and terminal == 'completed' and autonomous),
+        'complete': bool(quality['ok'] and terminal in {'completed', 'waiting'} and autonomous),
         'bucket': bucket,
     }
 

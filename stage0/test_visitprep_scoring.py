@@ -370,6 +370,58 @@ class NegativeControlTest(unittest.TestCase):
         self.assertFalse(outcome['complete'])
 
 
+class CompletionTest(unittest.TestCase):
+    """``complete`` 与计数 ``autonomous_without_degradation`` 判据不同，且
+    这个差别有实际后果。"""
+
+    def _task(self):
+        return _task(allowed_terminal_reasons=['waiting_review', 'checks_completed'],
+                     required_report_sections=['3. 不同材料之间的差异'])
+
+    def _observed(self):
+        return _observed(report_markdown='## 3. 不同材料之间的差异\n\n- 两处不一致\n',
+                         termination_reason='waiting_review', subquestion_source='model',
+                         attribution={'policy_fallback': 0})
+
+    def test_handing_an_unresolved_conflict_to_a_human_is_a_complete_outcome(self):
+        """停在该任务**声明允许**的 waiting_review 是正确产品行为，不是未完成。"""
+        outcome = scoring.score_outcome(self._task(), self._observed())
+        self.assertEqual(outcome['terminal_state'], 'waiting')
+        self.assertTrue(outcome['complete'])
+
+    def test_but_it_is_not_counted_as_autonomous_without_degradation(self):
+        """那个计数明确要求分类为 completed——两者不可混为一谈。"""
+        outcome = scoring.score_outcome(self._task(), self._observed())
+        self.assertNotEqual(outcome['bucket'], 'autonomous_without_degradation')
+        self.assertTrue(outcome['autonomy'])
+
+    def test_a_terminal_reason_outside_the_declared_set_is_still_not_complete(self):
+        task = _task(allowed_terminal_reasons=['checks_completed'])
+        outcome = scoring.score_outcome(task, self._observed())
+        self.assertFalse(outcome['complete'])
+
+    def test_stopping_where_the_task_allows_is_not_an_execution_failure(self):
+        """预算耗尽不在 completed/waiting 之列，但它可以是任务**声明允许**的
+        出路：`first_search_empty` 族把检索压到 1 次，首搜无果就如实交付部分
+        结果。把它记成"执行失败或未采样"是把一条正确路径读成故障。"""
+        task = _task(allowed_terminal_reasons=['checks_completed', 'budget_insufficient'],
+                     required_report_sections=['3. 不同材料之间的差异'])
+        outcome = scoring.score_outcome(task, _observed(
+            report_markdown='## 3. 不同材料之间的差异\n\n- 部分结果\n',
+            termination_reason='budget_insufficient', subquestion_source='model',
+            attribution={'policy_fallback': 0}))
+        self.assertEqual(outcome['bucket'], 'terminal_expected')
+        self.assertFalse(outcome['complete'], '它仍然不是一次完整完成')
+
+    def test_stopping_somewhere_the_task_forbids_is_still_not_a_usable_sample(self):
+        task = _task(allowed_terminal_reasons=['checks_completed'])
+        outcome = scoring.score_outcome(task, _observed(
+            report_markdown='## 3. 不同材料之间的差异\n\n- x\n',
+            termination_reason='cancelled', subquestion_source='model',
+            attribution={'policy_fallback': 0}))
+        self.assertEqual(outcome['bucket'], 'execution_failed_or_not_sampled')
+
+
 class RescoreTest(unittest.TestCase):
     def test_missing_fields_become_undetermined_not_fabricated(self):
         artifact = {'protocol': 'visitprep-eval@1', 'arm': 'fixed',
