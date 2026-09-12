@@ -2179,30 +2179,41 @@ class HybridPlanner:
         self.rejected_same_as_last = False
 
     def correction_for(self, state: AgentState) -> dict[str, Any] | None:
-        """Structured correction task for the next proposal: what was rejected,
-        why, what is allowed now, and the code-owned next-action hint.
+        """Structured correction task for the next proposal: WHAT was rejected,
+        WHY, and WHICH CONSTRAINTS now hold.
 
-        Feedback only — the validator re-checks every new proposal exactly as
-        before; the hint never bypasses it."""
+        Deliberately carries no action and no arguments.  The earlier version
+        returned the code-computed next action — including its fixed search
+        wording, evidence id and top_k — as ``next_expected_action_hint``.  A
+        model that simply echoed it passed validation while the trace recorded
+        ``source: "llm"``, i.e. code-supplied planning was counted as
+        independent autonomous planning.  Constraints are feedback; the choice
+        of action must remain the model's.  Nothing here weakens a rule: the
+        validator re-checks every new proposal exactly as before.
+        """
         rejection = self.last_rejection
         if not rejection:
             return None
         inv = state.investigation
         allowed = None
-        next_hint = None
+        open_gaps = None
+        termination_ready = None
         if inv is not None:
             from .investigation import allowed_tools
-            allowed = list(allowed_tools(inv))
-            next_hint = inv.candidates[0] if inv.candidates else None
+            allowed = [name for name in allowed_tools(inv) if name != 'respond']
+            open_gaps = [g['gap_id'] for g in inv.gaps if g['status'] == 'open']
+            termination_ready = bool(inv.termination_reason)
         return {
             'previous_proposal_was_rejected': rejection['proposal'],
             'rejection_reasons': rejection['errors'],
-            'instruction': ('上一提案因上述原因被安全代码拒绝且未执行；请提出一个不同的、满足要求的动作，'
-                            '不要重复被拒提案。当前允许的工具见 tool_catalog'
-                            + (f'（{allowed}）' if allowed is not None else '')
-                            + '；respond 仅在 investigation.termination_reason 非空时可用。'),
             'allowed_tools_now': allowed,
-            'next_expected_action_hint': next_hint,
+            'open_gap_ids': open_gaps,
+            'termination_ready': termination_ready,
+            'instruction': ('上一提案因上述原因被安全代码拒绝且未执行；请自行提出一个不同的、满足要求的动作，'
+                            '不要重复被拒提案。约束：工具取自 allowed_tools_now，'
+                            'gap_id 取自 open_gap_ids，'
+                            'respond 仅在 termination_ready 为 true 时可用。'
+                            '本提示只给约束，不提供动作或参数。'),
         }
 
     def _fallback(
