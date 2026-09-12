@@ -191,6 +191,72 @@ class CorrectionContextTest(unittest.TestCase):
         self.assertIn('llm_post_correction', sources, f'sources={sources}')
 
 
+def _open_investigation(claim_status='insufficient', checks='uncovered'):
+    """A minimal investigation with one open evidence gap."""
+    from stage0.investigation import InvestigationState
+    inv = InvestigationState('核对用药相互作用', 'local-demo')
+    inv.authority_read = True
+    inv.facts = {'medications': [{'display_name': '氨氯地平'}], 'semantic': [], 'open_conflicts': []}
+    inv.claims = [{'claim_id': 'claim:a', 'statement': '氨氯地平的标签证据', 'entities': ['氨氯地平'],
+                   'status': claim_status, 'supporting_evidence': [], 'opposing_evidence': [],
+                   'source_status': 'unknown', 'condition_status': 'unknown'}]
+    inv.gaps = [{'gap_id': 'claim:a', 'kind': 'evidence_missing', 'status': 'open',
+                 'description': '核查氨氯地平的支持和反对证据', 'claim_id': 'claim:a'}]
+    if checks == 'checked':
+        inv.checks = {key: 'checked' for key in inv.checks}
+        inv.gaps[0]['status'] = 'resolved'
+        inv.gaps.append({'gap_id': 'subquestions', 'kind': 'plan_missing',
+                         'status': 'resolved', 'description': 'plan'})
+    return inv
+
+
+class ResponsibilitySplitTest(unittest.TestCase):
+    """强制停止 / 模型策略 / 降级策略 / 状态同步 必须可分辨。"""
+
+    def test_forced_stop_produces_no_action_and_no_prefilled_candidate(self):
+        inv = _open_investigation()
+        self.assertIsNone(inv.forced_stop())
+        self.assertEqual(inv.candidates, [],
+                         '正常路径不得预填候选动作：那会把代码的策略塞回给模型')
+
+    def test_degraded_path_still_produces_the_scripted_action(self):
+        inv = _open_investigation()
+        action = inv.degraded_next_action()
+        self.assertIsNotNone(action)
+        self.assertEqual(action.tool, 'rag_search')
+        self.assertIn('氨氯地平', action.arguments['query'])
+        self.assertEqual([c['tool'] for c in inv.candidates], ['rag_search'])
+
+    def test_forced_stop_covers_the_non_negotiable_conditions(self):
+        inv = _open_investigation(claim_status='supported', checks='checked')
+        self.assertEqual(inv.forced_stop(), 'checks_completed')
+        self.assertEqual(inv.termination_reason, 'checks_completed')
+
+    def test_open_evidence_conflict_waits_for_review_and_never_picks_a_side(self):
+        inv = _open_investigation(claim_status='supported', checks='checked')
+        inv.gaps.append({'gap_id': 'conflict:claim:a', 'kind': 'evidence_conflict',
+                         'status': 'open', 'description': '支持与反对证据并存'})
+        self.assertEqual(inv.forced_stop(), 'waiting_review')
+
+    def test_search_budget_exhaustion_stops_without_producing_an_action(self):
+        inv = _open_investigation()
+        from stage0.investigation import MAX_SEARCHES
+        inv.queries = [f'q{i}' for i in range(MAX_SEARCHES)]
+        self.assertEqual(inv.forced_stop(), 'budget_insufficient')
+        self.assertEqual(inv.candidates, [])
+
+    def test_an_already_set_termination_is_returned_verbatim(self):
+        inv = _open_investigation()
+        inv.termination_reason = 'waiting_input'
+        self.assertEqual(inv.forced_stop(), 'waiting_input')
+
+    def test_next_action_is_the_degraded_policy(self):
+        """兼容层：既有调用方（finish/report 路径）语义不变。"""
+        inv = _open_investigation()
+        action = inv.next_action()
+        self.assertEqual(action.tool, 'rag_search')
+
+
 WARFARIN_WARNING = {
     'drug_a': '华法林', 'drug_b': '阿司匹林', 'effect': '出血风险增加',
     'source_text': '华法林与阿司匹林合用可增加出血风险，需监测凝血功能。',

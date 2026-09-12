@@ -22,7 +22,7 @@ MAX_EVIDENCE = 12
 # Protocol v2: state-conditional tool exposure + structured rejection
 # feedback.  The state schema itself is unchanged (restore() still validates
 # VERSION/CONTRACT), so persisted investigations stay loadable.
-PROTOCOL_VERSION = 'propose-next-action@2'
+PROTOCOL_VERSION = 'investigation-protocol@2'
 
 
 def allowed_tools(inv):
@@ -314,7 +314,41 @@ class InvestigationState:
         self.checks['interaction_evidence'] = 'checked' if self.claims and all(c['status'] != 'insufficient' for c in self.claims) else 'uncovered'
         self.checks['applicability'] = 'checked' if self.claims and all(c['condition_status'] == 'verified' for c in self.claims) else 'uncovered'
 
-    def next_action(self):
+    # ---- 职责四分（协议 v2）------------------------------------------------
+    # forced_stop()              纯状态检查 + 强制停止条件   —— 执行约束，不可协商
+    # model_policy()             由 LLMPlanner 执行          —— 本类不实现
+    # degraded_next_action()     确定性降级策略（含固定搜索词）
+    # observe()/sync_authority() 事实读取与状态同步          —— 基础设施
+
+    def forced_stop(self) -> str | None:
+        """Non-negotiable stop conditions only.
+
+        Returns and sets ``termination_reason``, and produces NO action — so it
+        can never pre-plan.  These are the conditions a model must not be able
+        to argue past: an already-set termination, an unresolved evidence
+        conflict (code must not vote, and must not let the user pick a side), a
+        conflict-free completion, and an exhausted search budget.  A repeated
+        read with no new information is terminated inside ``observe``.
+        """
+        if self.termination_reason:
+            return self.termination_reason
+        if any(g['kind'] == 'evidence_conflict' and g['status'] == 'open' for g in self.gaps):
+            self.termination_reason = 'waiting_review'
+        elif (self.claims and all(v == 'checked' for v in self.checks.values())
+              and not any(g['status'] == 'open' for g in self.gaps)):
+            self.termination_reason = 'checks_completed'
+        elif len(self.queries) >= MAX_SEARCHES:
+            self.termination_reason = 'budget_insufficient'
+        return self.termination_reason
+
+    def degraded_next_action(self):
+        """The scripted, deterministic policy — the DEGRADED path only.
+
+        Its fixed ordering and fixed search wording live here deliberately:
+        they are a fallback for when the model path is unavailable, not the
+        normal planning policy.  The model path must never see this action, so
+        ``candidates`` is populated here and nowhere else.
+        """
         from .agent import ToolAction
         self.candidates = []
         def action(tool, gap_id, arguments, expected):
@@ -331,16 +365,10 @@ class InvestigationState:
             return action('ask_clarification', missing[0]['gap_id'], {'question': '\n'.join(g['description'] for g in missing)}, '等待补充指定字段；未写入临床审批')
         for ref in self.evidence_refs:
             if ref not in self.read_refs:
-                claim_id = next((g['gap_id'] for g in self.gaps if g['kind'] == 'evidence_missing' and g['status'] == 'open'), self.claims[0]['claim_id'])
+                claim_id = next((g['gap_id'] for g in self.gaps if g['kind'] == 'evidence_missing' and g['status'] == 'open'),
+                                self.claims[0]['claim_id'] if self.claims else 'authority')
                 return action('read_evidence', claim_id, {'evidence_id': ref, 'limit': 2000}, '回读并校验原文、实体、否定和适用条件')
-        if any(g['kind'] == 'evidence_conflict' and g['status'] == 'open' for g in self.gaps):
-            self.termination_reason = 'waiting_review'
-            return None
-        if self.claims and all(v == 'checked' for v in self.checks.values()) and not any(g['status'] == 'open' for g in self.gaps):
-            self.termination_reason = 'checks_completed'
-            return None
-        if len(self.queries) >= MAX_SEARCHES:
-            self.termination_reason = 'budget_insufficient'
+        if self.forced_stop():
             return None
         gap = next((g for g in self.gaps if g['kind'] == 'evidence_missing' and g['status'] == 'open'), None)
         if gap is None:
@@ -348,8 +376,13 @@ class InvestigationState:
             return None
         claim = next((c for c in self.claims if c['claim_id'] == gap.get('claim_id')), self.claims[0] if self.claims else None)
         terms = ' '.join(claim['entities']) if claim else self.goal[:150]
-        suffix = ('药物相互作用 风险', '适用条件 禁忌 否定 相互作用', '证据不足 相互作用 日期')[len(self.queries)]
+        suffix = ('药物相互作用 风险', '适用条件 禁忌 否定 相互作用', '证据不足 相互作用 日期')[len(self.queries) % 3]
         return action('rag_search', gap['gap_id'], {'query': terms + ' ' + suffix, 'top_k': 5}, '获得新增可核验证据或明确冲突')
+
+    def next_action(self):
+        """Compatibility shim.  The normal (model) path calls ``forced_stop()``
+        instead; only the degraded path plans an action."""
+        return self.degraded_next_action()
 
     def finish(self, degraded_reason=None):
         if degraded_reason and degraded_reason.startswith('planner_circuit_break:') and self.termination_reason:
