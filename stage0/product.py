@@ -366,6 +366,76 @@ class ProductStore:
         return self.command(key, payload, execute)
 
 
+class MaterialIndex:
+    """Read-only adapter: what the agent may see of the caregiver's materials.
+
+    Uploaded materials are STAGED CANDIDATES — parsed from a document, not yet
+    confirmed by the caregiver, and never patient facts.  This adapter exposes
+    the deterministic diff ``recompute()`` already computed (``kind`` plus
+    ``issues`` plus the original source coordinates) so a planner can decide
+    WHICH discrepancy to investigate.  It exposes no raw document bytes, takes
+    no write path, and an item only supports a report citation once
+    ``read_material_item`` has actually read it back.
+    """
+
+    def __init__(self, store: 'ProductStore', scope_id: str = SCOPE):
+        self._store = store
+        self._scope_id = scope_id
+
+    @staticmethod
+    def _fields(candidate):
+        return dict((candidate or {}).get('fields') or {})
+
+    def index(self) -> dict:
+        materials = []
+        for case in self._store.objects('case'):
+            items = []
+            for item in case.get('items', []):
+                candidate = item.get('candidate')
+                items.append({
+                    'item_id': item['item_id'],
+                    'fields': self._fields(candidate),
+                    'locations': dict((candidate or {}).get('locations') or {}),
+                    'kind': item.get('kind'),
+                    'issues': list(item.get('issues') or []),
+                    'current': [med.get('ref') for med in (item.get('current') or [])],
+                    'confirmed': item.get('status') != 'pending',
+                })
+            materials.append({
+                'case_id': case['id'],
+                'document_id': case.get('document_id'),
+                'parser_version': case.get('parser_version'),
+                'created_at': case.get('created_at'),
+                'status': case.get('status'),
+                'item_count': len(items),
+                'pending_count': sum(1 for item in items if not item['confirmed']),
+                'items': items,
+            })
+        return {'materials': materials,
+                'revision': self._store.memory.scope_revision('materials'),
+                'note': ('条目是尚未确认的材料候选，不是患者事实；kind/issues 是与当前权威记录的'
+                         '确定性差异结果。索引里的条目不算引用，必须 read_material_item 读原文。')}
+
+    def item(self, case_id, item_id) -> dict:
+        case = self._store.get(case_id, 'case')
+        item = next((entry for entry in case.get('items', [])
+                     if entry['item_id'] == item_id), None)
+        if item is None:
+            raise ProductError('材料条目不存在', 404)
+        candidate = item.get('candidate') or {}
+        return {
+            'case_id': case_id, 'item_id': item_id,
+            'fields': self._fields(candidate),
+            'original_fields': dict(candidate.get('original_fields') or {}),
+            'corrections': list(candidate.get('corrections') or []),
+            'locations': dict(candidate.get('locations') or {}),
+            'kind': item.get('kind'), 'issues': list(item.get('issues') or []),
+            'status': item.get('status'),
+            'document_id': case.get('document_id'),
+            'parser_version': case.get('parser_version'),
+        }
+
+
 def register_product_routes(app, store, principal, authorize_scope, require_role, api_error):
     from fastapi import Request
     # Make annotation resolvable under future annotations for FastAPI.

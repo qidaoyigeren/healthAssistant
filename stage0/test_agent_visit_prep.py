@@ -371,6 +371,93 @@ class SubquestionsTest(unittest.TestCase):
         self.assertIn('plan_questions', names)
 
 
+MATERIAL_CSV = ('name,dose,unit,schedule,date,subject\n'
+                '氨氯地平,10,mg,每日一次,2026-01-05,local-demo\n'
+                '克拉霉素,250,mg,每日两次,2026-01-05,local-demo\n')
+
+
+class MaterialVisibilityTest(unittest.TestCase):
+    """材料差异是既有的确定性结果，模型必须能看到它才能决定调查哪个分歧。"""
+
+    def _product(self, store):
+        from stage0.product import ProductStore
+        return ProductStore(store)
+
+    def test_index_exposes_the_deterministic_diff_and_source_coordinates(self):
+        with _env() as store:
+            product = self._product(store)
+            store.apply_medication_change(action='add', name='氨氯地平', ingredients=[],
+                session_id='s', turn_id='t', source='test', dose='5mg', schedule='每日一次')
+            case = product.import_csv('k1', MATERIAL_CSV)
+            from stage0.product import MaterialIndex
+            payload = MaterialIndex(product).index()
+            blob = json.dumps(payload, ensure_ascii=False)
+            self.assertIn(case['id'], blob)
+            kinds = {item['kind'] for material in payload['materials'] for item in material['items']}
+            # 10mg in the material vs 5mg on record is a real discrepancy; the
+            # index must carry it rather than flattening materials to text.
+            self.assertIn('changed', kinds)
+            self.assertTrue(any(item['locations'] for material in payload['materials']
+                                for item in material['items']),
+                            '差异必须带原文定位，否则模型无法指认来源')
+
+    def test_index_never_leaks_raw_document_bytes(self):
+        with _env() as store:
+            product = self._product(store)
+            product.import_csv('k1', MATERIAL_CSV)
+            from stage0.product import MaterialIndex
+            blob = json.dumps(MaterialIndex(product).index(), ensure_ascii=False)
+            self.assertNotIn('base64', blob)
+            self.assertNotIn('raw', blob.lower().replace('raw_', ''))
+
+    def test_read_material_item_reports_correction_history(self):
+        with _env() as store:
+            product = self._product(store)
+            case = product.import_csv('k1', MATERIAL_CSV)
+            item = case['items'][0]
+            product.decide(case['id'], item['item_id'], 'k2', product.revisions(), 'correct',
+                           {'dose': '5'}, None)
+            from stage0.product import MaterialIndex
+            detail = MaterialIndex(product).item(case['id'], item['item_id'])
+            self.assertEqual(detail['fields']['dose'], '5')
+            self.assertEqual(detail['original_fields']['dose'], '10')
+            self.assertTrue(detail['corrections'])
+            self.assertTrue(detail['locations'])
+
+    def test_reading_a_missing_item_is_an_error_not_an_empty_answer(self):
+        with _env() as store:
+            product = self._product(store)
+            case = product.import_csv('k1', MATERIAL_CSV)
+            from stage0.product import MaterialIndex, ProductError
+            with self.assertRaises(ProductError):
+                MaterialIndex(product).item(case['id'], 'does-not-exist')
+
+    def test_material_tools_are_absent_until_an_index_is_attached(self):
+        """未注入材料时目录保持不变：不得广告一个用不了的工具。"""
+        with _env() as store:
+            agent = MedicationCoordinatorAgent(
+                store, ddi_tool=DDITool(lambda meds: []), rag_tool=_rag())
+            self.assertNotIn('list_materials', agent.executor.catalog())
+            from stage0.product import MaterialIndex
+            agent.attach_material_index(MaterialIndex(self._product(store)))
+            self.assertIn('list_materials', agent.executor.catalog())
+            self.assertIn('read_material_item', agent.executor.catalog())
+            agent.attach_material_index(MaterialIndex(self._product(store)))  # idempotent
+            self.assertIn('list_materials', agent.executor.catalog())
+
+    def test_attaching_materials_rebinds_the_planner_catalog(self):
+        """prompt / guard / executor 必须看到同一套工具，否则三者会漂移。"""
+        with _env() as store:
+            agent = MedicationCoordinatorAgent(
+                store, ddi_tool=DDITool(lambda meds: []), rag_tool=_rag(),
+                llm_planner_enabled=True, proposal_provider=lambda payload: {'decision': 'respond'})
+            self.assertNotIn('list_materials', agent.planner.validator.tool_schemas)
+            from stage0.product import MaterialIndex
+            agent.attach_material_index(MaterialIndex(self._product(store)))
+            self.assertIn('list_materials', agent.planner.validator.tool_schemas)
+            self.assertIn('list_materials', agent.planner.llm_planner.tool_schemas)
+
+
 WARFARIN_WARNING = {
     'drug_a': '华法林', 'drug_b': '阿司匹林', 'effect': '出血风险增加',
     'source_text': '华法林与阿司匹林合用可增加出血风险，需监测凝血功能。',

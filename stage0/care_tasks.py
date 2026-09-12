@@ -292,7 +292,14 @@ class CareTasks:
             task['invalidations'].append({'at': utc_now(), 'changed': changed,
                 'policy': 'medications→全量重查；semantic→适用条件重核、材料证据复用；materials→来源重校验'})
         task['missing_inputs'] = []
-        result = self.agent().run_open_review(
+        # Protocol v2: the review must be able to SEE the caregiver's uploaded
+        # materials (their staged candidates and the deterministic diff against
+        # the authoritative list) — otherwise "多份材料之间有什么差异" is
+        # answered by code reciting a diff rather than by investigation.
+        agent = self.agent()
+        from .product import MaterialIndex
+        agent.attach_material_index(MaterialIndex(self.p))
+        result = agent.run_open_review(
             task['goal'], run_id=run_id or f"care-task:{task['id']}:{len(task['runs'])}", scope_id=SCOPE,
             initial_state=task.get('investigation'), max_cycles=contract['max_steps'],
             saved_budget=task.get('_queued_limits'))

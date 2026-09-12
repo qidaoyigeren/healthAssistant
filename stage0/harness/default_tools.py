@@ -194,6 +194,43 @@ PLAN_QUESTIONS_SPEC = ToolSpec(
 )
 
 
+# Protocol v2: the material index and single-item read-back.  Registered ONLY
+# when a MaterialIndex is attached, so a run without materials keeps exactly
+# the catalog it had — no unavailable tool is ever advertised.  Both go through
+# the ordinary executor path (permission, schema, budget, audit).
+LIST_MATERIALS_SPEC = ToolSpec(
+    name="list_materials",
+    description=("列出本轮已上传材料及其确定性差异：每条目的字段、原文定位、与当前权威记录的差异"
+                 "（kind: same/changed/new/possible_duplicate/not_listed/unresolved）和未决问题。"
+                 "条目是 caregiver 尚未确认的候选，不是患者事实。"),
+    argument_schema={"type": "object", "properties": {}, "required": []},
+    result_shape="dict(materials[{case_id, document_id, item_count, pending_count, items[]}], revision)",
+    kind="read", required_permission="materials:read", idempotency="pure", cacheable=True,
+)
+
+READ_MATERIAL_ITEM_SPEC = ToolSpec(
+    name="read_material_item",
+    description=("按 case_id/item_id 读取单条材料的原文与定位，含 caregiver 已做的更正历史。"
+                 "只有读过原文的条目才能作为报告引用。"),
+    argument_schema={"type": "object", "properties": {"case_id": {"type": "string"},
+                                                      "item_id": {"type": "string"}},
+                     "required": ["case_id", "item_id"]},
+    result_shape=("dict(case_id, item_id, fields, original_fields, corrections, locations, "
+                  "kind, issues)"),
+    kind="read", required_permission="materials:read", idempotency="pure", cacheable=True,
+)
+
+
+def register_material_tools(executor: ToolExecutor, index: Any) -> None:
+    """Idempotent: attaching a newer index replaces the handlers in place
+    rather than raising, so a re-attach can never half-update the catalog."""
+    executor.register(LIST_MATERIALS_SPEC, lambda request: index.index(), override=True)
+    executor.register(READ_MATERIAL_ITEM_SPEC,
+                      lambda request: index.item(request.arguments["case_id"],
+                                                 request.arguments["item_id"]),
+                      override=True)
+
+
 # Harness P3, both default-OFF (independent flags; see delegation.py and the
 # P3 report).  ``batch_read`` is the ordinary read-only batching CONTROL; the
 # planner proposes it like any single tool and the executor fans the pure

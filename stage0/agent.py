@@ -888,11 +888,14 @@ def _tool_descriptions() -> dict[str, str]:
     specs = dict(DEFAULT_TOOL_SPECS)
     try:
         from .harness.default_tools import (BATCH_READ_SPEC, DELEGATE_TASK_SPEC,
-                                            PLAN_QUESTIONS_SPEC, READ_EVIDENCE_SPEC)
+                                            LIST_MATERIALS_SPEC, PLAN_QUESTIONS_SPEC,
+                                            READ_EVIDENCE_SPEC, READ_MATERIAL_ITEM_SPEC)
     except ImportError:  # pragma: no cover - script-style import
         from harness.default_tools import (BATCH_READ_SPEC, DELEGATE_TASK_SPEC,
-                                           PLAN_QUESTIONS_SPEC, READ_EVIDENCE_SPEC)  # type: ignore
-    for spec in (READ_EVIDENCE_SPEC, BATCH_READ_SPEC, DELEGATE_TASK_SPEC, PLAN_QUESTIONS_SPEC):
+                                           LIST_MATERIALS_SPEC, PLAN_QUESTIONS_SPEC,
+                                           READ_EVIDENCE_SPEC, READ_MATERIAL_ITEM_SPEC)  # type: ignore
+    for spec in (READ_EVIDENCE_SPEC, BATCH_READ_SPEC, DELEGATE_TASK_SPEC, PLAN_QUESTIONS_SPEC,
+                 LIST_MATERIALS_SPEC, READ_MATERIAL_ITEM_SPEC):
         specs.setdefault(spec.name, spec)
     return {name: spec.description for name, spec in specs.items()}
 
@@ -2624,6 +2627,23 @@ class MedicationCoordinatorAgent:
         # re-verified with the real detector over the current medication list.
         if hasattr(self.memory, "recheck_hook"):
             self.memory.recheck_hook = self._recheck_hook
+        # Protocol v2: uploaded materials are invisible until a MaterialIndex is
+        # attached, so a run without materials keeps exactly its old catalog.
+        self.material_index = None
+
+    def attach_material_index(self, index: Any) -> None:
+        """Make the caregiver's uploaded materials visible to the planner.
+
+        Idempotent.  Registers the two read-only tools on the shared executor
+        and rebinds the planner catalog, so prompt, guard and executor see the
+        same tool set and cannot drift."""
+        if self.material_index is index:
+            return
+        self.material_index = index
+        from .harness.default_tools import register_material_tools
+        register_material_tools(self.executor, index)
+        if isinstance(self.planner, HybridPlanner):
+            self.planner.bind_tools(self.executor.catalog())
 
     # ---- Harness P2: progress events, corpus version, no-progress ----------
 
