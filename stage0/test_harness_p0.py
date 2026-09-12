@@ -327,6 +327,42 @@ class ResourceLedgerTests(unittest.TestCase):
         self.assertEqual([r['status'] for r in rows], ['failed_estimate','estimate'])
         self.assertTrue(all(r['usage_tokens'] is None for r in rows))
 
+    def test_latency_token_split_is_observational_and_never_fabricated(self):
+        """Latency L0 invariant: the per-call split cannot move a single token
+        of budget, and a provider that reports only a total must be recorded as
+        unknown -- not as "0 completion tokens", which would read as a
+        perfectly disciplined model that simply never answered."""
+        with_split = NS(choices=[NS(message=NS(content='{}', tool_calls=[]))],
+                        usage=NS(prompt_tokens=4000, completion_tokens=50, total_tokens=4050,
+                                 completion_tokens_details=NS(reasoning_tokens=0)))
+        reasoning = NS(choices=[NS(message=NS(content='{}', tool_calls=[]))],
+                       usage=NS(prompt_tokens=483, completion_tokens=374, total_tokens=857,
+                                completion_tokens_details=NS(reasoning_tokens=300)))
+        total_only = reply(tokens=70)
+        client = FakeClient([with_split, reasoning, total_only])
+        with budget_scope(self.store, 'r') as budget:
+            completion_call('planner', client, messages=[], max_tokens=100)
+            after_first = dict(budget.data)
+            completion_call('planner', client, messages=[], max_tokens=100)
+            completion_call('planner', client, messages=[], max_tokens=100)
+            after_third = dict(budget.data)
+        # Charging follows the TOTAL, split or no split.
+        self.assertEqual(after_first['tokens_actual'], 4050)
+        self.assertEqual(after_third['tokens_actual'], 4977)
+        rows = list(self.store.connection.execute(
+            'SELECT usage_tokens,prompt_tokens,completion_tokens,reasoning_tokens '
+            'FROM llm_attempts ORDER BY rowid'))
+        self.assertEqual((rows[0]['prompt_tokens'], rows[0]['completion_tokens']), (4000, 50))
+        # Reported-as-zero and not-reported must stay distinguishable: 0 means
+        # "the gateway says it did not reason", NULL means "the gateway did not
+        # say".  Collapsing them would read silence as a clean bill of health.
+        self.assertEqual(rows[0]['reasoning_tokens'], 0)
+        self.assertEqual(rows[1]['reasoning_tokens'], 300)
+        self.assertIsNone(rows[2]['prompt_tokens'])
+        self.assertIsNone(rows[2]['completion_tokens'])
+        self.assertIsNone(rows[2]['reasoning_tokens'])
+        self.assertEqual(rows[2]['usage_tokens'], 70)
+
     def test_guard_rejection_is_charged(self):
         calls = []
         def provider(payload):

@@ -1,0 +1,141 @@
+{
+  "phase": "L1",
+  "title": "按输出 token 纪律选型",
+  "date": "2026-09-12",
+  "status": "pass_with_caveats",
+  "source_fingerprint": {
+    "scope": "repo",
+    "digest": "d07e6530ae56cfdb342381f228693ef848d080a0c602d97fdc87b768ba52d782"
+  },
+  "selected_endpoint": {
+    "provider": "siliconflow",
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "base_url": "https://api.siliconflow.cn/v1",
+    "authorization": "added explicitly to AUTHORIZED_LIVE_TARGETS with the user's approval; NOT added to auto-detection"
+  },
+  "threshold": {
+    "completion_tokens_max": 200,
+    "preregistered": true,
+    "basis": {
+      "reference_disciplined_answer": 49,
+      "longest_contract_compliant_arguments": "209 chars ~ 130 tokens",
+      "observed_reasoning_range": "823-2440"
+    },
+    "note": "measures output discipline only, not answer quality"
+  },
+  "probe": {
+    "artifact": "qualification-2/qualification.json",
+    "candidates": 6,
+    "samples_each": 6,
+    "results": [
+      {"candidate": "siliconflow/Qwen/Qwen2.5-7B-Instruct", "contract_complete": 6, "calls": 6,
+       "completion_tokens_each": [76, 76, 80, 75, 76, 76], "reasoning_tokens_each": [0, 0, 0, 0, 0, 0],
+       "latency_ms_each": [6272, 1929, 1950, 2032, 1976, 2067], "rate_limited": 0, "verdict": "pass"},
+      {"candidate": "siliconflow/Qwen/Qwen3.5-9B", "contract_complete": 6, "calls": 6,
+       "completion_tokens_each": [213, 208, 214, 222, 223, 215], "reasoning_tokens_each": [null, null, null, null, null, null],
+       "latency_ms_each": [4713, 3358, 3229, 2534, 2337, 2752], "rate_limited": 0, "verdict": "fail_discipline"},
+      {"candidate": "tokendance/glm-5.3-flash", "contract_complete": 6, "calls": 6,
+       "completion_tokens_each": [361, 387, 402, 300, 328, 319], "reasoning_tokens_each": [238, 220, 263, 190, 224, 200],
+       "latency_ms_each": [14484, 15098, 15560, 10813, 12448, 11024], "rate_limited": 0, "verdict": "fail_discipline"},
+      {"candidate": "siliconflow/zai-org/GLM-5.3", "role": "control", "contract_complete": 6, "calls": 6,
+       "completion_tokens_each": [257, 374, 257, 374, 374, 374], "reasoning_tokens_each": [180, 279, 180, 279, 279, 279],
+       "latency_ms_each": [4601, 6718, 5545, 6763, 6583, 6612], "rate_limited": 0, "verdict": "fail_discipline"},
+      {"candidate": "siliconflow/zai-org/GLM-4.5-Air", "contract_complete": 0, "calls": 6, "empty_choices_calls": 6,
+       "completion_tokens_each": [349, 287, 298, 298, 245, 282], "reasoning_tokens_each": [261, 191, 200, 200, 158, 193],
+       "latency_ms_each": [], "rate_limited": 0, "verdict": "fail_reasoning_exhausted_the_response"},
+      {"candidate": "zhipu/glm-4.7-flash", "contract_complete": 1, "calls": 6, "accepted": 1,
+       "completion_tokens_each": [44], "reasoning_tokens_each": [0], "latency_ms_each": [45726],
+       "rate_limited": 5, "verdict": "inconclusive_provider_errors"}
+    ]
+  },
+  "control_result": {
+    "question": "is hidden reasoning a property of the model or of the TokenDance gateway?",
+    "answer": "the model",
+    "tokendance_glm53": {"completion_each": [361, 387, 402, 300, 328, 319], "reasoning_each": [238, 220, 263, 190, 224, 200], "latency_ms_each": [14484, 15098, 15560, 10813, 12448, 11024]},
+    "siliconflow_glm53": {"completion_each": [257, 374, 257, 374, 374, 374], "reasoning_each": [180, 279, 180, 279, 279, 279], "latency_ms_each": [4601, 6718, 5545, 6763, 6583, 6612]},
+    "reading": "reasoning volume overlaps and is statistically indistinguishable; the gateway changes speed (~2.3x), not output size. Switching gateways cannot fix hidden reasoning; changing model can.",
+    "single_variable": true
+  },
+  "batch_path_verification": {
+    "artifact": "live/live-cohort.json",
+    "entry_point": "scripts/run-planner-live-acceptance-v3.py (frozen endpoint switched, following the documented pattern)",
+    "protocol_version": "propose-next-action@3",
+    "k": 3,
+    "collection_status": "complete",
+    "contract_acceptance": {
+      "parameter_rejections": 0,
+      "parse_failures": 0,
+      "autocorrected_proposals": 0,
+      "safety_rejections": 0,
+      "duplicate_effects": 0,
+      "required": "all zero",
+      "result": "met"
+    },
+    "runs": [
+      {"index": 1, "goal_status": "incomplete", "execution_status": "degraded", "fallback_free": false,
+       "autonomous_success": false, "turn_wall_ms": 63080.7,
+       "planner_latency_ms_each": [2024.399, 60015.942],
+       "failure": "gateway APITimeoutError at 60013ms on cycle 2; budget set usage_unknown and fail-closed further model calls (designed behaviour, no silent retry, no double billing)",
+       "latency_comparable": false},
+      {"index": 2, "goal_status": "completed", "execution_status": "finished", "fallback_free": true,
+       "autonomous_success": true, "turn_wall_ms": 8886.3,
+       "planner_latency_ms_each": [1798.994, 2933.94, 3161.464],
+       "token_calls": [{"prompt": 2335, "completion": 50, "reasoning": 0},
+                       {"prompt": 4178, "completion": 89, "reasoning": 0},
+                       {"prompt": 5331, "completion": 106, "reasoning": 0}],
+       "latency_comparable": true},
+      {"index": 3, "goal_status": "completed", "execution_status": "finished", "fallback_free": true,
+       "autonomous_success": true, "turn_wall_ms": 10731.36,
+       "planner_latency_ms_each": [2435.065, 3403.141, 3936.424],
+       "token_calls": [{"prompt": 2335, "completion": 50, "reasoning": 0},
+                       {"prompt": 4178, "completion": 89, "reasoning": 0},
+                       {"prompt": 5332, "completion": 99, "reasoning": 0}],
+       "latency_comparable": true}
+    ]
+  },
+  "latency_comparison": {
+    "metric": "L0 definition, recomputed by the same command via --cohort",
+    "artifact": "baseline.json",
+    "before": {"cohort": "provider-switch-2026-09-11", "endpoint": "tokendance/glm-5.3-flash",
+               "planner_latency_ms_median": 21867.5, "turn_wall_ms_median": 72021.0,
+               "calls_per_turn": [3, 3, 3], "completion_tokens_median": null},
+    "after": {"cohort": "L1-siliconflow-qwen2.5", "planner_latency_ms_median": 3047.7,
+              "turn_wall_ms_median": 9808.8, "calls_per_turn": [3, 3],
+              "completion_tokens_median": 89, "reasoning_tokens_each": [0, 0, 0, 0, 0, 0, 0],
+              "ms_per_output_token_aggregate_each": [32.22, 41.07]},
+    "improvement": {"planner_call": "7.2x", "turn_wall": "7.3x", "model_calls_per_turn": "unchanged (3)"},
+    "mechanism": "the model emits ~13x fewer output tokens (1162 -> 89); per-token cost did NOT improve (32-41 vs 22.9-37.3 ms/token)",
+    "attribution": "NOT fully controlled -- endpoint, model and gateway changed together. Only the 2.3x gateway component is isolated (control_result)."
+  },
+  "code_changes": {
+    "stage0/extract_ddi.py": "0fa576d656a3fb2d9e12ef4dc04a1d67cb09af309e5aec477d0aeebebd12ec39",
+    "stage0/turn_budget.py": "4232d68c4ba9f08e0416af988254faa1e703c1158b1190980290dd2492e7f51f",
+    "stage0/memory.py": "50d8ab0b0c5a6cb9d7b0637bfa80b8f7dba68c978b2c1b9d24d3ff3b292ffbed",
+    "stage0/agent.py": "c3ed83cb702034cf5f637211c5157ed4c11a83edf26feca1de9023c0e1b0d521",
+    "stage0/test_live_regressions.py": "4a69be5e7d9ee5fe58d579a478ca07bfe1b2e12f1e4f99663c47d6b9133b02cb",
+    "scripts/model-qualification-probe.py": "3170d9d804deeb4ad29a35d88a5391331dfeaa7137a510ec9e1fa0ae3f1ccaa8",
+    "scripts/run-planner-live-acceptance-v3.py": "db8d1abbd63ffa390b7c65fe9e82ad36064a725b7c6a7294e5db3c6a4c536930"
+  },
+  "protocol_semantics_changed": false,
+  "budget_arithmetic_changed": false,
+  "whitelist_gap_closed": "scripts/model-qualification-probe.py previously called create_llm_client() without assert_live_authorized(); the probe now fails closed exactly as the product does",
+  "provider_isolation": "siliconflow is reachable only via LLM_PROVIDER and is absent from auto-detection, locked by a regression test",
+  "verification": {
+    "unit": {"command": "python -m unittest stage0.test_harness_p0 stage0.test_live_regressions", "passed": true},
+    "offline_closeout": {"status": "pass", "tests_executed": 421, "suites": 34, "failed_suites": [], "evals_passed": 4}
+  },
+  "unavailable": [
+    {"field": "independent held-out task quality for the new endpoint",
+     "why": "outside this phase's acceptance scope (contract + discipline + latency, not quality)",
+     "risk": "the endpoint passed contract and discipline; that is NOT evidence that task quality is unchanged"},
+    {"field": "clean attribution of the 7.2x",
+     "why": "endpoint, model and gateway changed together",
+     "remedy": "a matched-output-volume control on a single gateway was not run"}
+  ],
+  "limitations": [
+    "Availability is NOT solved: 1 of 3 turns failed on a gateway timeout. n=3 is too small to characterise the rate.",
+    "Qwen/Qwen3.5-9B missed the threshold by 8-23 tokens; it was judged by the pre-registered threshold and was NOT retroactively admitted.",
+    "Probe numbers (completion 75-80, latency 1.9-2.1s) must not be quoted as batch results; the real payload differs.",
+    "Run 2/3 reaching autonomous_success is NOT the same claim as the 09-11 3/3 cohort threshold (different n, different endpoint); planner capability was not re-accepted this round."
+  ]
+}

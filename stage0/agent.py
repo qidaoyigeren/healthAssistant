@@ -23,13 +23,15 @@ from pathlib import Path
 from typing import Any, Callable, Sequence
 
 try:
-    from .turn_budget import TurnBudget, BudgetExceeded, CURRENT, budget_scope, provider_call, completion_call, check_lease
+    from .turn_budget import (TurnBudget, BudgetExceeded, CURRENT, budget_scope, provider_call,
+                              completion_call, check_lease, usage_split, usage_reasoning_tokens)
     from . import ddi_engine, extract_ddi, rag
     from .memory import EpisodicFact, MemoryStore, SemanticFact
     from .memory_context import build_context
     from .response_safety import check_composed_response, composed_text_prescribes
 except ImportError:  # Support ``python stage0/agent.py`` style imports.
-    from turn_budget import TurnBudget, BudgetExceeded, CURRENT, budget_scope, provider_call, completion_call, check_lease
+    from turn_budget import (TurnBudget, BudgetExceeded, CURRENT, budget_scope, provider_call,
+                             completion_call, check_lease, usage_split, usage_reasoning_tokens)
     import ddi_engine  # type: ignore
     import extract_ddi  # type: ignore
     import rag  # type: ignore
@@ -1526,7 +1528,14 @@ class LLMPlanner:
                         self._rate_limit_backoff(attempt_number)
                         continue
                     raise PlannerProposalError("provider_error", "provider_error", f"{type(exc).__name__}: {exc}") from exc
+                # Latency L0/L1: the per-attempt token split, so a metric can
+                # point at ONE call rather than at a turn total.  Observational
+                # only.
+                prompt_tokens, completion_tokens = usage_split(response)
                 self.last_provider_attempts.append({'outcome': 'response',
+                    'prompt_tokens': prompt_tokens,
+                    'completion_tokens': completion_tokens,
+                    'reasoning_tokens': usage_reasoning_tokens(response),
                     'latency_ms': round((time.perf_counter() - attempt_started) * 1000, 3)})
                 try:
                     return self._parse_response(response)

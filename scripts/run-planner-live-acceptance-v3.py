@@ -29,14 +29,26 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 PROTOCOL = ROOT / 'docs/agent-capability-upgrade/closeout-2026-09-10/planner-reliability/acceptance-protocol.md'
-# Switched 2026-09-11 for AVAILABILITY, not latency: the qualification probe
-# found both endpoints protocol-compliant and statistically indistinguishable
-# on latency (median 10.8s vs 11.8s), while the official flash endpoint was
-# rate-limiting.  Results from this endpoint are NOT comparable with the
-# earlier official-Zhipu cohort; that batch stays as its own record.
-MODEL = 'glm-5.3-flash'
-PROVIDER = 'tokendance'
-BASE_URL = 'https://tokendance.space/gateway/v1'
+# Switched 2026-09-12 for LATENCY, on measured output discipline -- the one
+# thing the 09-11 switch did not fix.  The qualification probe (L1) measured,
+# per candidate, completion tokens and the reasoning tokens the gateway itself
+# reports:
+#
+#   tokendance/glm-5.3-flash    completion 300-402, reasoning 190-263, 10.8-15.6s
+#   siliconflow/Qwen2.5-7B      completion  75- 80, reasoning   0-  0,  1.9- 2.1s
+#
+# and the CONTROL -- zai-org/GLM-5.3 at a second gateway -- returned the same
+# reasoning volume as TokenDance's copy of the same model (180-279 vs 190-263)
+# while answering ~2.3x faster.  So hidden reasoning is a property of the GLM
+# models, not of TokenDance's gateway, and switching gateways cannot fix it;
+# changing model can.  Qwen2.5-7B-Instruct is the only candidate that passed
+# the pre-registered discipline threshold while holding the v3 contract.
+#
+# Results from this endpoint are NOT comparable with either earlier cohort;
+# each batch stays as its own record.
+MODEL = 'Qwen/Qwen2.5-7B-Instruct'
+PROVIDER = 'siliconflow'
+BASE_URL = 'https://api.siliconflow.cn/v1'
 
 # The batch definition is frozen here: k, the per-run envelopes, and the
 # environment the child process runs under.  PLANNER_PROVIDER_RETRIES follows
@@ -56,6 +68,10 @@ CHILD_ENV = {
     # Pinned so a stale ambient selector cannot silently change which endpoint
     # handles the run; effective_config() reports it back for verification.
     'LLM_PROVIDER': PROVIDER,
+    # The model pin must be the variable THIS provider reads.  resolve_llm_config
+    # would otherwise fall back to that provider's default and quietly run a
+    # different model than the constant above claims.
+    f'{PROVIDER.upper()}_MODEL': MODEL,
     'MEMORY_ENABLE_LLM': '0',
     'AGENT_MULTI_REVIEW_MODEL_ENABLED': '0',
     'PLANNER_PROVIDER_RETRIES': str(BATCH['planner_provider_retries']),
@@ -143,8 +159,9 @@ def load_credentials() -> None:
         load_dotenv(ROOT / 'stage0/.env', override=False)
     except ModuleNotFoundError:
         pass
-    os.environ.update(ZHIPU_MODEL=MODEL, ZHIPU_THINKING='disabled',
-                      ZHIPU_MAX_TOKENS='4096', LLM_MAX_RETRIES='0')
+    # Pin the model for whichever provider this batch is frozen to.  A ZHIPU_*
+    # variable naming a Qwen model would be an inert, misleading leftover.
+    os.environ.update({f'{PROVIDER.upper()}_MODEL': MODEL, 'LLM_MAX_RETRIES': '0'})
 
 
 def smoke(out: Path, attempts: int = 4, backoff: float = 4.0) -> int:

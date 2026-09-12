@@ -26,6 +26,8 @@ ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
 TOKENDANCE_BASE_URL = "https://tokendance.space/gateway/v1"
 TOKENDANCE_DEFAULT_MODEL = "glm-5.3-flash"
+SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
+SILICONFLOW_DEFAULT_MODEL = "zai-org/GLM-4.5-Air"
 SEVERITIES = ["contraindicated", "major", "moderate", "minor", "unknown"]
 MECHANISM_TYPES = [
     "renal_clearance_reduction", "electrolyte_mediated", "pharmacodynamic_antagonism",
@@ -213,6 +215,17 @@ def _load_dotenv() -> None:
 AUTHORIZED_LIVE_TARGETS = (
     ("zhipu", "glm-4.7-flash", "https://open.bigmodel.cn/api/paas/v4"),
     ("tokendance", "glm-5.3-flash", "https://tokendance.space/gateway/v1"),
+    # Latency L1 (2026-09-12): candidates for output-token discipline, plus a
+    # control.  ``zai-org/GLM-5.3`` is the same model the TokenDance gateway
+    # serves as ``glm-5.3-flash``; running it at a second gateway is what
+    # separates "the model reasons a lot" from "this gateway makes it reason",
+    # which no single-endpoint measurement can do.  Exactly the models
+    # approved for this phase -- the whitelist is a list of decisions, not a
+    # place to enumerate a catalogue.
+    ("siliconflow", "zai-org/GLM-4.5-Air", SILICONFLOW_BASE_URL),
+    ("siliconflow", "Qwen/Qwen2.5-7B-Instruct", SILICONFLOW_BASE_URL),
+    ("siliconflow", "Qwen/Qwen3.5-9B", SILICONFLOW_BASE_URL),
+    ("siliconflow", "zai-org/GLM-5.3", SILICONFLOW_BASE_URL),
 )
 
 
@@ -237,10 +250,16 @@ def resolve_llm_config(model: str | None = None, require_key: bool = True) -> di
     The explicit selector exists because switching the endpoint that handles
     patient-derived context is a deliberate decision — it must not be a side
     effect of which key happens to be present in someone's ``.env``.
+
+    ``siliconflow`` is reachable through ``LLM_PROVIDER`` ONLY and is
+    deliberately absent from the auto-detection order: it was added as a
+    latency candidate (2026-09-12) and must never be picked because a key
+    happened to be sitting in a file.
     """
     _load_dotenv()
     zhipu_key = os.getenv("ZHIPU_API_KEY", "").strip()
     tokendance_key = os.getenv("TOKENDANCE_API_KEY", "").strip()
+    siliconflow_key = os.getenv("SILICONFLOW_API_KEY", "").strip()
     generic_key = os.getenv("LLM_API_KEY", "").strip()
     legacy_key = (os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip()
 
@@ -253,6 +272,10 @@ def resolve_llm_config(model: str | None = None, require_key: bool = True) -> di
             "provider": "tokendance", "api_key": tokendance_key,
             "base_url": os.getenv("TOKENDANCE_BASE_URL", TOKENDANCE_BASE_URL).strip(),
             "model": os.getenv("TOKENDANCE_MODEL", TOKENDANCE_DEFAULT_MODEL).strip()},
+        "siliconflow": lambda: {
+            "provider": "siliconflow", "api_key": siliconflow_key,
+            "base_url": os.getenv("SILICONFLOW_BASE_URL", SILICONFLOW_BASE_URL).strip(),
+            "model": os.getenv("SILICONFLOW_MODEL", SILICONFLOW_DEFAULT_MODEL).strip()},
         "openai_compatible": lambda: {
             "provider": "openai_compatible", "api_key": generic_key,
             "base_url": (os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1").strip(),

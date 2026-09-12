@@ -1,0 +1,119 @@
+{
+  "phase": "L0",
+  "title": "规划延迟度量与可比基线",
+  "date": "2026-09-12",
+  "status": "pass",
+  "source_fingerprint": {
+    "scope": "repo",
+    "digest": "d07e6530ae56cfdb342381f228693ef848d080a0c602d97fdc87b768ba52d782",
+    "note": "final digest, after the reasoning_tokens extension added during L1"
+  },
+  "changed_files": {
+    "stage0/memory.py": "50d8ab0b0c5a6cb9d7b0637bfa80b8f7dba68c978b2c1b9d24d3ff3b292ffbed",
+    "stage0/turn_budget.py": "4232d68c4ba9f08e0416af988254faa1e703c1158b1190980290dd2492e7f51f",
+    "stage0/agent.py": "c3ed83cb702034cf5f637211c5157ed4c11a83edf26feca1de9023c0e1b0d521",
+    "stage0/test_harness_p0.py": "cc82441db249e5f7b2aaba6fea2f4c3cb9afe689a9f696a855ccbba7980701d8",
+    "scripts/latency-baseline.py": "76fe8b6309174a35b0853dc585ff724902af6f9b4535dc79f4011d5a742b7aa1"
+  },
+  "protocol_semantics_changed": false,
+  "budget_arithmetic_changed": false,
+  "metric": {
+    "per_call_fields": ["prompt_tokens", "completion_tokens", "reasoning_tokens", "wall_ms", "outcome"],
+    "per_turn_fields": ["model_call_count", "turn_wall_ms", "first_progress_ms", "remote_ms"],
+    "primary_predictor": "completion_tokens",
+    "ratio": "ms_per_output_token = wall_ms / completion_tokens",
+    "scorable": "outcome == 'response' AND completion_tokens > 0",
+    "turn_comparable": "every model call reported usage",
+    "unavailable_policy": "missing field is null and named; never estimated",
+    "reasoning_tokens": "direct measurement of hidden reasoning where the gateway reports it; 0 (reported none), >0 (reasoning), null (gateway silent) stay distinguishable",
+    "planner_latency_source": "scripts/analyze-planner-metrics.py (imported, not re-derived)",
+    "cohort_override": "--cohort LABEL=GLOB so later phases reuse this one definition instead of writing a second one"
+  },
+  "commands": {
+    "baseline_one_command": "python scripts/latency-baseline.py --out docs/agent-capability-upgrade/latency-2026-09-11/L0/baseline.json",
+    "unit": "python -m unittest stage0.test_harness_p0 -v",
+    "offline_closeout": "python scripts/verify-agent-closeout.py --out output/latency-final-closeout"
+  },
+  "results": {
+    "doc_claims_reproduced": 4,
+    "doc_claims_total": 4,
+    "doc_claims_differing": [],
+    "baseline_deterministic_recompute": true,
+    "unit_tests": {"modules": 2, "passed": 40, "failed": 0},
+    "offline_closeout": {"status": "pass", "tests_executed": 421, "suites": 34, "failed_suites": [], "evals_passed": 4}
+  },
+  "measured": {
+    "probe_ms_per_output_token_each": [30.1, 37.34, 27.84, 27.17, 25.86, 22.92],
+    "probe_ms_per_output_token_min": 22.92,
+    "probe_ms_per_output_token_max": 37.34,
+    "documented_ms_per_output_token_claim": 27,
+    "documented_claim_verdict": "in range as a central value; conflates marginal (19.27 ms/token, R2=0.956) with a ~9.7s fixed term"
+  },
+  "batches": [
+    {
+      "cohort": "planner-closeout-2026-09-11",
+      "endpoint": "zhipu/glm-4.7-flash",
+      "planner_provider_retries": 1,
+      "runs": 3,
+      "latency_comparable_runs": 0,
+      "planner_latency_ms_median": null,
+      "turn_wall_ms_median": null,
+      "turn_wall_ms_median_including_failed_runs": 31147.0,
+      "token_split": "unavailable",
+      "note": "all 3 runs lost model calls (12 of 20 calls without usage); previously quoted medians are over failed runs"
+    },
+    {
+      "cohort": "planner-closeout-v3-2026-09-11",
+      "endpoint": "zhipu/glm-4.7-flash",
+      "planner_provider_retries": 0,
+      "runs": 3,
+      "latency_comparable_runs": 1,
+      "planner_latency_ms_median": 1536.6,
+      "turn_wall_ms_median": 6876.4,
+      "turn_wall_ms_median_including_failed_runs": 5109.9,
+      "calls_per_turn": [3],
+      "token_split": "unavailable",
+      "note": "batch-path evidence for the Zhipu side is n=1 healthy run"
+    },
+    {
+      "cohort": "provider-switch-2026-09-11",
+      "endpoint": "tokendance/glm-5.3-flash",
+      "planner_provider_retries": 1,
+      "runs": 3,
+      "latency_comparable_runs": 3,
+      "planner_latency_ms_median": 21867.5,
+      "turn_wall_ms_median": 72021.0,
+      "calls_per_turn": [3, 3, 3],
+      "token_split": "unavailable",
+      "remote_share_each": [0.9843, 0.9865, 0.989],
+      "first_progress_ms_each": [17022.929, 20768.328, 22319.169],
+      "note": "matches the prompt document's 21.9s/call and 72s/turn"
+    }
+  ],
+  "decomposition": {
+    "vendor_queue_and_backoff": "measured (remote_ms - sum(provider_attempts latency)); 2.8-3.0ms on tokendance, 3.0-6.0s on zhipu retries=1",
+    "model_decode": "inference only",
+    "model_prefill": "inference only",
+    "local_tool_execution": "upper bound; response composition and checkpoint writes are uninstrumented",
+    "prefill_vs_decode_inference": {
+      "provider": "tokendance",
+      "n": 5,
+      "wall_ms_on_completion_tokens": {"slope": 19.271, "intercept": 9659.0, "r_squared": 0.9556},
+      "wall_ms_on_prompt_tokens": {"slope": 0.876, "r_squared": 0.0174},
+      "caveat": "non-streamed samples; intercept is not prefill; a streaming measurement should replace this"
+    }
+  },
+  "unavailable": [
+    {"field": "prompt_tokens / completion_tokens", "where": "all three 2026-09-11 cohorts",
+     "backfill": "none; a total does not determine a split",
+     "resolved_for_future_cohorts": "yes -- L1's batch is the first with token_split: recorded"},
+    {"field": "browser-visible first feedback", "where": "every artifact", "note": "only the backend progress event is recorded"},
+    {"field": "prefill vs decode split", "where": "every artifact", "note": "needs a streaming time-to-first-token measurement"},
+    {"field": "zhipu batch-path latency sample", "where": "planner-closeout-v3", "note": "n=1 comparable run"}
+  ],
+  "limitations": [
+    "The endpoint comparison rests on 9 clean TokenDance calls vs 3 clean Zhipu calls; direction and magnitude (14x) are clear but the Zhipu batch sample is one run.",
+    "latency.json's median_* fields take the upper of two middle values, so with n=2 the median is the maximum; the prompt document quotes single calls instead.",
+    "Local timing is an upper bound and is not a measurement of tool execution."
+  ]
+}

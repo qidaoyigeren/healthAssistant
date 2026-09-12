@@ -1,0 +1,636 @@
+{
+  "started_at": "2026-09-12T03:21:10.649681+00:00",
+  "note": "synthetic content only; qualification for the v3 tool contract",
+  "discipline_threshold_tokens": 200,
+  "thinking_mode": "product",
+  "records": [
+    {
+      "candidate": "zhipu/glm-4.7-flash",
+      "provider": "zhipu",
+      "model": "glm-4.7-flash",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "max_tokens": 4096,
+      "tool_choice": "required",
+      "thinking_mode": "product",
+      "thinking": "disabled",
+      "calls": [
+        {
+          "call": 1,
+          "at": "2026-09-12T03:16:59.423025+00:00",
+          "latency_ms": 866,
+          "outcome": "error",
+          "error_type": "RateLimitError",
+          "error": "Error code: 429 - {'error': {'code': '1305', 'message': '该模型当前访问量过大，请您稍后再试'}}",
+          "accepted": false
+        },
+        {
+          "call": 2,
+          "at": "2026-09-12T03:17:00.288588+00:00",
+          "latency_ms": 60004,
+          "outcome": "error",
+          "error_type": "APITimeoutError",
+          "error": "Request timed out.",
+          "accepted": false
+        },
+        {
+          "call": 3,
+          "at": "2026-09-12T03:18:00.293088+00:00",
+          "latency_ms": 139,
+          "outcome": "error",
+          "error_type": "RateLimitError",
+          "error": "Error code: 429 - {'error': {'code': '1305', 'message': '该模型当前访问量过大，请您稍后再试'}}",
+          "accepted": false
+        },
+        {
+          "call": 4,
+          "at": "2026-09-12T03:18:00.432517+00:00",
+          "latency_ms": 91,
+          "outcome": "error",
+          "error_type": "RateLimitError",
+          "error": "Error code: 429 - {'error': {'code': '1305', 'message': '该模型当前访问量过大，请您稍后再试'}}",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "candidate": "tokendance/glm-5.3-flash",
+      "provider": "tokendance",
+      "model": "glm-5.3-flash",
+      "base_url": "https://tokendance.space/gateway/v1",
+      "max_tokens": 4096,
+      "tool_choice": "required",
+      "thinking_mode": "product",
+      "thinking": "disabled",
+      "calls": [
+        {
+          "call": 1,
+          "at": "2026-09-12T03:18:00.525570+00:00",
+          "latency_ms": 10734,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"expected_observation\":\"在药品说明书「药物相互作用」章节中找到合成药甲与合成药乙合用的相互作用描述（如药代动力学/药效学相互作用、禁忌或警示），若两者均有本地说明书，则应至少命中其中一份的相关段落\",\"gap_id\":\"claim:abc\",\"query\":\"合成药甲与合成药乙联合使用时的药物相互作用（包括药代动力学、药效学相互作用、禁忌与警示）在药品说明书中如何描述？\",\"section\":\"药物相互作用\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "prompt_tokens": 483,
+          "completion_tokens": 324,
+          "total_tokens": 807,
+          "ms_per_output_token": 33.13,
+          "accepted": true
+        },
+        {
+          "call": 2,
+          "at": "2026-09-12T03:18:11.259544+00:00",
+          "latency_ms": 10615,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"expected_observation\":\"说明书相互作用章节中直接提及合成药甲与合成药乙联合使用的文字，包括相互作用类型（如代谢抑制/竞争蛋白结合）、机制及临床后果（毒性增强或疗效降低）\",\"gap_id\":\"claim:abc\",\"query\":\"合成药甲与合成药乙联合使用时的药物相互作用（含机制、临床意义及剂量调整建议）\",\"section\":\"药物相互作用\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "prompt_tokens": 483,
+          "completion_tokens": 252,
+          "total_tokens": 735,
+          "ms_per_output_token": 42.12,
+          "accepted": true
+        },
+        {
+          "call": 3,
+          "at": "2026-09-12T03:18:21.874893+00:00",
+          "latency_ms": 13812,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"expected_observation\":\"说明书或标签语料中包含\\\"合成药甲\\\"与\\\"合成药乙\\\"联用时相互作用描述的条目，含相互作用机制/严重程度与临床处置建议；若为无关或空结果，则该 gap 维持未闭合。\",\"gap_id\":\"claim:abc\",\"query\":\"合成药甲与合成药乙 药物相互作用 联合用药 风险与处置（含相互作用机制、严重程度、剂量调整或禁忌建议）\",\"section\":\"药物相互作用\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "prompt_tokens": 483,
+          "completion_tokens": 399,
+          "total_tokens": 882,
+          "ms_per_output_token": 34.62,
+          "accepted": true
+        },
+        {
+          "call": 4,
+          "at": "2026-09-12T03:18:35.686555+00:00",
+          "latency_ms": 12168,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"expected_observation\":\"药物相互作用章节中关于合成药甲与合成药乙联用的证据描述，包括相互作用机制、临床后果（如药效增强/减弱、毒性风险）以及是否需要调整剂量或禁忌联用。\",\"gap_id\":\"claim:abc\",\"query\":\"合成药甲与合成药乙联合使用时的药物相互作用：机制、临床意义及剂量调整或禁忌建议\",\"section\":\"药物相互作用 / 警告与注意事项\",\"top_k\":5}"
+          ],
+          "content_present": false,
+          "prompt_tokens": 483,
+          "completion_tokens": 246,
+          "total_tokens": 729,
+          "ms_per_output_token": 49.46,
+          "accepted": true
+        }
+      ]
+    },
+    {
+      "candidate": "siliconflow/zai-org/GLM-4.5-Air",
+      "provider": "siliconflow",
+      "model": "zai-org/GLM-4.5-Air",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "max_tokens": 4096,
+      "tool_choice": "required",
+      "thinking_mode": "product",
+      "thinking": null,
+      "calls": [
+        {
+          "call": 1,
+          "at": "2026-09-12T03:18:47.857786+00:00",
+          "latency_ms": 11836,
+          "outcome": "error",
+          "error_type": "IndexError",
+          "error": "list index out of range",
+          "accepted": false
+        },
+        {
+          "call": 2,
+          "at": "2026-09-12T03:18:59.694155+00:00",
+          "latency_ms": 5998,
+          "outcome": "error",
+          "error_type": "IndexError",
+          "error": "list index out of range",
+          "accepted": false
+        },
+        {
+          "call": 3,
+          "at": "2026-09-12T03:19:05.692224+00:00",
+          "latency_ms": 11191,
+          "outcome": "error",
+          "error_type": "IndexError",
+          "error": "list index out of range",
+          "accepted": false
+        },
+        {
+          "call": 4,
+          "at": "2026-09-12T03:19:16.883597+00:00",
+          "latency_ms": 10716,
+          "outcome": "error",
+          "error_type": "IndexError",
+          "error": "list index out of range",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "candidate": "siliconflow/Qwen/Qwen2.5-7B-Instruct",
+      "provider": "siliconflow",
+      "model": "Qwen/Qwen2.5-7B-Instruct",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "max_tokens": 4096,
+      "tool_choice": "required",
+      "thinking_mode": "product",
+      "thinking": null,
+      "calls": [
+        {
+          "call": 1,
+          "at": "2026-09-12T03:19:27.602833+00:00",
+          "latency_ms": 1587,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"query\": \"甲药与乙药的相互作用\", \"top_k\": 5, \"section\": \"drug_interactions\", \"gap_id\": \"claim:abc\", \"expected_observation\": \"甲药与乙药相互作用的详细信息\"}"
+          ],
+          "content_present": false,
+          "prompt_tokens": 513,
+          "completion_tokens": 80,
+          "total_tokens": 593,
+          "ms_per_output_token": 19.84,
+          "accepted": true
+        },
+        {
+          "call": 2,
+          "at": "2026-09-12T03:19:29.189718+00:00",
+          "latency_ms": 2158,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"query\": \"甲药与乙药的相互作用\", \"top_k\": 5, \"section\": \"drug_interactions\", \"gap_id\": \"claim:abc\", \"expected_observation\": \"甲药与乙药相互作用的详细信息\"}"
+          ],
+          "content_present": false,
+          "prompt_tokens": 513,
+          "completion_tokens": 80,
+          "total_tokens": 593,
+          "ms_per_output_token": 26.98,
+          "accepted": true
+        },
+        {
+          "call": 3,
+          "at": "2026-09-12T03:19:31.347313+00:00",
+          "latency_ms": 1163,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"query\": \"甲 乙 相互作用\", \"top_k\": 5, \"section\": \"drug_interactions\", \"gap_id\": \"claim:abc\", \"expected_observation\": \"甲 乙 相互作用\"}"
+          ],
+          "content_present": false,
+          "prompt_tokens": 513,
+          "completion_tokens": 76,
+          "total_tokens": 589,
+          "ms_per_output_token": 15.3,
+          "accepted": true
+        },
+        {
+          "call": 4,
+          "at": "2026-09-12T03:19:32.510832+00:00",
+          "latency_ms": 60012,
+          "outcome": "error",
+          "error_type": "APITimeoutError",
+          "error": "Request timed out.",
+          "accepted": false
+        }
+      ]
+    },
+    {
+      "candidate": "siliconflow/Qwen/Qwen3.5-9B",
+      "provider": "siliconflow",
+      "model": "Qwen/Qwen3.5-9B",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "max_tokens": 4096,
+      "tool_choice": "required",
+      "thinking_mode": "product",
+      "thinking": null,
+      "calls": [
+        {
+          "call": 1,
+          "at": "2026-09-12T03:20:32.525751+00:00",
+          "latency_ms": 4481,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"query\": \"合成药甲与合成药乙的药物相互作用\", \"gap_id\": \"claim:abc\", \"expected_observation\": \"药物相互作用证据\"}"
+          ],
+          "content_present": false,
+          "prompt_tokens": 618,
+          "completion_tokens": 225,
+          "total_tokens": 843,
+          "ms_per_output_token": 19.92,
+          "accepted": true
+        },
+        {
+          "call": 2,
+          "at": "2026-09-12T03:20:37.006829+00:00",
+          "latency_ms": 4864,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"query\": \"合成药甲与合成药乙的药物相互作用\", \"gap_id\": \"claim:abc\", \"expected_observation\": \"药物相互作用证据，包括禁忌、不良反应或联合用药注意事项\"}"
+          ],
+          "content_present": false,
+          "prompt_tokens": 618,
+          "completion_tokens": 210,
+          "total_tokens": 828,
+          "ms_per_output_token": 23.16,
+          "accepted": true
+        },
+        {
+          "call": 3,
+          "at": "2026-09-12T03:20:41.870706+00:00",
+          "latency_ms": 2924,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"query\": \"合成药甲与合成药乙的相互作用\", \"gap_id\": \"claim:abc\", \"expected_observation\": \"药物相互作用证据\"}"
+          ],
+          "content_present": false,
+          "prompt_tokens": 618,
+          "completion_tokens": 222,
+          "total_tokens": 840,
+          "ms_per_output_token": 13.17,
+          "accepted": true
+        },
+        {
+          "call": 4,
+          "at": "2026-09-12T03:20:44.794806+00:00",
+          "latency_ms": 2316,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"query\": \"合成药甲与合成药乙的相互作用\", \"gap_id\": \"claim:abc\", \"expected_observation\": \"药物相互作用证据\"}"
+          ],
+          "content_present": false,
+          "prompt_tokens": 618,
+          "completion_tokens": 221,
+          "total_tokens": 839,
+          "ms_per_output_token": 10.48,
+          "accepted": true
+        }
+      ]
+    },
+    {
+      "candidate": "siliconflow/zai-org/GLM-5.3",
+      "provider": "siliconflow",
+      "model": "zai-org/GLM-5.3",
+      "base_url": "https://api.siliconflow.cn/v1",
+      "max_tokens": 4096,
+      "tool_choice": "required",
+      "thinking_mode": "product",
+      "thinking": null,
+      "calls": [
+        {
+          "call": 1,
+          "at": "2026-09-12T03:20:47.113189+00:00",
+          "latency_ms": 6672,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"expected_observation\": \"药品说明书（相互作用/禁忌/注意事项章节）中记载合成药甲与合成药乙合用的相互作用信息，例如禁忌合用、需调整剂量或加强监测；若未记载则确认为证据缺失\", \"gap_id\": \"claim:abc\", \"query\": \"合成药甲与合成药乙联合使用的药物相互作用（相互作用、禁忌、注意事项章节）\", \"top_k\": 5}"
+          ],
+          "content_present": false,
+          "prompt_tokens": 483,
+          "completion_tokens": 374,
+          "total_tokens": 857,
+          "ms_per_output_token": 17.84,
+          "accepted": true
+        },
+        {
+          "call": 2,
+          "at": "2026-09-12T03:20:53.785630+00:00",
+          "latency_ms": 4442,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"query\": \"合成药甲与合成药乙 联合用药 相互作用 禁忌 警示\", \"gap_id\": \"claim:abc\", \"expected_observation\": \"药品说明书中存在关于合成药甲与合成药乙合用的相互作用信息（如禁忌、警示、剂量调整或监测要求），或明确说明无临床显著相互作用\"}"
+          ],
+          "content_present": false,
+          "prompt_tokens": 483,
+          "completion_tokens": 235,
+          "total_tokens": 718,
+          "ms_per_output_token": 18.9,
+          "accepted": true
+        },
+        {
+          "call": 3,
+          "at": "2026-09-12T03:20:58.227694+00:00",
+          "latency_ms": 6020,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"query\": \"合成药甲与合成药乙联合使用时的药物相互作用：说明书是否列出两药合用的禁忌、剂量调整或监测要求（相互作用/药物相互作用章节）？\", \"gap_id\": \"claim:abc\", \"expected_observation\": \"药品说明书（相互作用/禁忌相关章节）中应能找到合成药甲与合成药乙合用的明确条目，例如：禁止合用、需调整剂量、或需临床监测；若检索结果中无任何两药相互作用的记载，则该证据缺失。\"}"
+          ],
+          "content_present": false,
+          "prompt_tokens": 483,
+          "completion_tokens": 324,
+          "total_tokens": 807,
+          "ms_per_output_token": 18.58,
+          "accepted": true
+        },
+        {
+          "call": 4,
+          "at": "2026-09-12T03:21:04.247693+00:00",
+          "latency_ms": 6402,
+          "outcome": "response",
+          "finish_reason": "tool_calls",
+          "returned_functions": [
+            "rag_search"
+          ],
+          "raw_arguments": [
+            "{\"expected_observation\": \"药品说明书（相互作用/禁忌/注意事项章节）中记载合成药甲与合成药乙合用的相互作用信息，例如禁忌合用、需调整剂量或加强监测；若未记载则确认为证据缺失\", \"gap_id\": \"claim:abc\", \"query\": \"合成药甲与合成药乙联合使用的药物相互作用（相互作用、禁忌、注意事项章节）\", \"top_k\": 5}"
+          ],
+          "content_present": false,
+          "prompt_tokens": 483,
+          "completion_tokens": 374,
+          "total_tokens": 857,
+          "ms_per_output_token": 17.12,
+          "accepted": true
+        }
+      ]
+    }
+  ],
+  "summary": [
+    {
+      "candidate": "zhipu/glm-4.7-flash",
+      "provider": "zhipu",
+      "model": "glm-4.7-flash",
+      "calls": 4,
+      "accepted": 0,
+      "complete_contract": 0,
+      "rate_limited": 3,
+      "latency_ms_each": [],
+      "completion_tokens_each": [],
+      "prompt_tokens_each": [],
+      "ms_per_output_token_each": [],
+      "completion_tokens_max": null,
+      "threshold_tokens": 200,
+      "threshold": "pre-registered; see DISCIPLINE_THRESHOLD_TOKENS",
+      "discipline_verdict": "fail_contract",
+      "problems": []
+    },
+    {
+      "candidate": "tokendance/glm-5.3-flash",
+      "provider": "tokendance",
+      "model": "glm-5.3-flash",
+      "calls": 4,
+      "accepted": 4,
+      "complete_contract": 4,
+      "rate_limited": 0,
+      "latency_ms_each": [
+        10734,
+        10615,
+        13812,
+        12168
+      ],
+      "completion_tokens_each": [
+        324,
+        252,
+        399,
+        246
+      ],
+      "prompt_tokens_each": [
+        483,
+        483,
+        483,
+        483
+      ],
+      "ms_per_output_token_each": [
+        33.13,
+        42.12,
+        34.62,
+        49.46
+      ],
+      "completion_tokens_max": 399,
+      "threshold_tokens": 200,
+      "threshold": "pre-registered; see DISCIPLINE_THRESHOLD_TOKENS",
+      "discipline_verdict": "fail_discipline",
+      "problems": []
+    },
+    {
+      "candidate": "siliconflow/zai-org/GLM-4.5-Air",
+      "provider": "siliconflow",
+      "model": "zai-org/GLM-4.5-Air",
+      "calls": 4,
+      "accepted": 0,
+      "complete_contract": 0,
+      "rate_limited": 0,
+      "latency_ms_each": [],
+      "completion_tokens_each": [],
+      "prompt_tokens_each": [],
+      "ms_per_output_token_each": [],
+      "completion_tokens_max": null,
+      "threshold_tokens": 200,
+      "threshold": "pre-registered; see DISCIPLINE_THRESHOLD_TOKENS",
+      "discipline_verdict": "fail_contract",
+      "problems": []
+    },
+    {
+      "candidate": "siliconflow/Qwen/Qwen2.5-7B-Instruct",
+      "provider": "siliconflow",
+      "model": "Qwen/Qwen2.5-7B-Instruct",
+      "calls": 4,
+      "accepted": 3,
+      "complete_contract": 3,
+      "rate_limited": 0,
+      "latency_ms_each": [
+        1587,
+        2158,
+        1163
+      ],
+      "completion_tokens_each": [
+        80,
+        80,
+        76
+      ],
+      "prompt_tokens_each": [
+        513,
+        513,
+        513
+      ],
+      "ms_per_output_token_each": [
+        19.84,
+        26.98,
+        15.3
+      ],
+      "completion_tokens_max": 80,
+      "threshold_tokens": 200,
+      "threshold": "pre-registered; see DISCIPLINE_THRESHOLD_TOKENS",
+      "discipline_verdict": "fail_contract",
+      "problems": []
+    },
+    {
+      "candidate": "siliconflow/Qwen/Qwen3.5-9B",
+      "provider": "siliconflow",
+      "model": "Qwen/Qwen3.5-9B",
+      "calls": 4,
+      "accepted": 4,
+      "complete_contract": 4,
+      "rate_limited": 0,
+      "latency_ms_each": [
+        4481,
+        4864,
+        2924,
+        2316
+      ],
+      "completion_tokens_each": [
+        225,
+        210,
+        222,
+        221
+      ],
+      "prompt_tokens_each": [
+        618,
+        618,
+        618,
+        618
+      ],
+      "ms_per_output_token_each": [
+        19.92,
+        23.16,
+        13.17,
+        10.48
+      ],
+      "completion_tokens_max": 225,
+      "threshold_tokens": 200,
+      "threshold": "pre-registered; see DISCIPLINE_THRESHOLD_TOKENS",
+      "discipline_verdict": "fail_discipline",
+      "problems": []
+    },
+    {
+      "candidate": "siliconflow/zai-org/GLM-5.3",
+      "provider": "siliconflow",
+      "model": "zai-org/GLM-5.3",
+      "calls": 4,
+      "accepted": 4,
+      "complete_contract": 4,
+      "rate_limited": 0,
+      "latency_ms_each": [
+        6672,
+        4442,
+        6020,
+        6402
+      ],
+      "completion_tokens_each": [
+        374,
+        235,
+        324,
+        374
+      ],
+      "prompt_tokens_each": [
+        483,
+        483,
+        483,
+        483
+      ],
+      "ms_per_output_token_each": [
+        17.84,
+        18.9,
+        18.58,
+        17.12
+      ],
+      "completion_tokens_max": 374,
+      "threshold_tokens": 200,
+      "threshold": "pre-registered; see DISCIPLINE_THRESHOLD_TOKENS",
+      "discipline_verdict": "fail_discipline",
+      "problems": []
+    }
+  ],
+  "completed_at": "2026-09-12T03:21:10.649890+00:00",
+  "superseded": true,
+  "superseded_by": "../qualification-2/qualification.json",
+  "superseded_reason": "The raw records here are valid measurements (4 samples per candidate). The summary[].discipline_verdict values are NOT: they were produced before the verdict logic was corrected, and scored a rate-limited candidate (zhipu/glm-4.7-flash, 5 of 6 refused with 429) as fail_contract, which would eliminate an endpoint for a busy afternoon. qualification-2 re-sampled with 6 calls per candidate under the corrected logic and additionally records reasoning_tokens. Read verdicts from qualification-2 only."
+}

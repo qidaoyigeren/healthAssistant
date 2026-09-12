@@ -1,0 +1,584 @@
+{
+  "started_at": "2026-09-12T03:31:23.121665+00:00",
+  "note": "synthetic content only; recomputed from artifacts, no calls made",
+  "metric": {
+    "per_call_fields": [
+      "prompt_tokens",
+      "completion_tokens",
+      "wall_ms",
+      "outcome"
+    ],
+    "per_turn_fields": [
+      "model_call_count",
+      "turn_wall_ms",
+      "first_progress_ms",
+      "remote_ms"
+    ],
+    "primary_predictor": "completion_tokens",
+    "ratio": "ms_per_output_token = wall_ms / completion_tokens",
+    "scorable": "outcome == 'response' AND completion_tokens > 0",
+    "excluded": "refusals, timeouts and calls with no reported split stay in the counts, out of the ratio",
+    "unavailable_policy": "a missing field is null and named; it is never estimated",
+    "first_feedback_vs_result": "first_progress_ms and turn_wall_ms are separate measurements; browser-visible feedback is not recorded by any artifact yet"
+  },
+  "probe": {
+    "source": "latency-2026-09-11/latency.json",
+    "records": [
+      {
+        "provider": "zhipu",
+        "model": "glm-4.7-flash",
+        "label": "tiny_prompt",
+        "thinking": "disabled",
+        "payload_chars": 54,
+        "calls": [
+          {
+            "call": 1,
+            "outcome": "error",
+            "error_type": "RateLimitError",
+            "wall_ms": 747,
+            "prompt_tokens": null,
+            "completion_tokens": null,
+            "total_tokens": null,
+            "ms_per_output_token": null
+          },
+          {
+            "call": 2,
+            "outcome": "error",
+            "error_type": "RateLimitError",
+            "wall_ms": 151,
+            "prompt_tokens": null,
+            "completion_tokens": null,
+            "total_tokens": null,
+            "ms_per_output_token": null
+          }
+        ],
+        "scorable_calls": 0,
+        "excluded_calls": 2,
+        "ms_per_output_token_each": [],
+        "published_median_latency_ms": null,
+        "published_median_completion_tokens": null
+      },
+      {
+        "provider": "zhipu",
+        "model": "glm-4.7-flash",
+        "label": "real_payload",
+        "thinking": "disabled",
+        "payload_chars": 12241,
+        "calls": [
+          {
+            "call": 1,
+            "outcome": "error",
+            "error_type": "RateLimitError",
+            "wall_ms": 248,
+            "prompt_tokens": null,
+            "completion_tokens": null,
+            "total_tokens": null,
+            "ms_per_output_token": null
+          },
+          {
+            "call": 2,
+            "outcome": "response",
+            "error_type": null,
+            "wall_ms": 1475,
+            "prompt_tokens": 4224,
+            "completion_tokens": 49,
+            "total_tokens": 4273,
+            "ms_per_output_token": 30.1
+          }
+        ],
+        "scorable_calls": 1,
+        "excluded_calls": 1,
+        "ms_per_output_token_each": [
+          30.1
+        ],
+        "published_median_latency_ms": 1475,
+        "published_median_completion_tokens": 49
+      },
+      {
+        "provider": "tokendance",
+        "model": "glm-5.3-flash",
+        "label": "tiny_prompt",
+        "thinking": "disabled",
+        "payload_chars": 54,
+        "calls": [
+          {
+            "call": 1,
+            "outcome": "response",
+            "error_type": null,
+            "wall_ms": 25502,
+            "prompt_tokens": 437,
+            "completion_tokens": 683,
+            "total_tokens": 1120,
+            "ms_per_output_token": 37.34
+          },
+          {
+            "call": 2,
+            "outcome": "response",
+            "error_type": null,
+            "wall_ms": 40399,
+            "prompt_tokens": 437,
+            "completion_tokens": 1451,
+            "total_tokens": 1888,
+            "ms_per_output_token": 27.84
+          }
+        ],
+        "scorable_calls": 2,
+        "excluded_calls": 0,
+        "ms_per_output_token_each": [
+          37.34,
+          27.84
+        ],
+        "published_median_latency_ms": 40399,
+        "published_median_completion_tokens": 1451
+      },
+      {
+        "provider": "tokendance",
+        "model": "glm-5.3-flash",
+        "label": "real_payload",
+        "thinking": "disabled",
+        "payload_chars": 12241,
+        "calls": [
+          {
+            "call": 1,
+            "outcome": "response",
+            "error_type": null,
+            "wall_ms": 31574,
+            "prompt_tokens": 4219,
+            "completion_tokens": 1162,
+            "total_tokens": 5381,
+            "ms_per_output_token": 27.17
+          },
+          {
+            "call": 2,
+            "outcome": "error",
+            "error_type": "APITimeoutError",
+            "wall_ms": 60018,
+            "prompt_tokens": null,
+            "completion_tokens": null,
+            "total_tokens": null,
+            "ms_per_output_token": null
+          }
+        ],
+        "scorable_calls": 1,
+        "excluded_calls": 1,
+        "ms_per_output_token_each": [
+          27.17
+        ],
+        "published_median_latency_ms": 31574,
+        "published_median_completion_tokens": 1162
+      },
+      {
+        "provider": "tokendance",
+        "model": "glm-5.3-flash",
+        "label": "real_payload_encoding_default",
+        "thinking": null,
+        "payload_chars": 12241,
+        "calls": [
+          {
+            "call": 1,
+            "outcome": "response",
+            "error_type": null,
+            "wall_ms": 21285,
+            "prompt_tokens": 4219,
+            "completion_tokens": 823,
+            "total_tokens": 5042,
+            "ms_per_output_token": 25.86
+          },
+          {
+            "call": 2,
+            "outcome": "response",
+            "error_type": null,
+            "wall_ms": 55934,
+            "prompt_tokens": 4219,
+            "completion_tokens": 2440,
+            "total_tokens": 6659,
+            "ms_per_output_token": 22.92
+          }
+        ],
+        "scorable_calls": 2,
+        "excluded_calls": 0,
+        "ms_per_output_token_each": [
+          25.86,
+          22.92
+        ],
+        "published_median_latency_ms": 55934,
+        "published_median_completion_tokens": 2440
+      }
+    ],
+    "doc_reconciliation": [
+      {
+        "provider": "zhipu",
+        "label": "real_payload",
+        "quoted_call": 2,
+        "doc": {
+          "prompt_tokens": 4224,
+          "completion_tokens": 49,
+          "latency_s": 1.5
+        },
+        "recomputed": {
+          "prompt_tokens": 4224,
+          "completion_tokens": 49,
+          "latency_s": 1.5
+        },
+        "status": "reproduced",
+        "differences": []
+      },
+      {
+        "provider": "tokendance",
+        "label": "tiny_prompt",
+        "quoted_call": 2,
+        "doc": {
+          "prompt_tokens": 437,
+          "completion_tokens": 1451,
+          "latency_s": 40.4
+        },
+        "recomputed": {
+          "prompt_tokens": 437,
+          "completion_tokens": 1451,
+          "latency_s": 40.4
+        },
+        "status": "reproduced",
+        "differences": []
+      },
+      {
+        "provider": "tokendance",
+        "label": "real_payload",
+        "quoted_call": 1,
+        "doc": {
+          "prompt_tokens": 4219,
+          "completion_tokens": 1162,
+          "latency_s": 31.6
+        },
+        "recomputed": {
+          "prompt_tokens": 4219,
+          "completion_tokens": 1162,
+          "latency_s": 31.6
+        },
+        "status": "reproduced",
+        "differences": []
+      },
+      {
+        "provider": "tokendance",
+        "label": "real_payload_encoding_default",
+        "quoted_call": 2,
+        "doc": {
+          "prompt_tokens": 4219,
+          "completion_tokens": 2440,
+          "latency_s": 55.9
+        },
+        "recomputed": {
+          "prompt_tokens": 4219,
+          "completion_tokens": 2440,
+          "latency_s": 55.9
+        },
+        "status": "reproduced",
+        "differences": []
+      }
+    ],
+    "prefill_vs_decode": [
+      {
+        "provider": "tokendance",
+        "status": "inference",
+        "scorable_calls": 5,
+        "wall_ms_on_completion_tokens": {
+          "slope": 19.271,
+          "intercept": 9659.0,
+          "r_squared": 0.9556,
+          "n": 5
+        },
+        "wall_ms_on_prompt_tokens": {
+          "slope": 0.876,
+          "intercept": 32567.6,
+          "r_squared": 0.0174,
+          "n": 5
+        },
+        "reading": "decode-dominated if the completion slope is large and the prompt slope is flat or undefined",
+        "caveat": "non-streamed samples only; queueing and prefill are folded into the intercept, which is why the intercept is not read as prefill"
+      },
+      {
+        "provider": "zhipu",
+        "status": "insufficient_samples",
+        "scorable_calls": 1,
+        "note": "a slope needs at least three calls"
+      }
+    ]
+  },
+  "batches": [
+    {
+      "cohort": "L1-siliconflow-qwen2.5",
+      "runs": 3,
+      "latency_comparable_runs": 2,
+      "excluded_runs": [
+        {
+          "file": "live-final-1.json",
+          "why": "1 of 2 model calls reported no usage (statuses: unknown)"
+        }
+      ],
+      "planner_calls": 8,
+      "comparable_planner_calls": 6,
+      "planner_latency_ms_median": 3047.7,
+      "planner_latency_ms_median_including_failed_runs": 3047.7,
+      "planner_latency_ms_each_comparable": [
+        1798.994,
+        2933.94,
+        3161.464,
+        2435.065,
+        3403.141,
+        3936.424
+      ],
+      "turn_wall_ms_each_comparable": [
+        8886.3,
+        10731.36
+      ],
+      "turn_wall_ms_median": 9808.8,
+      "turn_wall_ms_median_including_failed_runs": 10731.4,
+      "calls_per_turn": [
+        3,
+        3
+      ],
+      "token_split": "recorded",
+      "calls_with_token_split": 7,
+      "completion_tokens_each": [
+        50,
+        50,
+        89,
+        106,
+        50,
+        89,
+        99
+      ],
+      "completion_tokens_median": 89,
+      "reasoning_tokens_each": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "ms_per_output_token_aggregate_each": [
+        32.22,
+        41.07
+      ],
+      "detail": [
+        {
+          "file": "live-final-1.json",
+          "task_id": "agent-dev-complete",
+          "goal_status": "incomplete",
+          "latency_comparable": false,
+          "latency_exclusion_reason": "1 of 2 model calls reported no usage (statuses: unknown)",
+          "planner_latency_ms_each": [
+            2024.399,
+            60015.942
+          ],
+          "planner_calls": 2,
+          "turn_wall_ms": 63080.7,
+          "model_calls": 2,
+          "actual_responses": 1,
+          "usage_unknown": 1,
+          "known_total_tokens": 2385,
+          "known_completion_tokens": 50,
+          "known_prompt_tokens": 2335,
+          "known_reasoning_tokens": 0,
+          "calls_with_token_split": 1,
+          "token_calls": [
+            {
+              "kind": "planner",
+              "cycle": 1,
+              "status": "actual",
+              "prompt_tokens": 2335,
+              "completion_tokens": 50,
+              "reasoning_tokens": 0,
+              "usage_tokens": 2385
+            },
+            {
+              "kind": "planner",
+              "cycle": 2,
+              "status": "unknown",
+              "prompt_tokens": null,
+              "completion_tokens": null,
+              "reasoning_tokens": null,
+              "usage_tokens": null
+            }
+          ],
+          "ms_per_output_token_aggregate": null,
+          "decomposition": {
+            "turn_wall_ms": 63080.7,
+            "remote_ms": 62040.3,
+            "remote_share": 0.9835,
+            "model_call_count": 2,
+            "provider_attempt_ms": 62036.7,
+            "provider_attempt_count": 2,
+            "vendor_queue_and_backoff_ms": 3.6,
+            "local_and_uninstrumented_ms": 1040.4,
+            "first_progress_ms": 3024.489,
+            "decode_vs_prefill": "not separable without streaming; see probe slope (inference)",
+            "local_execution": "upper bound only; response composition and checkpoint writes uninstrumented"
+          }
+        },
+        {
+          "file": "live-final-2.json",
+          "task_id": "agent-dev-complete",
+          "goal_status": "completed",
+          "latency_comparable": true,
+          "latency_exclusion_reason": null,
+          "planner_latency_ms_each": [
+            1798.994,
+            2933.94,
+            3161.464
+          ],
+          "planner_calls": 3,
+          "turn_wall_ms": 8886.3,
+          "model_calls": 3,
+          "actual_responses": 3,
+          "usage_unknown": 0,
+          "known_total_tokens": 12089,
+          "known_completion_tokens": 245,
+          "known_prompt_tokens": 11844,
+          "known_reasoning_tokens": 0,
+          "calls_with_token_split": 3,
+          "token_calls": [
+            {
+              "kind": "planner",
+              "cycle": 1,
+              "status": "actual",
+              "prompt_tokens": 2335,
+              "completion_tokens": 50,
+              "reasoning_tokens": 0,
+              "usage_tokens": 2385
+            },
+            {
+              "kind": "planner",
+              "cycle": 2,
+              "status": "actual",
+              "prompt_tokens": 4178,
+              "completion_tokens": 89,
+              "reasoning_tokens": 0,
+              "usage_tokens": 4267
+            },
+            {
+              "kind": "planner",
+              "cycle": 3,
+              "status": "actual",
+              "prompt_tokens": 5331,
+              "completion_tokens": 106,
+              "reasoning_tokens": 0,
+              "usage_tokens": 5437
+            }
+          ],
+          "ms_per_output_token_aggregate": 32.22,
+          "decomposition": {
+            "turn_wall_ms": 8886.3,
+            "remote_ms": 7894.4,
+            "remote_share": 0.8884,
+            "model_call_count": 3,
+            "provider_attempt_ms": 7891.8,
+            "provider_attempt_count": 3,
+            "vendor_queue_and_backoff_ms": 2.6,
+            "local_and_uninstrumented_ms": 991.9,
+            "first_progress_ms": 2737.626,
+            "decode_vs_prefill": "not separable without streaming; see probe slope (inference)",
+            "local_execution": "upper bound only; response composition and checkpoint writes uninstrumented"
+          }
+        },
+        {
+          "file": "live-final-3.json",
+          "task_id": "agent-dev-complete",
+          "goal_status": "completed",
+          "latency_comparable": true,
+          "latency_exclusion_reason": null,
+          "planner_latency_ms_each": [
+            2435.065,
+            3403.141,
+            3936.424
+          ],
+          "planner_calls": 3,
+          "turn_wall_ms": 10731.36,
+          "model_calls": 3,
+          "actual_responses": 3,
+          "usage_unknown": 0,
+          "known_total_tokens": 12083,
+          "known_completion_tokens": 238,
+          "known_prompt_tokens": 11845,
+          "known_reasoning_tokens": 0,
+          "calls_with_token_split": 3,
+          "token_calls": [
+            {
+              "kind": "planner",
+              "cycle": 1,
+              "status": "actual",
+              "prompt_tokens": 2335,
+              "completion_tokens": 50,
+              "reasoning_tokens": 0,
+              "usage_tokens": 2385
+            },
+            {
+              "kind": "planner",
+              "cycle": 2,
+              "status": "actual",
+              "prompt_tokens": 4178,
+              "completion_tokens": 89,
+              "reasoning_tokens": 0,
+              "usage_tokens": 4267
+            },
+            {
+              "kind": "planner",
+              "cycle": 3,
+              "status": "actual",
+              "prompt_tokens": 5332,
+              "completion_tokens": 99,
+              "reasoning_tokens": 0,
+              "usage_tokens": 5431
+            }
+          ],
+          "ms_per_output_token_aggregate": 41.07,
+          "decomposition": {
+            "turn_wall_ms": 10731.36,
+            "remote_ms": 9774.6,
+            "remote_share": 0.9108,
+            "model_call_count": 3,
+            "provider_attempt_ms": 9771.2,
+            "provider_attempt_count": 3,
+            "vendor_queue_and_backoff_ms": 3.4,
+            "local_and_uninstrumented_ms": 956.7,
+            "first_progress_ms": 3340.465,
+            "decode_vs_prefill": "not separable without streaming; see probe slope (inference)",
+            "local_execution": "upper bound only; response composition and checkpoint writes uninstrumented"
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "scorable_calls": 6,
+    "excluded_calls": 4,
+    "ms_per_output_token_each": [
+      30.1,
+      37.34,
+      27.84,
+      27.17,
+      25.86,
+      22.92
+    ],
+    "ms_per_output_token_min": 22.92,
+    "ms_per_output_token_max": 37.34,
+    "batches_with_token_split": 1
+  },
+  "unavailable": [
+    {
+      "field": "prompt_tokens / completion_tokens",
+      "where": "all three 2026-09-11 cohorts",
+      "why": "llm_attempts recorded one total; the planner trace recorded latency only",
+      "remedy": "L0 adds the split to the ledger and to provider_attempts; applies to future batches",
+      "backfill": "none -- historical splits are not recoverable from a total"
+    },
+    {
+      "field": "browser-visible first feedback",
+      "where": "every artifact",
+      "why": "only the backend progress event is sampled (first_backend_progress_ms)",
+      "remedy": "out of scope for L0; recorded here so it is not confused with the turn wall"
+    }
+  ],
+  "completed_at": "2026-09-12T03:31:23.121676+00:00"
+}

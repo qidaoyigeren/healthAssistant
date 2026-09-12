@@ -1,0 +1,978 @@
+{
+  "protocol": "agent-eval@1",
+  "planner_protocol_version": "propose-next-action@3",
+  "dataset": "author-synthetic-dev@1",
+  "policy": "gap",
+  "path": "replay",
+  "source_fingerprint": "70e99ba7dc27a3dad767582133d6e9461e9c86c57fd9545c997b3ec93da5b6d9",
+  "dataset_sha256": "477220626b1f31509087ff0feed05f54274348c7b0cfee31e4184be18ffdfed8",
+  "engineering_status": "fail",
+  "real_model_quality": "single_exposed_dev_task_only",
+  "provider_availability": {
+    "attempts": 2,
+    "actual_responses": 1,
+    "unknown_usage": 1
+  },
+  "independent_held_out": "unavailable",
+  "summary": {
+    "total": 1,
+    "passed": 0
+  },
+  "tasks": [
+    {
+      "task_id": "agent-dev-complete",
+      "family_id": "complete",
+      "score": {
+        "passed": false,
+        "failures": [
+          "unexpected_terminal_reason"
+        ],
+        "necessary_question_recall": {
+          "numerator": 0,
+          "denominator": 0
+        },
+        "invalid_questions": 0,
+        "supported_claim_ratio": {
+          "numerator": 0,
+          "denominator": 0
+        },
+        "false_completion": false,
+        "recovery_success": null,
+        "duplicate_effects": 0
+      },
+      "observed": {
+        "investigation": {
+          "goal": "请核查当前用药合用的证据和剩余不确定性",
+          "scope_id": "local-demo",
+          "version": "investigation@1",
+          "contract_version": "medication-evidence-review@1",
+          "patient_version": {
+            "medications": 2,
+            "semantic": 0
+          },
+          "claims": [
+            {
+              "claim_id": "claim:23cd3ebf4138",
+              "statement": "合成药甲、合成药乙的标签证据",
+              "entities": [
+                "合成药甲",
+                "合成药乙"
+              ],
+              "status": "insufficient",
+              "supporting_evidence": [],
+              "opposing_evidence": [],
+              "source_status": "unknown",
+              "condition_status": "unknown"
+            }
+          ],
+          "gaps": [
+            {
+              "gap_id": "authority",
+              "kind": "patient_fact_missing",
+              "description": "读取完整权威药单与关键事实",
+              "status": "resolved"
+            },
+            {
+              "gap_id": "claim:23cd3ebf4138",
+              "kind": "evidence_missing",
+              "description": "核查合成药甲、合成药乙的支持和反对证据",
+              "status": "open",
+              "claim_id": "claim:23cd3ebf4138"
+            },
+            {
+              "gap_id": "failure:memory_write",
+              "kind": "tool_failure",
+              "description": "工具执行失败，已有结果保留。",
+              "status": "open",
+              "error_kind": "cancelled"
+            }
+          ],
+          "checks": {
+            "authority": "checked",
+            "interaction_evidence": "uncovered",
+            "applicability": "uncovered"
+          },
+          "facts": {
+            "semantic": [],
+            "medications": [
+              {
+                "id": 1,
+                "medication_key": "合成药甲",
+                "display_name": "合成药甲",
+                "dose": "5 mg",
+                "route": null,
+                "schedule": null,
+                "status": "active",
+                "start_at": "2026-09-01T00:00:00+00:00",
+                "end_at": null,
+                "source": "synthetic-fixture",
+                "source_uri": null,
+                "version": 1,
+                "predecessor_id": null,
+                "created_at": "2026-09-12T03:28:55+00:00",
+                "start_at_basis": "reported",
+                "ingredients": [],
+                "ref": "memory:medication:1@v1"
+              },
+              {
+                "id": 2,
+                "medication_key": "合成药乙",
+                "display_name": "合成药乙",
+                "dose": "10 mg",
+                "route": null,
+                "schedule": null,
+                "status": "active",
+                "start_at": "2026-09-01T00:00:00+00:00",
+                "end_at": null,
+                "source": "synthetic-fixture",
+                "source_uri": null,
+                "version": 1,
+                "predecessor_id": null,
+                "created_at": "2026-09-12T03:28:55+00:00",
+                "start_at_basis": "reported",
+                "ingredients": [],
+                "ref": "memory:medication:2@v1"
+              }
+            ],
+            "open_conflicts": []
+          },
+          "conflicts": [],
+          "questions": [],
+          "candidates": [
+            {
+              "tool": "rag_search",
+              "purpose": "investigation:claim:23cd3ebf4138",
+              "arguments": {
+                "query": "合成药甲 合成药乙 药物相互作用 风险",
+                "top_k": 5
+              },
+              "rationale": "解决已记录缺口",
+              "gap_id": "claim:23cd3ebf4138",
+              "expected_observation": "获得新增可核验证据或明确冲突"
+            }
+          ],
+          "evidence_refs": [],
+          "read_refs": [],
+          "content_hashes": [],
+          "queries": [],
+          "assessments": {},
+          "no_progress_count": 0,
+          "termination_reason": "budget_insufficient",
+          "authority_read": true,
+          "invalidations": [],
+          "context_integrity": "full_authority_checked_evidence_body_on_demand",
+          "mode": "llm"
+        },
+        "responses": [
+          {
+            "text": "有界证据核查报告\n已核查范围：权威用药及关键事实。\n合成药甲、合成药乙的标签证据：insufficient。支持引用：无；反对引用：无。\n待补充/未解决：核查合成药甲、合成药乙的支持和反对证据；工具执行失败，已有结果保留。。\n终止原因：budget_insufficient。\n这份报告仅说明有界标签核查结果；insufficient/unknown 不是无风险，未列药物不代表停药。建议咨询医生/药师。",
+            "warnings": [],
+            "conflicts": [],
+            "audit_trail": {
+              "session_id": "synthetic-dev",
+              "turn_id": "t-0",
+              "memory_refs": [],
+              "source_refs": [],
+              "response_source": "template",
+              "response_fallback_reason": "budget_exhausted:usage_unknown",
+              "investigation": {
+                "goal": "请核查当前用药合用的证据和剩余不确定性",
+                "scope_id": "local-demo",
+                "version": "investigation@1",
+                "contract_version": "medication-evidence-review@1",
+                "patient_version": {
+                  "medications": 2,
+                  "semantic": 0
+                },
+                "claims": [
+                  {
+                    "claim_id": "claim:23cd3ebf4138",
+                    "statement": "合成药甲、合成药乙的标签证据",
+                    "entities": [
+                      "合成药甲",
+                      "合成药乙"
+                    ],
+                    "status": "insufficient",
+                    "supporting_evidence": [],
+                    "opposing_evidence": [],
+                    "source_status": "unknown",
+                    "condition_status": "unknown"
+                  }
+                ],
+                "gaps": [
+                  {
+                    "gap_id": "authority",
+                    "kind": "patient_fact_missing",
+                    "description": "读取完整权威药单与关键事实",
+                    "status": "resolved"
+                  },
+                  {
+                    "gap_id": "claim:23cd3ebf4138",
+                    "kind": "evidence_missing",
+                    "description": "核查合成药甲、合成药乙的支持和反对证据",
+                    "status": "open",
+                    "claim_id": "claim:23cd3ebf4138"
+                  },
+                  {
+                    "gap_id": "failure:memory_write",
+                    "kind": "tool_failure",
+                    "description": "工具执行失败，已有结果保留。",
+                    "status": "open",
+                    "error_kind": "cancelled"
+                  }
+                ],
+                "checks": {
+                  "authority": "checked",
+                  "interaction_evidence": "uncovered",
+                  "applicability": "uncovered"
+                },
+                "facts": {
+                  "semantic": [],
+                  "medications": [
+                    {
+                      "id": 1,
+                      "medication_key": "合成药甲",
+                      "display_name": "合成药甲",
+                      "dose": "5 mg",
+                      "route": null,
+                      "schedule": null,
+                      "status": "active",
+                      "start_at": "2026-09-01T00:00:00+00:00",
+                      "end_at": null,
+                      "source": "synthetic-fixture",
+                      "source_uri": null,
+                      "version": 1,
+                      "predecessor_id": null,
+                      "created_at": "2026-09-12T03:28:55+00:00",
+                      "start_at_basis": "reported",
+                      "ingredients": [],
+                      "ref": "memory:medication:1@v1"
+                    },
+                    {
+                      "id": 2,
+                      "medication_key": "合成药乙",
+                      "display_name": "合成药乙",
+                      "dose": "10 mg",
+                      "route": null,
+                      "schedule": null,
+                      "status": "active",
+                      "start_at": "2026-09-01T00:00:00+00:00",
+                      "end_at": null,
+                      "source": "synthetic-fixture",
+                      "source_uri": null,
+                      "version": 1,
+                      "predecessor_id": null,
+                      "created_at": "2026-09-12T03:28:55+00:00",
+                      "start_at_basis": "reported",
+                      "ingredients": [],
+                      "ref": "memory:medication:2@v1"
+                    }
+                  ],
+                  "open_conflicts": []
+                },
+                "conflicts": [],
+                "questions": [],
+                "candidates": [
+                  {
+                    "tool": "rag_search",
+                    "purpose": "investigation:claim:23cd3ebf4138",
+                    "arguments": {
+                      "query": "合成药甲 合成药乙 药物相互作用 风险",
+                      "top_k": 5
+                    },
+                    "rationale": "解决已记录缺口",
+                    "gap_id": "claim:23cd3ebf4138",
+                    "expected_observation": "获得新增可核验证据或明确冲突"
+                  }
+                ],
+                "evidence_refs": [],
+                "read_refs": [],
+                "content_hashes": [],
+                "queries": [],
+                "assessments": {},
+                "no_progress_count": 0,
+                "termination_reason": "budget_insufficient",
+                "authority_read": true,
+                "invalidations": [],
+                "context_integrity": "full_authority_checked_evidence_body_on_demand",
+                "mode": "llm"
+              }
+            },
+            "tool_trace": [
+              {
+                "phase": "plan",
+                "cycle": 1,
+                "decision": {
+                  "tool": "memory_read",
+                  "purpose": "memory_read",
+                  "arguments": {
+                    "query": "snapshot"
+                  },
+                  "rationale": "",
+                  "gap_id": "authority",
+                  "expected_observation": "获得完整当前事实及版本"
+                },
+                "planner": {
+                  "mode": "hybrid",
+                  "source": "llm",
+                  "proposal": {
+                    "decision": "tool",
+                    "tool": "memory_read",
+                    "gap_id": "authority",
+                    "expected_observation": "获得完整当前事实及版本",
+                    "arguments": {
+                      "query": "snapshot"
+                    }
+                  },
+                  "validation": {
+                    "status": "accepted",
+                    "valid": true,
+                    "errors": []
+                  },
+                  "fallback_reason": null,
+                  "fallback_kind": null,
+                  "argument_corrections": [],
+                  "model": "Qwen/Qwen2.5-7B-Instruct",
+                  "latency_ms": 2024.399,
+                  "provider_attempts": [
+                    {
+                      "outcome": "response",
+                      "prompt_tokens": 2335,
+                      "completion_tokens": 50,
+                      "reasoning_tokens": 0,
+                      "latency_ms": 2023.83
+                    }
+                  ]
+                }
+              },
+              {
+                "phase": "act",
+                "cycle": 1,
+                "tool": "memory_read",
+                "purpose": "memory_read",
+                "arguments": {
+                  "query": "snapshot"
+                },
+                "planner_source": "llm"
+              },
+              {
+                "phase": "observe",
+                "cycle": 1,
+                "tool": "memory_read",
+                "purpose": "memory_read",
+                "ok": true,
+                "summary": {
+                  "keys": [
+                    "medications",
+                    "open_conflicts",
+                    "semantic"
+                  ],
+                  "medications_count": 2
+                },
+                "observation": {
+                  "tool": "memory_read",
+                  "purpose": "memory_read",
+                  "arguments": {
+                    "query": "snapshot"
+                  },
+                  "result": {
+                    "semantic": [],
+                    "medications": [
+                      {
+                        "id": 1,
+                        "medication_key": "合成药甲",
+                        "display_name": "合成药甲",
+                        "dose": "5 mg",
+                        "route": null,
+                        "schedule": null,
+                        "status": "active",
+                        "start_at": "2026-09-01T00:00:00+00:00",
+                        "end_at": null,
+                        "source": "synthetic-fixture",
+                        "source_uri": null,
+                        "version": 1,
+                        "predecessor_id": null,
+                        "created_at": "2026-09-12T03:28:55+00:00",
+                        "start_at_basis": "reported",
+                        "ingredients": [],
+                        "ref": "memory:medication:1@v1"
+                      },
+                      {
+                        "id": 2,
+                        "medication_key": "合成药乙",
+                        "display_name": "合成药乙",
+                        "dose": "10 mg",
+                        "route": null,
+                        "schedule": null,
+                        "status": "active",
+                        "start_at": "2026-09-01T00:00:00+00:00",
+                        "end_at": null,
+                        "source": "synthetic-fixture",
+                        "source_uri": null,
+                        "version": 1,
+                        "predecessor_id": null,
+                        "created_at": "2026-09-12T03:28:55+00:00",
+                        "start_at_basis": "reported",
+                        "ingredients": [],
+                        "ref": "memory:medication:2@v1"
+                      }
+                    ],
+                    "open_conflicts": []
+                  },
+                  "ok": true,
+                  "cycle": 1,
+                  "error_kind": null,
+                  "recoverable": null,
+                  "evidence_refs": [],
+                  "no_progress": false
+                }
+              },
+              {
+                "phase": "investigation_progress",
+                "cycle": 1,
+                "tool": "memory_read",
+                "new_evidence_refs": [],
+                "new_read_refs": [],
+                "gap_changes": [
+                  "authority",
+                  "claim:23cd3ebf4138"
+                ]
+              },
+              {
+                "phase": "reflect",
+                "cycle": 1,
+                "note": "观察结果足以继续规划。"
+              },
+              {
+                "phase": "plan",
+                "cycle": 2,
+                "decision": {
+                  "tool": "memory_write",
+                  "purpose": "consolidate_interaction",
+                  "arguments": {
+                    "operation": "consolidate_event"
+                  },
+                  "rationale": "每次交互先进行结构化事实整合、去重和冲突检测。",
+                  "gap_id": null,
+                  "expected_observation": null
+                },
+                "planner": {
+                  "mode": "hybrid",
+                  "source": "fallback",
+                  "proposal": null,
+                  "validation": {
+                    "status": "proposal_error",
+                    "valid": false,
+                    "errors": [
+                      {
+                        "code": "provider_error",
+                        "category": "provider_error",
+                        "message": "APITimeoutError: Request timed out."
+                      }
+                    ]
+                  },
+                  "fallback_reason": "provider_error",
+                  "fallback_kind": "emergency",
+                  "argument_corrections": [],
+                  "model": "Qwen/Qwen2.5-7B-Instruct",
+                  "latency_ms": 60015.942,
+                  "provider_attempts": [
+                    {
+                      "outcome": "timeout",
+                      "error_type": "APITimeoutError",
+                      "latency_ms": 60012.904
+                    }
+                  ]
+                }
+              },
+              {
+                "phase": "act",
+                "cycle": 2,
+                "tool": "memory_write",
+                "purpose": "consolidate_interaction",
+                "arguments": {
+                  "operation": "consolidate_event"
+                },
+                "planner_source": "fallback"
+              },
+              {
+                "phase": "observe",
+                "cycle": 2,
+                "tool": "memory_write",
+                "purpose": "consolidate_interaction",
+                "ok": false,
+                "summary": {
+                  "keys": [
+                    "error",
+                    "error_kind",
+                    "recoverable"
+                  ],
+                  "error": "run is cancelled or over budget"
+                },
+                "observation": {
+                  "tool": "memory_write",
+                  "purpose": "consolidate_interaction",
+                  "arguments": {
+                    "operation": "consolidate_event"
+                  },
+                  "result": {
+                    "error_kind": "cancelled",
+                    "recoverable": false,
+                    "error": "run is cancelled or over budget"
+                  },
+                  "ok": false,
+                  "cycle": 2,
+                  "error_kind": "cancelled",
+                  "recoverable": false,
+                  "evidence_refs": [],
+                  "no_progress": false
+                }
+              },
+              {
+                "phase": "investigation_progress",
+                "cycle": 2,
+                "tool": "memory_write",
+                "new_evidence_refs": [],
+                "new_read_refs": [],
+                "gap_changes": [
+                  "failure:memory_write"
+                ]
+              },
+              {
+                "phase": "reflect",
+                "cycle": 2,
+                "note": "工具 memory_write 失败；不得据此形成确定性医疗结论，响应必须标记不确定并升级。"
+              },
+              {
+                "phase": "cancel",
+                "cycle": 2,
+                "note": "收到取消请求；停止后续规划与工具执行，已完成操作不受影响。"
+              },
+              {
+                "phase": "budget",
+                "cycle": 2,
+                "exhausted": "usage_unknown",
+                "tokens_estimated": 15491,
+                "elapsed_seconds": 62.070853399985936,
+                "limits": {
+                  "max_cycles": 12,
+                  "wall_clock_seconds": 180.0,
+                  "token_budget": 150000,
+                  "call_budget": 8
+                }
+              },
+              {
+                "phase": "respond",
+                "cycle": 2,
+                "source": "template",
+                "delivered_text": "有界证据核查报告\n已核查范围：权威用药及关键事实。\n合成药甲、合成药乙的标签证据：insufficient。支持引用：无；反对引用：无。\n待补充/未解决：核查合成药甲、合成药乙的支持和反对证据；工具执行失败，已有结果保留。。\n终止原因：budget_insufficient。\n这份报告仅说明有界标签核查结果；insufficient/unknown 不是无风险，未列药物不代表停药。建议咨询医生/药师。",
+                "investigation": {
+                  "goal": "请核查当前用药合用的证据和剩余不确定性",
+                  "scope_id": "local-demo",
+                  "version": "investigation@1",
+                  "contract_version": "medication-evidence-review@1",
+                  "patient_version": {
+                    "medications": 2,
+                    "semantic": 0
+                  },
+                  "claims": [
+                    {
+                      "claim_id": "claim:23cd3ebf4138",
+                      "statement": "合成药甲、合成药乙的标签证据",
+                      "entities": [
+                        "合成药甲",
+                        "合成药乙"
+                      ],
+                      "status": "insufficient",
+                      "supporting_evidence": [],
+                      "opposing_evidence": [],
+                      "source_status": "unknown",
+                      "condition_status": "unknown"
+                    }
+                  ],
+                  "gaps": [
+                    {
+                      "gap_id": "authority",
+                      "kind": "patient_fact_missing",
+                      "description": "读取完整权威药单与关键事实",
+                      "status": "resolved"
+                    },
+                    {
+                      "gap_id": "claim:23cd3ebf4138",
+                      "kind": "evidence_missing",
+                      "description": "核查合成药甲、合成药乙的支持和反对证据",
+                      "status": "open",
+                      "claim_id": "claim:23cd3ebf4138"
+                    },
+                    {
+                      "gap_id": "failure:memory_write",
+                      "kind": "tool_failure",
+                      "description": "工具执行失败，已有结果保留。",
+                      "status": "open",
+                      "error_kind": "cancelled"
+                    }
+                  ],
+                  "checks": {
+                    "authority": "checked",
+                    "interaction_evidence": "uncovered",
+                    "applicability": "uncovered"
+                  },
+                  "facts": {
+                    "semantic": [],
+                    "medications": [
+                      {
+                        "id": 1,
+                        "medication_key": "合成药甲",
+                        "display_name": "合成药甲",
+                        "dose": "5 mg",
+                        "route": null,
+                        "schedule": null,
+                        "status": "active",
+                        "start_at": "2026-09-01T00:00:00+00:00",
+                        "end_at": null,
+                        "source": "synthetic-fixture",
+                        "source_uri": null,
+                        "version": 1,
+                        "predecessor_id": null,
+                        "created_at": "2026-09-12T03:28:55+00:00",
+                        "start_at_basis": "reported",
+                        "ingredients": [],
+                        "ref": "memory:medication:1@v1"
+                      },
+                      {
+                        "id": 2,
+                        "medication_key": "合成药乙",
+                        "display_name": "合成药乙",
+                        "dose": "10 mg",
+                        "route": null,
+                        "schedule": null,
+                        "status": "active",
+                        "start_at": "2026-09-01T00:00:00+00:00",
+                        "end_at": null,
+                        "source": "synthetic-fixture",
+                        "source_uri": null,
+                        "version": 1,
+                        "predecessor_id": null,
+                        "created_at": "2026-09-12T03:28:55+00:00",
+                        "start_at_basis": "reported",
+                        "ingredients": [],
+                        "ref": "memory:medication:2@v1"
+                      }
+                    ],
+                    "open_conflicts": []
+                  },
+                  "conflicts": [],
+                  "questions": [],
+                  "candidates": [
+                    {
+                      "tool": "rag_search",
+                      "purpose": "investigation:claim:23cd3ebf4138",
+                      "arguments": {
+                        "query": "合成药甲 合成药乙 药物相互作用 风险",
+                        "top_k": 5
+                      },
+                      "rationale": "解决已记录缺口",
+                      "gap_id": "claim:23cd3ebf4138",
+                      "expected_observation": "获得新增可核验证据或明确冲突"
+                    }
+                  ],
+                  "evidence_refs": [],
+                  "read_refs": [],
+                  "content_hashes": [],
+                  "queries": [],
+                  "assessments": {},
+                  "no_progress_count": 0,
+                  "termination_reason": "budget_insufficient",
+                  "authority_read": true,
+                  "invalidations": [],
+                  "context_integrity": "full_authority_checked_evidence_body_on_demand",
+                  "mode": "llm"
+                }
+              }
+            ],
+            "safety_status": "enforced",
+            "operation_outcomes": [],
+            "answer_bundle": {
+              "bundle_version": "answer-bundle@1",
+              "execution_status": "degraded",
+              "goal_status": "incomplete",
+              "answer_status": "bounded_report",
+              "investigation": {
+                "goal": "请核查当前用药合用的证据和剩余不确定性",
+                "scope_id": "local-demo",
+                "version": "investigation@1",
+                "contract_version": "medication-evidence-review@1",
+                "patient_version": {
+                  "medications": 2,
+                  "semantic": 0
+                },
+                "claims": [
+                  {
+                    "claim_id": "claim:23cd3ebf4138",
+                    "statement": "合成药甲、合成药乙的标签证据",
+                    "entities": [
+                      "合成药甲",
+                      "合成药乙"
+                    ],
+                    "status": "insufficient",
+                    "supporting_evidence": [],
+                    "opposing_evidence": [],
+                    "source_status": "unknown",
+                    "condition_status": "unknown"
+                  }
+                ],
+                "gaps": [
+                  {
+                    "gap_id": "authority",
+                    "kind": "patient_fact_missing",
+                    "description": "读取完整权威药单与关键事实",
+                    "status": "resolved"
+                  },
+                  {
+                    "gap_id": "claim:23cd3ebf4138",
+                    "kind": "evidence_missing",
+                    "description": "核查合成药甲、合成药乙的支持和反对证据",
+                    "status": "open",
+                    "claim_id": "claim:23cd3ebf4138"
+                  },
+                  {
+                    "gap_id": "failure:memory_write",
+                    "kind": "tool_failure",
+                    "description": "工具执行失败，已有结果保留。",
+                    "status": "open",
+                    "error_kind": "cancelled"
+                  }
+                ],
+                "checks": {
+                  "authority": "checked",
+                  "interaction_evidence": "uncovered",
+                  "applicability": "uncovered"
+                },
+                "facts": {
+                  "semantic": [],
+                  "medications": [
+                    {
+                      "id": 1,
+                      "medication_key": "合成药甲",
+                      "display_name": "合成药甲",
+                      "dose": "5 mg",
+                      "route": null,
+                      "schedule": null,
+                      "status": "active",
+                      "start_at": "2026-09-01T00:00:00+00:00",
+                      "end_at": null,
+                      "source": "synthetic-fixture",
+                      "source_uri": null,
+                      "version": 1,
+                      "predecessor_id": null,
+                      "created_at": "2026-09-12T03:28:55+00:00",
+                      "start_at_basis": "reported",
+                      "ingredients": [],
+                      "ref": "memory:medication:1@v1"
+                    },
+                    {
+                      "id": 2,
+                      "medication_key": "合成药乙",
+                      "display_name": "合成药乙",
+                      "dose": "10 mg",
+                      "route": null,
+                      "schedule": null,
+                      "status": "active",
+                      "start_at": "2026-09-01T00:00:00+00:00",
+                      "end_at": null,
+                      "source": "synthetic-fixture",
+                      "source_uri": null,
+                      "version": 1,
+                      "predecessor_id": null,
+                      "created_at": "2026-09-12T03:28:55+00:00",
+                      "start_at_basis": "reported",
+                      "ingredients": [],
+                      "ref": "memory:medication:2@v1"
+                    }
+                  ],
+                  "open_conflicts": []
+                },
+                "conflicts": [],
+                "questions": [],
+                "candidates": [
+                  {
+                    "tool": "rag_search",
+                    "purpose": "investigation:claim:23cd3ebf4138",
+                    "arguments": {
+                      "query": "合成药甲 合成药乙 药物相互作用 风险",
+                      "top_k": 5
+                    },
+                    "rationale": "解决已记录缺口",
+                    "gap_id": "claim:23cd3ebf4138",
+                    "expected_observation": "获得新增可核验证据或明确冲突"
+                  }
+                ],
+                "evidence_refs": [],
+                "read_refs": [],
+                "content_hashes": [],
+                "queries": [],
+                "assessments": {},
+                "no_progress_count": 0,
+                "termination_reason": "budget_insufficient",
+                "authority_read": true,
+                "invalidations": [],
+                "context_integrity": "full_authority_checked_evidence_body_on_demand",
+                "mode": "llm"
+              },
+              "multi_review": null,
+              "route": "open_planning",
+              "route_basis": "open_nl_request",
+              "phase_budget": {
+                "limit_cycles": 12,
+                "wrap_up_reserved": 2,
+                "wrap_up_seconds_reserved": 2.0,
+                "wrap_up_tokens_reserved": 1024,
+                "cycles_used": 2,
+                "token_usage": {
+                  "max_cycles": 12,
+                  "wall_clock_seconds": 180.0,
+                  "token_budget": 150000,
+                  "call_budget": 8,
+                  "consumed_seconds": 62.079066000005696,
+                  "tokens_estimated": 15491,
+                  "tokens_actual": 2385,
+                  "tokens_charged": 12066,
+                  "calls_attempted": 2,
+                  "refused_calls": 0,
+                  "cycles_consumed": 2,
+                  "accounting_version": 2,
+                  "usage_unknown": true,
+                  "wrap_up_seconds_reserved": 2.0,
+                  "wrap_up_tokens_reserved": 1024,
+                  "usage_quality": "mixed"
+                }
+              },
+              "safety_status": "enforced",
+              "claims": [
+                {
+                  "claim_id": "claim:23cd3ebf4138",
+                  "statement": "合成药甲、合成药乙的标签证据",
+                  "entities": [
+                    "合成药甲",
+                    "合成药乙"
+                  ],
+                  "status": "insufficient",
+                  "supporting_evidence": [],
+                  "opposing_evidence": [],
+                  "source_status": "unknown",
+                  "condition_status": "unknown",
+                  "kind": "investigation",
+                  "support_status": "insufficient",
+                  "evidence_refs": []
+                }
+              ],
+              "fact_refs": [],
+              "evidence_refs": [],
+              "patient_revision": {
+                "medications": 2,
+                "semantic": 0
+              },
+              "unresolved_questions": [
+                "degraded:budget_exhausted:usage_unknown",
+                "核查合成药甲、合成药乙的支持和反对证据",
+                "工具执行失败，已有结果保留。"
+              ],
+              "coverage": {
+                "consolidated": false,
+                "response_source": "template",
+                "degraded_reason": "budget_exhausted:usage_unknown",
+                "planner_fallback_reasons": [
+                  "provider_error"
+                ],
+                "research": []
+              }
+            }
+          }
+        ],
+        "execution_status": "degraded",
+        "goal_status": "incomplete",
+        "answer_status": "bounded_report",
+        "tool_calls": 2,
+        "model_calls": 2,
+        "actual_tokens": 2385,
+        "unknown_usage": 1,
+        "mode": "llm",
+        "degradation_reasons": [
+          "budget_exhausted:usage_unknown"
+        ],
+        "recovery_success": null,
+        "duplicate_effects": 0,
+        "receipts": [],
+        "usage_ledger": [
+          {
+            "attempt_id": "f875cdf54eab4111bfab736742a8626b",
+            "run_id": "t-0",
+            "kind": "planner",
+            "operation_id": "t-0:planner:cycle:1",
+            "cycle": 1,
+            "status": "actual",
+            "reserved_tokens": 9620,
+            "reserved_seconds": 60.0,
+            "usage_tokens": 2385,
+            "estimated_tokens": 5810,
+            "created_at": "2026-09-12T03:28:55+00:00",
+            "settled_at": "2026-09-12T03:28:57+00:00",
+            "prompt_tokens": 2335,
+            "completion_tokens": 50,
+            "reasoning_tokens": 0
+          },
+          {
+            "attempt_id": "db23625c07e2421bbcb7efb9001f340a",
+            "run_id": "t-0",
+            "kind": "planner",
+            "operation_id": "t-0:planner:cycle:2",
+            "cycle": 2,
+            "status": "unknown",
+            "reserved_tokens": 13777,
+            "reserved_seconds": 60.0,
+            "usage_tokens": null,
+            "estimated_tokens": 9681,
+            "created_at": "2026-09-12T03:28:57+00:00",
+            "settled_at": "2026-09-12T03:29:57+00:00",
+            "prompt_tokens": null,
+            "completion_tokens": null,
+            "reasoning_tokens": null
+          }
+        ],
+        "scripted_provider_attempts": 0,
+        "config": {
+          "provider": "siliconflow",
+          "model": "Qwen/Qwen2.5-7B-Instruct",
+          "base_url": "https://api.siliconflow.cn/v1"
+        },
+        "budgets": [
+          {
+            "run_id": "t-0",
+            "budget_json": "{\"accounting_version\":2,\"call_budget\":8,\"calls_attempted\":2,\"consumed_seconds\":62.08047660003649,\"cycles_consumed\":2,\"max_cycles\":12,\"refused_calls\":0,\"token_budget\":150000,\"tokens_actual\":2385,\"tokens_charged\":12066,\"tokens_estimated\":15491,\"usage_quality\":\"mixed\",\"usage_unknown\":true,\"wall_clock_seconds\":180.0,\"wrap_up_seconds_reserved\":2.0,\"wrap_up_tokens_reserved\":1024}"
+          }
+        ],
+        "progress_samples": [
+          {
+            "event_id": "pe-94793839d6f4aa1b5a99",
+            "kind": "organizing",
+            "elapsed_ms": 3024.489
+          },
+          {
+            "event_id": "pe-778dd2f371f259cbff46",
+            "kind": "organizing",
+            "elapsed_ms": 63054.316
+          }
+        ],
+        "first_backend_progress_ms": 3024.489,
+        "latency_ms": 63080.7
+      }
+    }
+  ],
+  "llm_answer_success": false,
+  "repeat_protocol": {
+    "planned_k": 1,
+    "actual_k": 1,
+    "per_run_seconds": 180,
+    "per_run_calls": 8
+  }
+}

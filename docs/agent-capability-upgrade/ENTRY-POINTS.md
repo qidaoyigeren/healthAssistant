@@ -15,6 +15,7 @@
 | `scripts/verify-agent-closeout.py` | 可选 | 完整离线收尾（34 模块 + 开发集） | 默认离线；`--live-repeats` / `--only-live` 会发远程调用 |
 | `scripts/planner-wire-probe.py` | **否** | 抓**序列化后的真实请求**与响应解析 | 模拟传输层。缺 `arguments` 的根因就是靠它确定的，不是猜的 |
 | `scripts/analyze-planner-metrics.py` | **否** | 逐次指标 | 纯离线读产物 |
+| `scripts/latency-baseline.py` | **否** | 延迟基线重算（每次调用的 token 拆分 + 墙钟、每回合调用数与墙钟、延迟/输出 token 比率） | 纯离线读产物；`planner_latency_ms_each` **直接 import** `analyze-planner-metrics.py`，不另建口径；缺字段一律记 null，不回填 |
 | `scripts/replay-agent-closeout.py` | **否** | 零网络回放既有失败提案 | |
 
 ## 历史 · 需要显式确认才跑

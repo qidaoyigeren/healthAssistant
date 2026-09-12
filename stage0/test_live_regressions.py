@@ -51,6 +51,26 @@ class LiveRegressionTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'API key is not configured'):
                 extract_ddi.resolve_llm_config()
 
+    def test_siliconflow_is_reachable_only_by_deliberate_selection(self):
+        """A candidate added for a latency experiment must not become the
+        endpoint that handles patient data because its key happens to be in a
+        file.  Auto-detection therefore ignores SILICONFLOW_API_KEY entirely;
+        only an explicit LLM_PROVIDER reaches it."""
+        with patch.object(extract_ddi, '_load_dotenv'), patch.dict(
+                'os.environ', {'SILICONFLOW_API_KEY': 'test-siliconflow'}, clear=True):
+            with self.assertRaisesRegex(RuntimeError, 'No LLM API key configured'):
+                extract_ddi.resolve_llm_config()
+        with patch.object(extract_ddi, '_load_dotenv'), patch.dict('os.environ', {
+                'SILICONFLOW_API_KEY': 'test-siliconflow',
+                'ZHIPU_API_KEY': 'test-zhipu', 'LLM_PROVIDER': 'siliconflow',
+        }, clear=True):
+            config = extract_ddi.resolve_llm_config()
+            self.assertEqual('siliconflow', config['provider'])
+            self.assertEqual('https://api.siliconflow.cn/v1', config['base_url'])
+            # No thinking knob: the product's own resolution governs, and for
+            # this provider it sends none.  The probe must agree (thinking_option).
+            self.assertEqual({'max_tokens': 1024}, extract_ddi.llm_completion_options())
+
     def test_live_authorization_fails_closed_for_unlisted_targets(self):
         listed = {'provider': 'tokendance', 'model': 'glm-5.3-flash',
                   'base_url': 'https://tokendance.space/gateway/v1'}

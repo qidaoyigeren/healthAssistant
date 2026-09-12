@@ -1,0 +1,1193 @@
+{
+  "protocol": "agent-eval@1",
+  "planner_protocol_version": "propose-next-action@3",
+  "dataset": "author-synthetic-dev@1",
+  "policy": "gap",
+  "path": "replay",
+  "source_fingerprint": "70e99ba7dc27a3dad767582133d6e9461e9c86c57fd9545c997b3ec93da5b6d9",
+  "dataset_sha256": "477220626b1f31509087ff0feed05f54274348c7b0cfee31e4184be18ffdfed8",
+  "engineering_status": "pass",
+  "real_model_quality": "single_exposed_dev_task_only",
+  "provider_availability": {
+    "attempts": 3,
+    "actual_responses": 3,
+    "unknown_usage": 0
+  },
+  "independent_held_out": "unavailable",
+  "summary": {
+    "total": 1,
+    "passed": 1
+  },
+  "tasks": [
+    {
+      "task_id": "agent-dev-complete",
+      "family_id": "complete",
+      "score": {
+        "passed": true,
+        "failures": [],
+        "necessary_question_recall": {
+          "numerator": 0,
+          "denominator": 0
+        },
+        "invalid_questions": 0,
+        "supported_claim_ratio": {
+          "numerator": 1,
+          "denominator": 1
+        },
+        "false_completion": false,
+        "recovery_success": null,
+        "duplicate_effects": 0
+      },
+      "observed": {
+        "investigation": {
+          "goal": "请核查当前用药合用的证据和剩余不确定性",
+          "scope_id": "local-demo",
+          "version": "investigation@1",
+          "contract_version": "medication-evidence-review@1",
+          "patient_version": {
+            "medications": 2,
+            "semantic": 0
+          },
+          "claims": [
+            {
+              "claim_id": "claim:23cd3ebf4138",
+              "statement": "合成药甲、合成药乙的标签证据",
+              "entities": [
+                "合成药甲",
+                "合成药乙"
+              ],
+              "status": "supported",
+              "supporting_evidence": [
+                "ev-6cd864426aa9d41485ac"
+              ],
+              "opposing_evidence": [],
+              "source_status": "current",
+              "condition_status": "verified"
+            }
+          ],
+          "gaps": [
+            {
+              "gap_id": "authority",
+              "kind": "patient_fact_missing",
+              "description": "读取完整权威药单与关键事实",
+              "status": "resolved"
+            },
+            {
+              "gap_id": "claim:23cd3ebf4138",
+              "kind": "evidence_missing",
+              "description": "核查合成药甲、合成药乙的支持和反对证据",
+              "status": "resolved",
+              "claim_id": "claim:23cd3ebf4138"
+            }
+          ],
+          "checks": {
+            "authority": "checked",
+            "interaction_evidence": "checked",
+            "applicability": "checked"
+          },
+          "facts": {
+            "semantic": [],
+            "medications": [
+              {
+                "id": 1,
+                "medication_key": "合成药甲",
+                "display_name": "合成药甲",
+                "dose": "5 mg",
+                "route": null,
+                "schedule": null,
+                "status": "active",
+                "start_at": "2026-09-01T00:00:00+00:00",
+                "end_at": null,
+                "source": "synthetic-fixture",
+                "source_uri": null,
+                "version": 1,
+                "predecessor_id": null,
+                "created_at": "2026-09-12T03:30:08+00:00",
+                "start_at_basis": "reported",
+                "ingredients": [],
+                "ref": "memory:medication:1@v1"
+              },
+              {
+                "id": 2,
+                "medication_key": "合成药乙",
+                "display_name": "合成药乙",
+                "dose": "10 mg",
+                "route": null,
+                "schedule": null,
+                "status": "active",
+                "start_at": "2026-09-01T00:00:00+00:00",
+                "end_at": null,
+                "source": "synthetic-fixture",
+                "source_uri": null,
+                "version": 1,
+                "predecessor_id": null,
+                "created_at": "2026-09-12T03:30:08+00:00",
+                "start_at_basis": "reported",
+                "ingredients": [],
+                "ref": "memory:medication:2@v1"
+              }
+            ],
+            "open_conflicts": []
+          },
+          "conflicts": [],
+          "questions": [],
+          "candidates": [],
+          "evidence_refs": [
+            "ev-6cd864426aa9d41485ac"
+          ],
+          "read_refs": [
+            "ev-6cd864426aa9d41485ac"
+          ],
+          "content_hashes": [
+            "650d5a367d92239212b0c1e0a07ef14309d159dfaca48cd9ee7aa1806e7b74ed"
+          ],
+          "queries": [
+            "合成药甲 合成药乙 药物相互作用 风险"
+          ],
+          "assessments": {
+            "claim:23cd3ebf4138": {
+              "ev-6cd864426aa9d41485ac": {
+                "status": "supported",
+                "evidence_refs": [
+                  "ev-6cd864426aa9d41485ac"
+                ],
+                "method": "conservative-lexical-v1",
+                "conditions": {
+                  "subject": null,
+                  "required_subject": null
+                },
+                "unresolved": [],
+                "source_status": "current",
+                "condition_status": "verified",
+                "time_status": "not_required"
+              }
+            }
+          },
+          "no_progress_count": 0,
+          "termination_reason": "checks_completed",
+          "authority_read": true,
+          "invalidations": [],
+          "context_integrity": "full_authority_checked_evidence_body_on_demand",
+          "mode": "llm"
+        },
+        "responses": [
+          {
+            "text": "有界证据核查报告\n已核查范围：权威用药及关键事实、标签证据、材料适用条件。\n合成药甲、合成药乙的标签证据：supported。支持引用：ev-6cd864426aa9d41485ac；反对引用：无。\n待补充/未解决：本契约内没有剩余缺口。\n终止原因：checks_completed。\n这份报告仅说明有界标签核查结果；insufficient/unknown 不是无风险，未列药物不代表停药。建议咨询医生/药师。",
+            "warnings": [],
+            "conflicts": [],
+            "audit_trail": {
+              "session_id": "synthetic-dev",
+              "turn_id": "t-0",
+              "memory_refs": [],
+              "source_refs": [],
+              "response_source": "template",
+              "response_fallback_reason": null,
+              "investigation": {
+                "goal": "请核查当前用药合用的证据和剩余不确定性",
+                "scope_id": "local-demo",
+                "version": "investigation@1",
+                "contract_version": "medication-evidence-review@1",
+                "patient_version": {
+                  "medications": 2,
+                  "semantic": 0
+                },
+                "claims": [
+                  {
+                    "claim_id": "claim:23cd3ebf4138",
+                    "statement": "合成药甲、合成药乙的标签证据",
+                    "entities": [
+                      "合成药甲",
+                      "合成药乙"
+                    ],
+                    "status": "supported",
+                    "supporting_evidence": [
+                      "ev-6cd864426aa9d41485ac"
+                    ],
+                    "opposing_evidence": [],
+                    "source_status": "current",
+                    "condition_status": "verified"
+                  }
+                ],
+                "gaps": [
+                  {
+                    "gap_id": "authority",
+                    "kind": "patient_fact_missing",
+                    "description": "读取完整权威药单与关键事实",
+                    "status": "resolved"
+                  },
+                  {
+                    "gap_id": "claim:23cd3ebf4138",
+                    "kind": "evidence_missing",
+                    "description": "核查合成药甲、合成药乙的支持和反对证据",
+                    "status": "resolved",
+                    "claim_id": "claim:23cd3ebf4138"
+                  }
+                ],
+                "checks": {
+                  "authority": "checked",
+                  "interaction_evidence": "checked",
+                  "applicability": "checked"
+                },
+                "facts": {
+                  "semantic": [],
+                  "medications": [
+                    {
+                      "id": 1,
+                      "medication_key": "合成药甲",
+                      "display_name": "合成药甲",
+                      "dose": "5 mg",
+                      "route": null,
+                      "schedule": null,
+                      "status": "active",
+                      "start_at": "2026-09-01T00:00:00+00:00",
+                      "end_at": null,
+                      "source": "synthetic-fixture",
+                      "source_uri": null,
+                      "version": 1,
+                      "predecessor_id": null,
+                      "created_at": "2026-09-12T03:30:08+00:00",
+                      "start_at_basis": "reported",
+                      "ingredients": [],
+                      "ref": "memory:medication:1@v1"
+                    },
+                    {
+                      "id": 2,
+                      "medication_key": "合成药乙",
+                      "display_name": "合成药乙",
+                      "dose": "10 mg",
+                      "route": null,
+                      "schedule": null,
+                      "status": "active",
+                      "start_at": "2026-09-01T00:00:00+00:00",
+                      "end_at": null,
+                      "source": "synthetic-fixture",
+                      "source_uri": null,
+                      "version": 1,
+                      "predecessor_id": null,
+                      "created_at": "2026-09-12T03:30:08+00:00",
+                      "start_at_basis": "reported",
+                      "ingredients": [],
+                      "ref": "memory:medication:2@v1"
+                    }
+                  ],
+                  "open_conflicts": []
+                },
+                "conflicts": [],
+                "questions": [],
+                "candidates": [],
+                "evidence_refs": [
+                  "ev-6cd864426aa9d41485ac"
+                ],
+                "read_refs": [
+                  "ev-6cd864426aa9d41485ac"
+                ],
+                "content_hashes": [
+                  "650d5a367d92239212b0c1e0a07ef14309d159dfaca48cd9ee7aa1806e7b74ed"
+                ],
+                "queries": [
+                  "合成药甲 合成药乙 药物相互作用 风险"
+                ],
+                "assessments": {
+                  "claim:23cd3ebf4138": {
+                    "ev-6cd864426aa9d41485ac": {
+                      "status": "supported",
+                      "evidence_refs": [
+                        "ev-6cd864426aa9d41485ac"
+                      ],
+                      "method": "conservative-lexical-v1",
+                      "conditions": {
+                        "subject": null,
+                        "required_subject": null
+                      },
+                      "unresolved": [],
+                      "source_status": "current",
+                      "condition_status": "verified",
+                      "time_status": "not_required"
+                    }
+                  }
+                },
+                "no_progress_count": 0,
+                "termination_reason": "checks_completed",
+                "authority_read": true,
+                "invalidations": [],
+                "context_integrity": "full_authority_checked_evidence_body_on_demand",
+                "mode": "llm"
+              }
+            },
+            "tool_trace": [
+              {
+                "phase": "plan",
+                "cycle": 1,
+                "decision": {
+                  "tool": "memory_read",
+                  "purpose": "memory_read",
+                  "arguments": {
+                    "query": "snapshot"
+                  },
+                  "rationale": "",
+                  "gap_id": "authority",
+                  "expected_observation": "获得完整当前事实及版本"
+                },
+                "planner": {
+                  "mode": "hybrid",
+                  "source": "llm",
+                  "proposal": {
+                    "decision": "tool",
+                    "tool": "memory_read",
+                    "gap_id": "authority",
+                    "expected_observation": "获得完整当前事实及版本",
+                    "arguments": {
+                      "query": "snapshot"
+                    }
+                  },
+                  "validation": {
+                    "status": "accepted",
+                    "valid": true,
+                    "errors": []
+                  },
+                  "fallback_reason": null,
+                  "fallback_kind": null,
+                  "argument_corrections": [],
+                  "model": "Qwen/Qwen2.5-7B-Instruct",
+                  "latency_ms": 2435.065,
+                  "provider_attempts": [
+                    {
+                      "outcome": "response",
+                      "prompt_tokens": 2335,
+                      "completion_tokens": 50,
+                      "reasoning_tokens": 0,
+                      "latency_ms": 2434.313
+                    }
+                  ]
+                }
+              },
+              {
+                "phase": "act",
+                "cycle": 1,
+                "tool": "memory_read",
+                "purpose": "memory_read",
+                "arguments": {
+                  "query": "snapshot"
+                },
+                "planner_source": "llm"
+              },
+              {
+                "phase": "observe",
+                "cycle": 1,
+                "tool": "memory_read",
+                "purpose": "memory_read",
+                "ok": true,
+                "summary": {
+                  "keys": [
+                    "medications",
+                    "open_conflicts",
+                    "semantic"
+                  ],
+                  "medications_count": 2
+                },
+                "observation": {
+                  "tool": "memory_read",
+                  "purpose": "memory_read",
+                  "arguments": {
+                    "query": "snapshot"
+                  },
+                  "result": {
+                    "semantic": [],
+                    "medications": [
+                      {
+                        "id": 1,
+                        "medication_key": "合成药甲",
+                        "display_name": "合成药甲",
+                        "dose": "5 mg",
+                        "route": null,
+                        "schedule": null,
+                        "status": "active",
+                        "start_at": "2026-09-01T00:00:00+00:00",
+                        "end_at": null,
+                        "source": "synthetic-fixture",
+                        "source_uri": null,
+                        "version": 1,
+                        "predecessor_id": null,
+                        "created_at": "2026-09-12T03:30:08+00:00",
+                        "start_at_basis": "reported",
+                        "ingredients": [],
+                        "ref": "memory:medication:1@v1"
+                      },
+                      {
+                        "id": 2,
+                        "medication_key": "合成药乙",
+                        "display_name": "合成药乙",
+                        "dose": "10 mg",
+                        "route": null,
+                        "schedule": null,
+                        "status": "active",
+                        "start_at": "2026-09-01T00:00:00+00:00",
+                        "end_at": null,
+                        "source": "synthetic-fixture",
+                        "source_uri": null,
+                        "version": 1,
+                        "predecessor_id": null,
+                        "created_at": "2026-09-12T03:30:08+00:00",
+                        "start_at_basis": "reported",
+                        "ingredients": [],
+                        "ref": "memory:medication:2@v1"
+                      }
+                    ],
+                    "open_conflicts": []
+                  },
+                  "ok": true,
+                  "cycle": 1,
+                  "error_kind": null,
+                  "recoverable": null,
+                  "evidence_refs": [],
+                  "no_progress": false
+                }
+              },
+              {
+                "phase": "investigation_progress",
+                "cycle": 1,
+                "tool": "memory_read",
+                "new_evidence_refs": [],
+                "new_read_refs": [],
+                "gap_changes": [
+                  "authority",
+                  "claim:23cd3ebf4138"
+                ]
+              },
+              {
+                "phase": "reflect",
+                "cycle": 1,
+                "note": "观察结果足以继续规划。"
+              },
+              {
+                "phase": "plan",
+                "cycle": 2,
+                "decision": {
+                  "tool": "rag_search",
+                  "purpose": "rag_search",
+                  "arguments": {
+                    "query": "合成药甲 合成药乙 药物相互作用 风险",
+                    "top_k": 5
+                  },
+                  "rationale": "",
+                  "gap_id": "claim:23cd3ebf4138",
+                  "expected_observation": "获得新增可核验证据或明确冲突"
+                },
+                "planner": {
+                  "mode": "hybrid",
+                  "source": "llm",
+                  "proposal": {
+                    "decision": "tool",
+                    "tool": "rag_search",
+                    "gap_id": "claim:23cd3ebf4138",
+                    "expected_observation": "获得新增可核验证据或明确冲突",
+                    "arguments": {
+                      "query": "合成药甲 合成药乙 药物相互作用 风险",
+                      "top_k": 5
+                    }
+                  },
+                  "validation": {
+                    "status": "accepted",
+                    "valid": true,
+                    "errors": []
+                  },
+                  "fallback_reason": null,
+                  "fallback_kind": null,
+                  "argument_corrections": [],
+                  "model": "Qwen/Qwen2.5-7B-Instruct",
+                  "latency_ms": 3403.141,
+                  "provider_attempts": [
+                    {
+                      "outcome": "response",
+                      "prompt_tokens": 4178,
+                      "completion_tokens": 89,
+                      "reasoning_tokens": 0,
+                      "latency_ms": 3401.857
+                    }
+                  ]
+                }
+              },
+              {
+                "phase": "act",
+                "cycle": 2,
+                "tool": "rag_search",
+                "purpose": "rag_search",
+                "arguments": {
+                  "query": "合成药甲 合成药乙 药物相互作用 风险",
+                  "top_k": 5
+                },
+                "planner_source": "llm"
+              },
+              {
+                "phase": "observe",
+                "cycle": 2,
+                "tool": "rag_search",
+                "purpose": "rag_search",
+                "ok": true,
+                "summary": {
+                  "keys": [
+                    "corpus_version",
+                    "evidence",
+                    "evidence_refs",
+                    "mode",
+                    "query",
+                    "results"
+                  ],
+                  "results_count": 1
+                },
+                "observation": {
+                  "tool": "rag_search",
+                  "purpose": "rag_search",
+                  "arguments": {
+                    "query": "合成药甲 合成药乙 药物相互作用 风险",
+                    "top_k": 5
+                  },
+                  "result": {
+                    "query": "合成药甲 合成药乙 药物相互作用 风险",
+                    "mode": "scripted",
+                    "corpus_version": "synthetic-v1",
+                    "results": [
+                      {
+                        "chunk_id": "synthetic-label-1",
+                        "drug_name": "合成药甲",
+                        "section": "药物相互作用",
+                        "text": "【合成材料】合成药甲与合成药乙合用增加出血风险。",
+                        "source_url": "https://synthetic.invalid/label/1",
+                        "corpus_version": "synthetic-v1"
+                      }
+                    ],
+                    "evidence": [
+                      {
+                        "evidence_id": "ev-6cd864426aa9d41485ac",
+                        "excerpt": "【合成材料】合成药甲与合成药乙合用增加出血风险。",
+                        "excerpt_start": 0,
+                        "total_chars": 24,
+                        "omitted_chars": 0,
+                        "source_uri": "https://synthetic.invalid/label/1"
+                      }
+                    ],
+                    "evidence_refs": [
+                      "ev-6cd864426aa9d41485ac"
+                    ]
+                  },
+                  "ok": true,
+                  "cycle": 2,
+                  "error_kind": null,
+                  "recoverable": null,
+                  "evidence_refs": [
+                    "ev-6cd864426aa9d41485ac"
+                  ],
+                  "no_progress": false
+                }
+              },
+              {
+                "phase": "investigation_progress",
+                "cycle": 2,
+                "tool": "rag_search",
+                "new_evidence_refs": [
+                  "ev-6cd864426aa9d41485ac"
+                ],
+                "new_read_refs": [],
+                "gap_changes": []
+              },
+              {
+                "phase": "reflect",
+                "cycle": 2,
+                "note": "观察结果足以继续规划。"
+              },
+              {
+                "phase": "plan",
+                "cycle": 3,
+                "decision": {
+                  "tool": "read_evidence",
+                  "purpose": "read_evidence",
+                  "arguments": {
+                    "evidence_id": "ev-6cd864426aa9d41485ac",
+                    "limit": 2000
+                  },
+                  "rationale": "",
+                  "gap_id": "claim:23cd3ebf4138",
+                  "expected_observation": "回读并校验原文、实体、否定和适用条件"
+                },
+                "planner": {
+                  "mode": "hybrid",
+                  "source": "llm",
+                  "proposal": {
+                    "decision": "tool",
+                    "tool": "read_evidence",
+                    "gap_id": "claim:23cd3ebf4138",
+                    "expected_observation": "回读并校验原文、实体、否定和适用条件",
+                    "arguments": {
+                      "evidence_id": "ev-6cd864426aa9d41485ac",
+                      "limit": 2000
+                    }
+                  },
+                  "validation": {
+                    "status": "accepted",
+                    "valid": true,
+                    "errors": []
+                  },
+                  "fallback_reason": null,
+                  "fallback_kind": null,
+                  "argument_corrections": [],
+                  "model": "Qwen/Qwen2.5-7B-Instruct",
+                  "latency_ms": 3936.424,
+                  "provider_attempts": [
+                    {
+                      "outcome": "response",
+                      "prompt_tokens": 5332,
+                      "completion_tokens": 99,
+                      "reasoning_tokens": 0,
+                      "latency_ms": 3935.022
+                    }
+                  ]
+                }
+              },
+              {
+                "phase": "act",
+                "cycle": 3,
+                "tool": "read_evidence",
+                "purpose": "read_evidence",
+                "arguments": {
+                  "evidence_id": "ev-6cd864426aa9d41485ac",
+                  "limit": 2000
+                },
+                "planner_source": "llm"
+              },
+              {
+                "phase": "observe",
+                "cycle": 3,
+                "tool": "read_evidence",
+                "purpose": "read_evidence",
+                "ok": true,
+                "summary": {
+                  "keys": [
+                    "content",
+                    "content_hash",
+                    "evidence_id",
+                    "offset",
+                    "returned_chars",
+                    "source_uri",
+                    "total_chars",
+                    "truncated"
+                  ]
+                },
+                "observation": {
+                  "tool": "read_evidence",
+                  "purpose": "read_evidence",
+                  "arguments": {
+                    "evidence_id": "ev-6cd864426aa9d41485ac",
+                    "limit": 2000
+                  },
+                  "result": {
+                    "evidence_id": "ev-6cd864426aa9d41485ac",
+                    "content": "【合成材料】合成药甲与合成药乙合用增加出血风险。",
+                    "offset": 0,
+                    "returned_chars": 24,
+                    "total_chars": 24,
+                    "truncated": false,
+                    "source_uri": "https://synthetic.invalid/label/1",
+                    "content_hash": "650d5a367d92239212b0c1e0a07ef14309d159dfaca48cd9ee7aa1806e7b74ed"
+                  },
+                  "ok": true,
+                  "cycle": 3,
+                  "error_kind": null,
+                  "recoverable": null,
+                  "evidence_refs": [],
+                  "no_progress": false
+                }
+              },
+              {
+                "phase": "investigation_progress",
+                "cycle": 3,
+                "tool": "read_evidence",
+                "new_evidence_refs": [],
+                "new_read_refs": [
+                  "ev-6cd864426aa9d41485ac"
+                ],
+                "gap_changes": [
+                  "claim:23cd3ebf4138"
+                ]
+              },
+              {
+                "phase": "reflect",
+                "cycle": 3,
+                "note": "观察结果足以继续规划。"
+              },
+              {
+                "phase": "plan",
+                "cycle": 4,
+                "decision": {
+                  "tool": "respond"
+                },
+                "planner": {
+                  "mode": "deterministic",
+                  "source": "deterministic",
+                  "proposal": {
+                    "decision": "respond"
+                  },
+                  "validation": {
+                    "status": "deterministic_terminal",
+                    "valid": true,
+                    "errors": []
+                  },
+                  "fallback_reason": null,
+                  "fallback_kind": null,
+                  "argument_corrections": [],
+                  "model": null,
+                  "latency_ms": 0
+                }
+              },
+              {
+                "phase": "respond",
+                "cycle": 4,
+                "source": "template",
+                "delivered_text": "有界证据核查报告\n已核查范围：权威用药及关键事实、标签证据、材料适用条件。\n合成药甲、合成药乙的标签证据：supported。支持引用：ev-6cd864426aa9d41485ac；反对引用：无。\n待补充/未解决：本契约内没有剩余缺口。\n终止原因：checks_completed。\n这份报告仅说明有界标签核查结果；insufficient/unknown 不是无风险，未列药物不代表停药。建议咨询医生/药师。",
+                "investigation": {
+                  "goal": "请核查当前用药合用的证据和剩余不确定性",
+                  "scope_id": "local-demo",
+                  "version": "investigation@1",
+                  "contract_version": "medication-evidence-review@1",
+                  "patient_version": {
+                    "medications": 2,
+                    "semantic": 0
+                  },
+                  "claims": [
+                    {
+                      "claim_id": "claim:23cd3ebf4138",
+                      "statement": "合成药甲、合成药乙的标签证据",
+                      "entities": [
+                        "合成药甲",
+                        "合成药乙"
+                      ],
+                      "status": "supported",
+                      "supporting_evidence": [
+                        "ev-6cd864426aa9d41485ac"
+                      ],
+                      "opposing_evidence": [],
+                      "source_status": "current",
+                      "condition_status": "verified"
+                    }
+                  ],
+                  "gaps": [
+                    {
+                      "gap_id": "authority",
+                      "kind": "patient_fact_missing",
+                      "description": "读取完整权威药单与关键事实",
+                      "status": "resolved"
+                    },
+                    {
+                      "gap_id": "claim:23cd3ebf4138",
+                      "kind": "evidence_missing",
+                      "description": "核查合成药甲、合成药乙的支持和反对证据",
+                      "status": "resolved",
+                      "claim_id": "claim:23cd3ebf4138"
+                    }
+                  ],
+                  "checks": {
+                    "authority": "checked",
+                    "interaction_evidence": "checked",
+                    "applicability": "checked"
+                  },
+                  "facts": {
+                    "semantic": [],
+                    "medications": [
+                      {
+                        "id": 1,
+                        "medication_key": "合成药甲",
+                        "display_name": "合成药甲",
+                        "dose": "5 mg",
+                        "route": null,
+                        "schedule": null,
+                        "status": "active",
+                        "start_at": "2026-09-01T00:00:00+00:00",
+                        "end_at": null,
+                        "source": "synthetic-fixture",
+                        "source_uri": null,
+                        "version": 1,
+                        "predecessor_id": null,
+                        "created_at": "2026-09-12T03:30:08+00:00",
+                        "start_at_basis": "reported",
+                        "ingredients": [],
+                        "ref": "memory:medication:1@v1"
+                      },
+                      {
+                        "id": 2,
+                        "medication_key": "合成药乙",
+                        "display_name": "合成药乙",
+                        "dose": "10 mg",
+                        "route": null,
+                        "schedule": null,
+                        "status": "active",
+                        "start_at": "2026-09-01T00:00:00+00:00",
+                        "end_at": null,
+                        "source": "synthetic-fixture",
+                        "source_uri": null,
+                        "version": 1,
+                        "predecessor_id": null,
+                        "created_at": "2026-09-12T03:30:08+00:00",
+                        "start_at_basis": "reported",
+                        "ingredients": [],
+                        "ref": "memory:medication:2@v1"
+                      }
+                    ],
+                    "open_conflicts": []
+                  },
+                  "conflicts": [],
+                  "questions": [],
+                  "candidates": [],
+                  "evidence_refs": [
+                    "ev-6cd864426aa9d41485ac"
+                  ],
+                  "read_refs": [
+                    "ev-6cd864426aa9d41485ac"
+                  ],
+                  "content_hashes": [
+                    "650d5a367d92239212b0c1e0a07ef14309d159dfaca48cd9ee7aa1806e7b74ed"
+                  ],
+                  "queries": [
+                    "合成药甲 合成药乙 药物相互作用 风险"
+                  ],
+                  "assessments": {
+                    "claim:23cd3ebf4138": {
+                      "ev-6cd864426aa9d41485ac": {
+                        "status": "supported",
+                        "evidence_refs": [
+                          "ev-6cd864426aa9d41485ac"
+                        ],
+                        "method": "conservative-lexical-v1",
+                        "conditions": {
+                          "subject": null,
+                          "required_subject": null
+                        },
+                        "unresolved": [],
+                        "source_status": "current",
+                        "condition_status": "verified",
+                        "time_status": "not_required"
+                      }
+                    }
+                  },
+                  "no_progress_count": 0,
+                  "termination_reason": "checks_completed",
+                  "authority_read": true,
+                  "invalidations": [],
+                  "context_integrity": "full_authority_checked_evidence_body_on_demand",
+                  "mode": "llm"
+                }
+              }
+            ],
+            "safety_status": "enforced",
+            "operation_outcomes": [],
+            "answer_bundle": {
+              "bundle_version": "answer-bundle@1",
+              "execution_status": "finished",
+              "goal_status": "completed",
+              "answer_status": "bounded_report",
+              "investigation": {
+                "goal": "请核查当前用药合用的证据和剩余不确定性",
+                "scope_id": "local-demo",
+                "version": "investigation@1",
+                "contract_version": "medication-evidence-review@1",
+                "patient_version": {
+                  "medications": 2,
+                  "semantic": 0
+                },
+                "claims": [
+                  {
+                    "claim_id": "claim:23cd3ebf4138",
+                    "statement": "合成药甲、合成药乙的标签证据",
+                    "entities": [
+                      "合成药甲",
+                      "合成药乙"
+                    ],
+                    "status": "supported",
+                    "supporting_evidence": [
+                      "ev-6cd864426aa9d41485ac"
+                    ],
+                    "opposing_evidence": [],
+                    "source_status": "current",
+                    "condition_status": "verified"
+                  }
+                ],
+                "gaps": [
+                  {
+                    "gap_id": "authority",
+                    "kind": "patient_fact_missing",
+                    "description": "读取完整权威药单与关键事实",
+                    "status": "resolved"
+                  },
+                  {
+                    "gap_id": "claim:23cd3ebf4138",
+                    "kind": "evidence_missing",
+                    "description": "核查合成药甲、合成药乙的支持和反对证据",
+                    "status": "resolved",
+                    "claim_id": "claim:23cd3ebf4138"
+                  }
+                ],
+                "checks": {
+                  "authority": "checked",
+                  "interaction_evidence": "checked",
+                  "applicability": "checked"
+                },
+                "facts": {
+                  "semantic": [],
+                  "medications": [
+                    {
+                      "id": 1,
+                      "medication_key": "合成药甲",
+                      "display_name": "合成药甲",
+                      "dose": "5 mg",
+                      "route": null,
+                      "schedule": null,
+                      "status": "active",
+                      "start_at": "2026-09-01T00:00:00+00:00",
+                      "end_at": null,
+                      "source": "synthetic-fixture",
+                      "source_uri": null,
+                      "version": 1,
+                      "predecessor_id": null,
+                      "created_at": "2026-09-12T03:30:08+00:00",
+                      "start_at_basis": "reported",
+                      "ingredients": [],
+                      "ref": "memory:medication:1@v1"
+                    },
+                    {
+                      "id": 2,
+                      "medication_key": "合成药乙",
+                      "display_name": "合成药乙",
+                      "dose": "10 mg",
+                      "route": null,
+                      "schedule": null,
+                      "status": "active",
+                      "start_at": "2026-09-01T00:00:00+00:00",
+                      "end_at": null,
+                      "source": "synthetic-fixture",
+                      "source_uri": null,
+                      "version": 1,
+                      "predecessor_id": null,
+                      "created_at": "2026-09-12T03:30:08+00:00",
+                      "start_at_basis": "reported",
+                      "ingredients": [],
+                      "ref": "memory:medication:2@v1"
+                    }
+                  ],
+                  "open_conflicts": []
+                },
+                "conflicts": [],
+                "questions": [],
+                "candidates": [],
+                "evidence_refs": [
+                  "ev-6cd864426aa9d41485ac"
+                ],
+                "read_refs": [
+                  "ev-6cd864426aa9d41485ac"
+                ],
+                "content_hashes": [
+                  "650d5a367d92239212b0c1e0a07ef14309d159dfaca48cd9ee7aa1806e7b74ed"
+                ],
+                "queries": [
+                  "合成药甲 合成药乙 药物相互作用 风险"
+                ],
+                "assessments": {
+                  "claim:23cd3ebf4138": {
+                    "ev-6cd864426aa9d41485ac": {
+                      "status": "supported",
+                      "evidence_refs": [
+                        "ev-6cd864426aa9d41485ac"
+                      ],
+                      "method": "conservative-lexical-v1",
+                      "conditions": {
+                        "subject": null,
+                        "required_subject": null
+                      },
+                      "unresolved": [],
+                      "source_status": "current",
+                      "condition_status": "verified",
+                      "time_status": "not_required"
+                    }
+                  }
+                },
+                "no_progress_count": 0,
+                "termination_reason": "checks_completed",
+                "authority_read": true,
+                "invalidations": [],
+                "context_integrity": "full_authority_checked_evidence_body_on_demand",
+                "mode": "llm"
+              },
+              "multi_review": null,
+              "route": "open_planning",
+              "route_basis": "open_nl_request",
+              "phase_budget": {
+                "limit_cycles": 12,
+                "wrap_up_reserved": 2,
+                "wrap_up_seconds_reserved": 2.0,
+                "wrap_up_tokens_reserved": 1024,
+                "cycles_used": 4,
+                "token_usage": {
+                  "max_cycles": 12,
+                  "wall_clock_seconds": 180.0,
+                  "token_budget": 150000,
+                  "call_budget": 8,
+                  "consumed_seconds": 9.824696700030472,
+                  "tokens_estimated": 28004,
+                  "tokens_actual": 12083,
+                  "tokens_charged": 12083,
+                  "calls_attempted": 3,
+                  "refused_calls": 0,
+                  "cycles_consumed": 4,
+                  "accounting_version": 2,
+                  "usage_unknown": false,
+                  "wrap_up_seconds_reserved": 2.0,
+                  "wrap_up_tokens_reserved": 1024,
+                  "usage_quality": "actual"
+                }
+              },
+              "safety_status": "enforced",
+              "claims": [
+                {
+                  "claim_id": "claim:23cd3ebf4138",
+                  "statement": "合成药甲、合成药乙的标签证据",
+                  "entities": [
+                    "合成药甲",
+                    "合成药乙"
+                  ],
+                  "status": "supported",
+                  "supporting_evidence": [
+                    "ev-6cd864426aa9d41485ac"
+                  ],
+                  "opposing_evidence": [],
+                  "source_status": "current",
+                  "condition_status": "verified",
+                  "kind": "investigation",
+                  "support_status": "supported",
+                  "evidence_refs": [
+                    "ev-6cd864426aa9d41485ac"
+                  ]
+                }
+              ],
+              "fact_refs": [],
+              "evidence_refs": [
+                "ev-6cd864426aa9d41485ac"
+              ],
+              "patient_revision": {
+                "medications": 2,
+                "semantic": 0
+              },
+              "unresolved_questions": [],
+              "coverage": {
+                "consolidated": false,
+                "response_source": "template",
+                "degraded_reason": null,
+                "planner_fallback_reasons": [],
+                "research": []
+              }
+            }
+          }
+        ],
+        "execution_status": "finished",
+        "goal_status": "completed",
+        "answer_status": "bounded_report",
+        "tool_calls": 3,
+        "model_calls": 3,
+        "actual_tokens": 12083,
+        "unknown_usage": 0,
+        "mode": "llm",
+        "degradation_reasons": [],
+        "recovery_success": null,
+        "duplicate_effects": 0,
+        "receipts": [],
+        "usage_ledger": [
+          {
+            "attempt_id": "e1d820defd814121a128c762e3cbb766",
+            "run_id": "t-0",
+            "kind": "planner",
+            "operation_id": "t-0:planner:cycle:1",
+            "cycle": 1,
+            "status": "actual",
+            "reserved_tokens": 9620,
+            "reserved_seconds": 60.0,
+            "usage_tokens": 2385,
+            "estimated_tokens": 5810,
+            "created_at": "2026-09-12T03:30:08+00:00",
+            "settled_at": "2026-09-12T03:30:10+00:00",
+            "prompt_tokens": 2335,
+            "completion_tokens": 50,
+            "reasoning_tokens": 0
+          },
+          {
+            "attempt_id": "1239f450547a4b219bb8fcdb229033f1",
+            "run_id": "t-0",
+            "kind": "planner",
+            "operation_id": "t-0:planner:cycle:2",
+            "cycle": 2,
+            "status": "actual",
+            "reserved_tokens": 13778,
+            "reserved_seconds": 60.0,
+            "usage_tokens": 4267,
+            "estimated_tokens": 9991,
+            "created_at": "2026-09-12T03:30:10+00:00",
+            "settled_at": "2026-09-12T03:30:14+00:00",
+            "prompt_tokens": 4178,
+            "completion_tokens": 89,
+            "reasoning_tokens": 0
+          },
+          {
+            "attempt_id": "0d72b2092e4746439519948c6b5dfabf",
+            "run_id": "t-0",
+            "kind": "planner",
+            "operation_id": "t-0:planner:cycle:3",
+            "cycle": 3,
+            "status": "actual",
+            "reserved_tokens": 15977,
+            "reserved_seconds": 60.0,
+            "usage_tokens": 5431,
+            "estimated_tokens": 12203,
+            "created_at": "2026-09-12T03:30:14+00:00",
+            "settled_at": "2026-09-12T03:30:18+00:00",
+            "prompt_tokens": 5332,
+            "completion_tokens": 99,
+            "reasoning_tokens": 0
+          }
+        ],
+        "scripted_provider_attempts": 0,
+        "config": {
+          "provider": "siliconflow",
+          "model": "Qwen/Qwen2.5-7B-Instruct",
+          "base_url": "https://api.siliconflow.cn/v1"
+        },
+        "budgets": [
+          {
+            "run_id": "t-0",
+            "budget_json": "{\"accounting_version\":2,\"call_budget\":8,\"calls_attempted\":3,\"consumed_seconds\":9.825448999996297,\"cycles_consumed\":4,\"max_cycles\":12,\"refused_calls\":0,\"token_budget\":150000,\"tokens_actual\":12083,\"tokens_charged\":12083,\"tokens_estimated\":28004,\"usage_quality\":\"actual\",\"usage_unknown\":false,\"wall_clock_seconds\":180.0,\"wrap_up_seconds_reserved\":2.0,\"wrap_up_tokens_reserved\":1024}"
+          }
+        ],
+        "progress_samples": [
+          {
+            "event_id": "pe-94793839d6f4aa1b5a99",
+            "kind": "organizing",
+            "elapsed_ms": 3340.465
+          },
+          {
+            "event_id": "pe-78408dcae6d1b1d1ca92",
+            "kind": "retrieving",
+            "elapsed_ms": 6758.131
+          },
+          {
+            "event_id": "pe-60799679f950c189babf",
+            "kind": "organizing",
+            "elapsed_ms": 10706.498
+          }
+        ],
+        "first_backend_progress_ms": 3340.465,
+        "latency_ms": 10731.36
+      }
+    }
+  ],
+  "llm_answer_success": false,
+  "repeat_protocol": {
+    "planned_k": 1,
+    "actual_k": 1,
+    "per_run_seconds": 180,
+    "per_run_calls": 8
+  }
+}

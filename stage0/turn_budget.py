@@ -79,6 +79,54 @@ def initial_budget(max_cycles=16, saved=None):
                                **{k: 0 for k in COUNTERS}, 'accounting_version': 2})
 
 
+def _as_count(value) -> int | None:
+    """A non-negative integer token count, or ``None`` if not reported.
+
+    ``None`` is a distinct, honest state: the latency metric labels it
+    ``unavailable`` and never estimates it.  ``bool`` is rejected explicitly so
+    ``True`` cannot masquerade as 1 token.
+    """
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        return None
+    return value
+
+
+def _usage_field(usage, name):
+    if usage is None:
+        return None
+    return usage.get(name) if isinstance(usage, dict) else getattr(usage, name, None)
+
+
+def _usage_total(usage) -> int | None:
+    """Read the integer total token count off a provider usage object or dict."""
+    return _as_count(_usage_field(usage, 'total_tokens'))
+
+
+def usage_split(result) -> tuple[int | None, int | None]:
+    """(prompt_tokens, completion_tokens) for one completed call.
+
+    Latency L0: a total alone cannot separate prefill from decode.  Purely
+    observational -- budget arithmetic keeps using the total.
+    """
+    usage = getattr(result, 'usage', None)
+    return (_as_count(_usage_field(usage, 'prompt_tokens')),
+            _as_count(_usage_field(usage, 'completion_tokens')))
+
+
+def usage_reasoning_tokens(result) -> int | None:
+    """Hidden reasoning tokens, where the provider reports them.
+
+    Latency L1: whether a gateway honours ``thinking:disabled`` used to be
+    INFERRED from an inflated completion count.  Gateways that report
+    ``completion_tokens_details.reasoning_tokens`` state it outright, which
+    turns the central claim of the endpoint comparison into a measurement.
+    ``None`` (unreported) and ``0`` (reported, no reasoning) must stay distinct
+    -- collapsing them would read "we cannot tell" as "it is not reasoning".
+    """
+    details = _usage_field(getattr(result, 'usage', None), 'completion_tokens_details')
+    return _as_count(_usage_field(details, 'reasoning_tokens'))
+
+
 def check_lease():
     guard = LEASE.get()
     if guard:
@@ -224,21 +272,30 @@ class BudgetSession:
             raise
         # BaseException/process death deliberately leaves the durable reservation.
         usage = getattr(result, 'usage', None)
-        actual = usage.get('total_tokens') if isinstance(usage, dict) else getattr(usage, 'total_tokens', None)
-        if not isinstance(actual, int) or isinstance(actual, bool) or actual < 0:
-            actual = None
+        actual = _usage_total(usage)
         estimated = estimate + max(1, math.ceil(len(str(getattr(result, 'choices', result))) / 1.5)) if token_metered else 0
-        if not token_metered:
-            actual = 0  # HTTP lookup, not an unknown LLM usage total.
+        if token_metered:
+            prompt_tokens, completion_tokens = usage_split(result)
+            reasoning_tokens = usage_reasoning_tokens(result)
+        else:
+            # HTTP lookup, not an LLM usage total: `actual` is forced to 0 for
+            # budget purposes, but claiming "0 completion tokens" as a
+            # measurement would be a fabricated observation, so the split stays
+            # unreported.
+            actual = 0
+            prompt_tokens = completion_tokens = reasoning_tokens = None
         late = time.perf_counter() - started >= allowed
-        self._settle(attempt_id, estimated, actual, 'late' if late else ('actual' if actual is not None else 'estimate'))
+        self._settle(attempt_id, estimated, actual, 'late' if late else ('actual' if actual is not None else 'estimate'),
+                     prompt_tokens=prompt_tokens, completion_tokens=completion_tokens,
+                     reasoning_tokens=reasoning_tokens)
         check_lease()
         if late:
             self.reason = 'wall_clock'
             raise BudgetExceeded(self.reason)
         return result
 
-    def _settle(self, attempt_id, estimated, actual, status, *, refund=False):
+    def _settle(self, attempt_id, estimated, actual, status, *, refund=False,
+                prompt_tokens=None, completion_tokens=None, reasoning_tokens=None):
         # The estimate is always OBSERVED (it describes what we tried to send);
         # a refunded refusal simply does not CHARGE it.  Nothing is ever
         # decremented, so the durable counters stay monotonic across
@@ -252,7 +309,10 @@ class BudgetSession:
             previous = self.data.get('usage_quality')
             self.data['usage_quality'] = quality if previous in (None, quality) else 'mixed'
         self.sync()
-        self.memory.settle_llm_attempt(attempt_id, status, actual, estimated, self.data)
+        self.memory.settle_llm_attempt(attempt_id, status, actual, estimated, self.data,
+                                       prompt_tokens=prompt_tokens,
+                                       completion_tokens=completion_tokens,
+                                       reasoning_tokens=reasoning_tokens)
 
 
 @contextmanager

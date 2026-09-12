@@ -660,6 +660,19 @@ def _ensure_r0_schema(connection: sqlite3.Connection) -> bool:
     _add_column("workflow_runs", "queue_wait_seconds", "REAL")
     _add_column("llm_attempts", "operation_id", "TEXT")
     _add_column("llm_attempts", "cycle", "INTEGER")
+    # Latency L0: `usage_tokens` is a TOTAL, which cannot say whether a slow
+    # call was paying for a long prompt (prefill) or for the model writing
+    # (decode) -- and on a gateway that ignores `thinking:disabled` those two
+    # lead to opposite remedies.  The split is recorded per attempt so a metric
+    # can point at ONE call.  NULL means "the provider did not report it",
+    # which is a real state and must never be back-filled with an estimate.
+    _add_column("llm_attempts", "prompt_tokens", "INTEGER")
+    _add_column("llm_attempts", "completion_tokens", "INTEGER")
+    # ...and of those completion tokens, how many the model spent thinking
+    # without saying so.  Where a gateway reports it, this is the difference
+    # between "this endpoint is slow" and "this endpoint ignores
+    # thinking:disabled"; NULL means the gateway stayed silent.
+    _add_column("llm_attempts", "reasoning_tokens", "INTEGER")
     # operation_receipts lives in the main SCHEMA (IF NOT EXISTS), so legacy
     # databases pick it up on the next open without a separate script here.
     return altered
@@ -3200,13 +3213,19 @@ class MemoryStore:
             self.connection.execute('UPDATE workflow_runs SET budget_json=? WHERE run_id=?',
                                     (_json(budget), run_id))
 
-    def settle_llm_attempt(self, attempt_id, status, actual, estimated, budget):
+    def settle_llm_attempt(self, attempt_id, status, actual, estimated, budget,
+                           prompt_tokens=None, completion_tokens=None, reasoning_tokens=None):
+        """Settle one reserved attempt.  The token split is observational only
+        -- budget arithmetic uses the ``actual`` total, so passing it can never
+        change what a run is charged."""
         with self._lock, self.connection:
             row = self.connection.execute('SELECT run_id FROM llm_attempts WHERE attempt_id=?',
                                           (attempt_id,)).fetchone()
-            self.connection.execute('UPDATE llm_attempts SET status=?,usage_tokens=?,estimated_tokens=?,settled_at=? '
+            self.connection.execute('UPDATE llm_attempts SET status=?,usage_tokens=?,estimated_tokens=?,'
+                                    'prompt_tokens=?,completion_tokens=?,reasoning_tokens=?,settled_at=? '
                                     'WHERE attempt_id=? AND status=\'reserved\'',
-                                    (status, actual, estimated, utc_now(), attempt_id))
+                                    (status, actual, estimated, prompt_tokens, completion_tokens,
+                                     reasoning_tokens, utc_now(), attempt_id))
             self.connection.execute('UPDATE workflow_runs SET budget_json=? WHERE run_id=?',
                                     (_json(budget), row['run_id']))
 
