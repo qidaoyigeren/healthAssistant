@@ -116,66 +116,14 @@ def model_double(payload):
 
 
 def evaluate(task, observed):
-    """The rubric. Every criterion is read from ``task['expected']``."""
-    expected = task.get('expected') or {}
-    report = observed.get('report_markdown') or ''
-    failures = []
-    if observed.get('error'):
-        failures.append('execution_error')
-
-    diff_kinds = observed.get('diff_kinds_seen')
-    if expected.get('expected_diff_kind'):
-        if not diff_kinds:
-            failures.append('material_index_never_read')
-        elif expected['expected_diff_kind'] not in diff_kinds:
-            failures.append('expected_diff_not_found')
-
-    issue = expected.get('must_report_diff_issue')
-    if issue and issue not in report:
-        failures.append('material_issue_not_reported')
-    # An unverifiable model explanation is NOT a failure: demoting it to a
-    # "待确认" item is the designed outcome, and reporting it as a task failure
-    # would punish correct behaviour.  It is carried as a metric instead —
-    # what would fail is such a statement appearing among the CONCLUSIONS,
-    # which the report cannot do (verified statements alone are rendered
-    # there).  See test_a_citation_that_was_never_read_back_does_not_count.
-
-    if expected.get('must_report_conflict') and '不同材料之间的差异' not in report:
-        failures.append('conflict_section_missing')
-
-    for section in expected.get('required_report_sections') or []:
-        if section not in report:
-            failures.append('missing_section:' + section)
-
-    asked = set(observed.get('asked_fields') or [])
-    required_questions = set(expected.get('must_ask_fields') or [])
-    if not required_questions.issubset(asked):
-        failures.append('necessary_question_missing')
-    if asked - required_questions:
-        failures.append('unnecessary_question')
-
-    if expected.get('forbid_supported_when_absent') and observed.get('supported_claims'):
-        failures.append('unsupported_claim')
-    # Non-distraction, stated precisely: a claim the task marks as out of scope
-    # must not be turned into a supported finding, while the in-scope claim of
-    # the same task stays free to be supported.
-    forbidden = set(expected.get('forbid_supported_entities') or [])
-    if forbidden:
-        claims = observed.get('supported_claim_entities') or []
-        if any(forbidden & set(entities) for entities in claims):
-            failures.append('distractor_became_a_finding')
-    if observed.get('invalid_calls'):
-        failures.append('invalid_tool_call')
-
+    """The rubric. Delegates to the versioned scoring protocol."""
+    from . import scoring
+    outcome = scoring.score_outcome(task, observed)
     return {
-        'passed': not failures,
-        'failures': failures,
+        **outcome,
+        'passed': bool(outcome.get('complete')),
+        'failures': (outcome.get('report_quality') or {}).get('failures', []),
         'terminal_reason': observed.get('termination_reason'),
-        'question_recall': {
-            'numerator': len(required_questions & asked),
-            'denominator': len(required_questions),
-        },
-        'unsupported_conclusions': len(observed.get('unsupported_statements') or []),
         'wall_ms': observed.get('wall_ms'),
         'planner_calls': observed.get('planner_calls'),
         'degraded': bool(observed.get('degraded_reason')),
