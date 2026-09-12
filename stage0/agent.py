@@ -2089,6 +2089,11 @@ class HybridPlanner:
 
     def decide(self, state: AgentState) -> ToolAction | None:
         started = time.perf_counter()
+        # A proposal accepted right after a rejection was shaped by the
+        # correction feedback, so it is counted separately from a proposal the
+        # model reached on its own.  ``last_rejection`` is cleared on every
+        # accept and on reset, so it is exact for this decision.
+        corrected = self.last_rejection is not None
         hooks = getattr(self, "hooks", None)
         if not self.enabled or state.event.event_type in {'query_current_medications', 'medication_recheck'}:
             action = self.deterministic_planner.decide(state)
@@ -2154,7 +2159,8 @@ class HybridPlanner:
         self._last_rejected_key = None
         self.last_rejection = None
         self.last_decision_trace = self._trace(
-            "llm", proposal, "accepted", True, [], None, started,
+            "llm_post_correction" if corrected else "llm",
+            proposal, "accepted", True, [], None, started,
             fallback_kind=None, corrections=list(self.validator.last_corrections),
         )
         if hooks is not None:
@@ -2252,9 +2258,16 @@ class HybridPlanner:
             "fallback_reason": fallback_reason,
             "fallback_kind": fallback_kind,
             "argument_corrections": corrections or [],
+            # Code supplied a decisive argument the model omitted: the action
+            # still ran, but it is not purely model planning, so it must be
+            # separable in every report.
+            "hydrated_arguments": bool(corrections),
             "model": self.llm_planner.model,
             "latency_ms": round((time.perf_counter() - started) * 1000, 3),
-            "provider_attempts": list(getattr(self.llm_planner, 'last_provider_attempts', [])) if fallback_kind != 'circuit_break' and source != 'deterministic' else [],
+            # Only sources that actually made a provider call carry attempts;
+            # a code-forced or deterministic step has none of its own.
+            "provider_attempts": list(getattr(self.llm_planner, 'last_provider_attempts', []))
+                if source in {"llm", "llm_post_correction", "fallback"} and fallback_kind != 'circuit_break' else [],
         }
 
     @staticmethod
@@ -3049,6 +3062,30 @@ class MedicationCoordinatorAgent:
         state.investigation.sync_authority(self.memory)
         state.investigation.validate_sources(self.evidence_store)
 
+    def _system_forced_action(self, state: AgentState) -> ToolAction | None:
+        """An action CODE constructs to satisfy a safety invariant.
+
+        Exactly one case today: an observed DDI/condition warning that has not
+        been persisted yet blocks ``respond``, so the write must happen before
+        the model can finish.  That is an invariant, not an investigation
+        strategy — but it is also not a model choice, so the caller labels the
+        resulting trace ``system_forced`` rather than letting it hide inside
+        "the model decided this" or "the planner degraded".
+        """
+        inv = state.investigation
+        if inv is None or state.degraded_reason:
+            return None
+        guard = PlannerPolicyGuard(snapshot_provider=self.memory.snapshot,
+                                   medication_grounding=self.memory.current_medications)
+        if guard._warning_source(state) is None:
+            return None
+        proposal = {'decision': 'tool', 'tool': 'memory_write',
+                    'purpose': 'record_investigation_warnings',
+                    'arguments': {'operation': 'record_warnings'}}
+        if not guard.validate(state, proposal).valid:
+            return None
+        return guard.materialize(state, proposal)
+
     def _decide(self, state: AgentState) -> ToolAction | None:
         # Code-owned completion / hydration must not reuse a previous model's
         # metadata and inflate accepted proposals or repeat a provider error.
@@ -3057,12 +3094,13 @@ class MedicationCoordinatorAgent:
         self._prepare_investigation(state)
         inv = state.investigation
         if inv:
-            guard = PlannerPolicyGuard(snapshot_provider=self.memory.snapshot, medication_grounding=self.memory.current_medications)
-            if guard._warning_source(state) is not None and not state.degraded_reason:
-                proposal = {'decision': 'tool', 'tool': 'memory_write', 'purpose': 'record_investigation_warnings',
-                            'arguments': {'operation': 'record_warnings'}}
-                if guard.validate(state, proposal).valid:
-                    return guard.materialize(state, proposal)
+            forced = self._system_forced_action(state)
+            if forced is not None:
+                if isinstance(self.planner, HybridPlanner):
+                    self.planner.last_decision_trace = self.planner._trace(
+                        "system_forced", asdict(forced), "accepted", True, [], None,
+                        time.perf_counter(), fallback_kind=None)
+                return forced
             inv.next_action()
             if inv.termination_reason:
                 return None
