@@ -5,7 +5,8 @@ from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import patch
 
-from stage0.agent import AgentState, CareEvent, DDITool, MedicationCoordinatorAgent, Observation, PlannerPolicyGuard
+from stage0.agent import (AgentState, CareEvent, DDITool, LLMPlanner,
+                          MedicationCoordinatorAgent, Observation, PlannerPolicyGuard)
 from stage0.harness.runtime import RunContext
 from stage0.memory import MemoryStore
 from stage0 import extract_ddi
@@ -70,6 +71,39 @@ class LiveRegressionTests(unittest.TestCase):
             # No thinking knob: the product's own resolution governs, and for
             # this provider it sends none.  The probe must agree (thinking_option).
             self.assertEqual({'max_tokens': 1024}, extract_ddi.llm_completion_options())
+
+    def test_selecting_siliconflow_without_pinning_a_model_is_safe(self):
+        """The provider key alone must not land on a known-broken model.
+
+        ``zai-org/GLM-4.5-Air`` returned an EMPTY choices list on 6/6 measured
+        calls (its reasoning consumed the whole response).  Leaving it as the
+        provider default meant ``LLM_PROVIDER=siliconflow`` alone would silently
+        select a model that never answers -- the same wrong-endpoint-by-accident
+        failure LLM_PROVIDER exists to prevent."""
+        with patch.object(extract_ddi, '_load_dotenv'), patch.dict('os.environ', {
+                'SILICONFLOW_API_KEY': 'test-sf', 'LLM_PROVIDER': 'siliconflow'}, clear=True):
+            config = extract_ddi.resolve_llm_config()
+            self.assertEqual('siliconflow', config['provider'])
+            self.assertEqual('Qwen/Qwen2.5-7B-Instruct', config['model'])
+            self.assertNotEqual('zai-org/GLM-4.5-Air', config['model'])
+
+    def test_endpoint_attribution_is_recorded_and_never_leaks_the_credential(self):
+        """With several endpoints allowlisted, a delivered report must be
+        traceable to the model that produced it."""
+        import json
+        planner = LLMPlanner(proposal_provider=lambda _: {})
+        planner.model = 'test-model'
+        planner.config = {'provider': 'siliconflow', 'model': 'test-model',
+                          'base_url': 'https://api.siliconflow.cn/v1',
+                          'api_key': 'sk-must-not-appear-anywhere'}
+        self.assertEqual({'provider': 'siliconflow', 'model': 'test-model',
+                          'base_url': 'https://api.siliconflow.cn/v1'}, planner.endpoint)
+        self.assertNotIn('sk-must-not-appear-anywhere', json.dumps(planner.endpoint))
+        # Unresolved (a harness injected the client): report None, never guess.
+        unresolved = LLMPlanner(proposal_provider=lambda _: {})
+        unresolved.model = 'injected-model'
+        self.assertEqual({'provider': None, 'model': 'injected-model', 'base_url': None},
+                         unresolved.endpoint)
 
     def test_live_authorization_fails_closed_for_unlisted_targets(self):
         listed = {'provider': 'tokendance', 'model': 'glm-5.3-flash',

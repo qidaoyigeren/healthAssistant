@@ -1576,6 +1576,18 @@ class LLMPlanner:
         message = str(exc)
         return "Error code: 429" in message
 
+    @property
+    def endpoint(self) -> dict[str, Any]:
+        """Which provider/model actually served this run.  NEVER the credential.
+
+        ``provider``/``base_url`` come from the resolved config, which exists
+        only when this planner created its own client; a harness that injects a
+        client records its own endpoint, so those stay None here rather than
+        guessing.  ``model`` is always the model actually requested."""
+        config = self.config or {}
+        return {'provider': config.get('provider'), 'model': self.model,
+                'base_url': config.get('base_url')}
+
     @staticmethod
     def _refund_refusals_enabled() -> bool:
         """Kill-switch for treating a definitive refusal as budget-free."""
@@ -3555,7 +3567,8 @@ class MedicationCoordinatorAgent:
             return AgentResponse(text, warnings, conflicts,
                 {'session_id': state.session_id, 'turn_id': state.turn_id, 'memory_refs': memory_refs,
                  'source_refs': source_refs, 'response_source': 'template',
-                 'response_fallback_reason': state.degraded_reason, 'investigation': inv.to_dict()},
+                 'response_fallback_reason': state.degraded_reason, 'investigation': inv.to_dict(),
+                 'planner_endpoint': self._endpoint_identity()},
                 state.trace, operation_outcomes=self._operation_outcomes(state))
         if self.response_composer is None and not state.degraded_reason:
             clarification = state.successful_observation("ask_clarification")
@@ -3650,10 +3663,23 @@ class MedicationCoordinatorAgent:
                 "reflection": state.reflection_notes,
                 "response_source": response_source,
                 "response_fallback_reason": compose_error,
+                "planner_endpoint": self._endpoint_identity(),
             },
             tool_trace=state.trace,
             operation_outcomes=self._operation_outcomes(state),
         )
+
+    def _endpoint_identity(self) -> dict[str, Any]:
+        """Endpoint attribution for the response artifact — never the credential.
+
+        Recorded so any delivered report can be traced to the provider and model
+        that produced it.  That matters once more than one endpoint is
+        allowlisted: without it a report cannot be attributed, and a quality
+        regression could not be tied to the model that caused it."""
+        planner = getattr(self.planner, 'llm_planner', None)
+        if planner is None or not isinstance(planner, LLMPlanner):
+            return {'provider': None, 'model': None, 'base_url': None}
+        return planner.endpoint
 
     @staticmethod
     def _operation_outcomes(state: AgentState) -> list[dict[str, Any]]:

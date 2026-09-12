@@ -27,7 +27,14 @@ DATA = ROOT / "data"
 TOKENDANCE_BASE_URL = "https://tokendance.space/gateway/v1"
 TOKENDANCE_DEFAULT_MODEL = "glm-5.3-flash"
 SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
-SILICONFLOW_DEFAULT_MODEL = "zai-org/GLM-4.5-Air"
+# The verified-discipline model, NOT the previous default.  ``zai-org/GLM-4.5-Air``
+# was removed as a default because the 2026-09-12 qualification round measured
+# it returning an EMPTY choices list on 6/6 calls -- its reasoning consumed the
+# whole response.  Selecting the provider without pinning a model must not land
+# on a model known not to answer; that is the same "wrong endpoint by accident"
+# failure the explicit LLM_PROVIDER selector exists to prevent.
+# Measured (L1): completion 75-80 tokens, reasoning_tokens 0 x6, ~1.9-2.1s/call.
+SILICONFLOW_DEFAULT_MODEL = "Qwen/Qwen2.5-7B-Instruct"
 SEVERITIES = ["contraindicated", "major", "moderate", "minor", "unknown"]
 MECHANISM_TYPES = [
     "renal_clearance_reduction", "electrolyte_mediated", "pharmacodynamic_antagonism",
