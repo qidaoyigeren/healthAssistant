@@ -192,16 +192,17 @@ class AutonomyTest(unittest.TestCase):
     def test_a_policy_fallback_is_not_autonomous(self):
         """策略兜底拿不到自主性，也不得算完整完成。
 
-        注意计数落点是 ``report_quality_pass`` 而非 ``degraded_outcome``：bucket
-        的互斥定义属 Task 4 的收敛范围，本任务不擅自改它，所以这里把**实际**
-        取值钉进断言——真到 Task 4 改口径时，这条会响，而不是悄悄跟着变。
+        Task 4 收敛了计数落点：兜底产出过动作就是降级，落 ``degraded_outcome``。
+        此前它落在 ``report_quality_pass``——把"确定性兜底产出了动作"读成了一次
+        报告质量通过。这条断言当时被刻意钉在**实际**取值上，所以口径一变它就响
+        （见 git 历史），而不是悄悄跟着变。
         """
         outcome = scoring.score_outcome(
             _clean_task(), _clean_observed(attribution={'policy_fallback': 1}))
         self.assertFalse(outcome['autonomy'])
         self.assertFalse(outcome['complete'])
         self.assertNotEqual(outcome['bucket'], 'autonomous_without_degradation')
-        self.assertEqual(outcome['bucket'], 'report_quality_pass')
+        self.assertEqual(outcome['bucket'], 'degraded_outcome')
 
     def test_code_default_subquestions_are_not_autonomous(self):
         """子问题由代码默认生成，就不是模型自主规划——即使报告本身完美。"""
@@ -331,6 +332,94 @@ class EmptySectionTest(unittest.TestCase):
                 task, _observed(report_markdown=report,
                                 empty_state_sections=['4. 仍缺少依据的问题（待核实）']))['failures'],
             [])
+
+
+class NegativeControlTest(unittest.TestCase):
+    """每条对照都必须判失败——否则该检查仍不可证伪。"""
+
+    def test_a_failed_task_with_a_complete_report_is_still_a_failure(self):
+        task = _task(required_report_sections=['2. 有来源支持的事实'])
+        report = '## 2. 有来源支持的事实\n\n- 有内容\n'
+        observed = _observed(report_markdown=report, error='RuntimeError: boom')
+        self.assertEqual(scoring.score_outcome(task, observed)['bucket'],
+                         'execution_failed_or_not_sampled')
+
+    def test_a_rule_takeover_is_not_autonomous(self):
+        task = _task()
+        observed = _observed(subquestion_source='code_default')
+        outcome = scoring.score_outcome(task, observed)
+        self.assertFalse(outcome['autonomy'])
+        self.assertNotEqual(outcome['bucket'], 'autonomous_without_degradation')
+
+    def test_a_policy_fallback_is_not_autonomous(self):
+        outcome = scoring.score_outcome(_task(), _observed(
+            subquestion_source='model',
+            attribution={'policy_fallback': 2}))
+        self.assertFalse(outcome['autonomy'])
+
+    def test_a_perfect_report_with_a_policy_fallback_is_not_a_quality_pass(self):
+        """报告完美，但**确定性兜底产出过动作**——这不是自主达成，也不是
+        "报告质量通过"就该记的那一格。"""
+        outcome = scoring.score_outcome(_task(), _observed(
+            subquestion_source='model', attribution={'policy_fallback': 1},
+            report_markdown='## 2. 有来源支持的事实\n\n- 有内容\n'))
+        self.assertEqual(outcome['bucket'], 'degraded_outcome')
+
+    def test_a_perfect_report_after_budget_exhaustion_is_not_complete(self):
+        outcome = scoring.score_outcome(_task(), _observed(termination_reason='budget_insufficient'))
+        self.assertFalse(outcome['complete'])
+
+
+class RescoreTest(unittest.TestCase):
+    def test_missing_fields_become_undetermined_not_fabricated(self):
+        artifact = {'protocol': 'visitprep-eval@1', 'arm': 'fixed',
+                    'tasks': [{'task_id': 't1', 'family_id': 'f',
+                               'score': {'passed': True}, 'observed': {}}]}
+        out = scoring.rescore(artifact)
+        entry = out['tasks'][0]
+        self.assertTrue(entry['undetermined'])
+        self.assertEqual(entry['protocol'], 'visitprep-eval@2')
+        self.assertEqual(out['original_protocol'], 'visitprep-eval@1')
+        self.assertIn('not_comparable_to', out)
+        self.assertIn('missing:termination_reason', entry['undetermined_reasons'])
+
+    def test_a_complete_old_record_is_rescored_without_guessing(self):
+        artifact = {'protocol': 'visitprep-eval@1', 'arm': 'fixed', 'tasks': [
+            {'task_id': 't1', 'family_id': 'f', 'observed': {
+                'report_markdown': '## 2. 有来源支持的事实\n\n- 有内容\n',
+                'termination_reason': 'checks_completed',
+                'subquestion_source': 'model', 'attribution': {}}}]}
+        out = scoring.rescore(artifact)
+        self.assertEqual(out['tasks'][0]['terminal_state'], 'completed')
+        self.assertFalse(out['tasks'][0]['undetermined'])
+
+    def test_the_old_score_is_kept_verbatim_and_the_new_one_added(self):
+        """不覆盖旧结论：旧分数原样留档，新判定另立字段。"""
+        artifact = {'protocol': 'visitprep-eval@1', 'arm': 'fixed', 'tasks': [
+            {'task_id': 't1', 'family_id': 'f', 'score': {'passed': True},
+             'observed': {'report_markdown': '', 'termination_reason': 'checks_completed',
+                          'subquestion_source': 'model', 'attribution': {}}}]}
+        entry = scoring.rescore(artifact)['tasks'][0]
+        self.assertEqual(entry['original_score'], {'passed': True})
+        self.assertIn('bucket', entry)
+
+    def test_a_missing_axis_input_is_undetermined_and_does_not_manufacture_a_verdict(self):
+        """`subquestion_source` 缺了，自主性那一轴就没有依据。
+
+        照 ``None != 'model'`` 判，会把**每一条**旧记录读成降级——那是把"没记"
+        当成"不是模型"，是补造判定。不可判定时不给 bucket，但在场的那部分仍
+        以 ``partial`` 给出。
+        """
+        artifact = {'protocol': 'visitprep-eval@1', 'arm': 'model', 'tasks': [
+            {'task_id': 't1', 'family_id': 'f', 'observed': {
+                'report_markdown': '## 2. 有来源支持的事实\n\n- 有内容\n',
+                'termination_reason': 'checks_completed', 'attribution': {}}}]}
+        entry = scoring.rescore(artifact)['tasks'][0]
+        self.assertTrue(entry['undetermined'])
+        self.assertIn('missing:subquestion_source', entry['undetermined_reasons'])
+        self.assertNotIn('bucket', entry)
+        self.assertNotIn('autonomy', entry)
+        self.assertEqual(entry['partial']['terminal_state'], 'completed')
 
 
 class DelegationTest(unittest.TestCase):

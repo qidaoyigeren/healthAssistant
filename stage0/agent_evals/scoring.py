@@ -229,7 +229,14 @@ def score_autonomy(observed: dict) -> bool:
 
 
 def score_outcome(task: dict, observed: dict) -> dict:
-    """三条轴 + 五项互斥计数之一。``undetermined`` 是并列标记，不占计数。"""
+    """三条轴 + 五项互斥计数之一。``undetermined`` 是并列标记，不占计数。
+
+    ``bucket`` 是一个**优先级**结论：越靠前的判断越强，先成立的先说。所以
+    "报告好看"不能盖过"这一步是确定性兜底产出的动作"，而"降级"也不能盖过
+    "根本没执行成功"。三条轴（``report_quality``/``terminal_state``/
+    ``autonomy``）始终给出各自的判定，bucket 只是它们的摘要——细节看轴，
+    不要从 bucket 反推。
+    """
     if observed.get('undetermined'):
         return {'protocol': PROTOCOL, 'undetermined': True,
                 'undetermined_reasons': list(observed.get('undetermined') or [])}
@@ -238,16 +245,29 @@ def score_outcome(task: dict, observed: dict) -> dict:
     terminal = classify_terminal(task, observed)
     autonomous = score_autonomy(observed)
 
+    # 降级不只是 ``degraded_reason``：子问题不是模型提的，或规划器有兜底产出过
+    # 动作，同样是降级。只看 ``degraded_reason`` 会让这类回合漏进
+    # ``report_quality_pass``——把"确定性兜底产出了动作"读成"自主达成"。
+    policy_fallback = bool((observed.get('attribution') or {}).get('policy_fallback'))
+    degraded = (bool(observed.get('degraded_reason'))
+                or observed.get('subquestion_source') != 'model'
+                or policy_fallback)
+
     if observed.get('error'):
         bucket = 'execution_failed_or_not_sampled'
-    elif observed.get('degraded_reason') or observed.get('subquestion_source') != 'model':
+    elif degraded:
         bucket = 'degraded_outcome'
-    elif quality['ok'] and terminal in {'completed', 'waiting'} and autonomous:
+    elif quality['ok'] and terminal == 'completed' and autonomous:
         bucket = 'autonomous_without_degradation'
     elif quality['ok'] and terminal in {'completed', 'waiting'}:
         bucket = 'report_quality_pass'
+    elif terminal in {'completed', 'waiting'}:
+        bucket = 'terminal_expected'
     else:
-        bucket = 'terminal_expected' if terminal != 'stopped' else 'report_quality_pass'
+        # 剩下的情形：报告不合格**且**停在不被允许的地方。这个桶读作"这一轮
+        # 不构成一个可用样本"——而不是"进程崩了"。它确实执行了，轴上的
+        # ``report_quality`` 与 ``terminal_state`` 记录了它实际是怎么失败的。
+        bucket = 'execution_failed_or_not_sampled'
 
     return {
         'protocol': PROTOCOL,
@@ -256,4 +276,62 @@ def score_outcome(task: dict, observed: dict) -> dict:
         'autonomy': autonomous,
         'complete': bool(quality['ok'] and terminal == 'completed' and autonomous),
         'bucket': bucket,
+    }
+
+
+# 重评历史产物时**必须**在场的字段——即 v2 的三条轴各自要读的东西。缺任何
+# 一项都记 undetermined：`subquestion_source` 缺失时，"自主性"这一轴没有依据，
+# 照判会得到 `None != 'model'` → 每一条旧记录都被判成降级。那是**补造证据**：
+# 把"没记"读成了"不是模型"，而补造一个判定比承认不可判定更糟。
+_REQUIRED_OBSERVED = ('report_markdown', 'termination_reason',
+                      'subquestion_source', 'attribution')
+
+
+def rescore(artifact: dict, task_index: dict | None = None) -> dict:
+    """用本协议重评一份既有产物。不覆盖、不改写旧结论。
+
+    旧分数原样留在 ``original_score`` 里，新判定另立字段——重评不是更正历史，
+    是给同一批观测换一套口径再看一遍。
+    """
+    tasks = []
+    for item in artifact.get('tasks') or []:
+        observed = dict(item.get('observed') or {})
+        missing = [key for key in _REQUIRED_OBSERVED if observed.get(key) is None]
+        entry = {'task_id': item.get('task_id'), 'family_id': item.get('family_id'),
+                 'arm': item.get('arm') or artifact.get('arm'), 'protocol': PROTOCOL,
+                 'original_score': item.get('score')}
+        if missing:
+            entry.update({'undetermined': True,
+                          'undetermined_reasons': ['missing:' + key for key in missing]})
+            # 不可判定的是**整条判定**，不是每一个观测量。在场的那部分仍然算得
+            # 出报告质量与终态，就一并给出——标注为 partial，且**不产生
+            # bucket**：五计数是互斥的完整判定，缺依据时不给。
+            partial = {}
+            task = (task_index or {}).get(item.get('task_id')) or {'expected': {}}
+            if 'report_markdown' not in missing:
+                partial['report_quality'] = score_report_quality(task, observed)
+            if 'termination_reason' not in missing:
+                partial['terminal_state'] = classify_terminal(task, observed)
+            if partial:
+                entry['partial'] = partial
+        else:
+            task = (task_index or {}).get(item.get('task_id')) or {'expected': {}}
+            entry.update(score_outcome(task, observed))
+            entry['undetermined'] = False
+        tasks.append(entry)
+    return {
+        'protocol': PROTOCOL,
+        'original_protocol': artifact.get('protocol'),
+        'arm': artifact.get('arm'),
+        'not_comparable_to': ('旧产物在 visitprep-eval@1 下采集，缺 v2 所需字段时'
+                              '只能记 undetermined；口径不同，不得与 v2 批次逐格比较。'),
+        'tasks': tasks,
+        'summary': {
+            'total': len(tasks),
+            'undetermined': sum(1 for t in tasks if t.get('undetermined')),
+            'by_bucket': {bucket: sum(1 for t in tasks if t.get('bucket') == bucket)
+                          for bucket in ('autonomous_without_degradation', 'report_quality_pass',
+                                         'terminal_expected', 'degraded_outcome',
+                                         'execution_failed_or_not_sampled')},
+        },
     }
