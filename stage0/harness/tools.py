@@ -61,6 +61,11 @@ PERMISSION_ROLES: dict[str, frozenset] = {
     "ddi:detect": frozenset({"caregiver", "ops", "reviewer"}),
     "evidence:read": frozenset({"caregiver", "ops", "reviewer"}),
     "clarify": frozenset({"caregiver", "ops"}),
+    # Protocol v2: declaring the sub-questions of an investigation, and reading
+    # the material index / a material item.  Both read-only; neither grants any
+    # write capability.
+    "plan:questions": frozenset({"caregiver", "ops", "reviewer"}),
+    "materials:read": frozenset({"caregiver", "ops", "reviewer"}),
     # Harness P3 (both default-OFF experiments): read-only batch fan-out and
     # read-only worker delegation.  Neither grants any write capability.
     "batch:read": frozenset({"caregiver", "ops"}),

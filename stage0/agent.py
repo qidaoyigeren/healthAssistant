@@ -877,16 +877,22 @@ PROPOSAL_META_KEYS = ('purpose', 'gap_id', 'expected_observation', 'rationale')
 EXECUTOR_ONLY_ARGUMENTS = ('warnings', 'context_refs', 'subject_key',
                            'reported_event_ref', 'warning_ref', 'description')
 
+# Protocol v2: tools that only exist inside an investigation.  Registered for
+# every agent (registration is static) but advertised — and accepted — only
+# when an investigation is active, so a non-investigation turn never sees a
+# control it cannot legally use.
+INVESTIGATION_ONLY_TOOLS = frozenset({'plan_questions'})
+
 
 def _tool_descriptions() -> dict[str, str]:
     specs = dict(DEFAULT_TOOL_SPECS)
     try:
         from .harness.default_tools import (BATCH_READ_SPEC, DELEGATE_TASK_SPEC,
-                                            READ_EVIDENCE_SPEC)
+                                            PLAN_QUESTIONS_SPEC, READ_EVIDENCE_SPEC)
     except ImportError:  # pragma: no cover - script-style import
         from harness.default_tools import (BATCH_READ_SPEC, DELEGATE_TASK_SPEC,
-                                           READ_EVIDENCE_SPEC)  # type: ignore
-    for spec in (READ_EVIDENCE_SPEC, BATCH_READ_SPEC, DELEGATE_TASK_SPEC):
+                                           PLAN_QUESTIONS_SPEC, READ_EVIDENCE_SPEC)  # type: ignore
+    for spec in (READ_EVIDENCE_SPEC, BATCH_READ_SPEC, DELEGATE_TASK_SPEC, PLAN_QUESTIONS_SPEC):
         specs.setdefault(spec.name, spec)
     return {name: spec.description for name, spec in specs.items()}
 
@@ -1035,6 +1041,12 @@ class PlannerPolicyGuard:
         if not isinstance(tool, str) or tool not in self.tool_schemas:
             reject("unknown_tool", "tool is not registered in the executor", "schema")
             return ProposalValidation(False, errors)
+        if tool in INVESTIGATION_ONLY_TOOLS and state.investigation is None:
+            # Belt and braces: the catalog already hides these outside an
+            # investigation, so a proposal naming one is a protocol violation.
+            reject("investigation_only_tool",
+                   f"{tool} is only valid inside an investigation", "protocol")
+            return ProposalValidation(False, errors)
 
         arguments = proposal.get("arguments")
         if arguments is None:
@@ -1112,6 +1124,9 @@ class PlannerPolicyGuard:
         if code == 'authority_requires_full_memory_read':
             return ("gap 'authority' 只接受 memory_read 且 arguments.query=\"snapshot\"（完整权威快照）；"
                     "其他工具不能关闭该缺口。缺省 query 会被自动补齐为 snapshot。")
+        if code == 'plan_questions_only_for_subquestions_gap':
+            return ("plan_questions 只能在 'subquestions' 缺口打开时使用，且 gap_id 必须是 'subquestions'；"
+                    "它不能被用来旁路其他缺口。当前 open gaps: " + str(open_gaps))
         if code == 'invalid_gap_link':
             return (f"gap_id 必须是当前 open gap 之一: {open_gaps}，"
                     "且必须给出非空字符串 expected_observation（本步预期观察到的结果）。")
@@ -1703,7 +1718,8 @@ class LLMPlanner:
             }
             meta_required = list(meta)
         else:
-            permitted = list(self.tool_schemas)
+            permitted = [name for name in self.tool_schemas
+                         if name not in INVESTIGATION_ONLY_TOOLS]
             respond_available = True
             meta, meta_required = {}, []
 
@@ -3112,7 +3128,10 @@ class MedicationCoordinatorAgent:
                         "system_forced", asdict(forced), "accepted", True, [], None,
                         time.perf_counter(), fallback_kind=None)
                 return forced
-            inv.next_action()
+            # Forced stops only — this must NOT plan.  Pre-filling a candidate
+            # action here would hand the model a code-computed plan that it
+            # could echo while the trace recorded an autonomous choice.
+            inv.forced_stop()
             if inv.termination_reason:
                 return None
         return self.planner.decide(state)

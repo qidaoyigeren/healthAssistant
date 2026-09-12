@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass, field
 import hashlib
 import itertools
 import json
+import os
 import re
 
 from .evidence_quality import assess_claim
@@ -24,6 +25,11 @@ MAX_EVIDENCE = 12
 # VERSION/CONTRACT), so persisted investigations stay loadable.
 PROTOCOL_VERSION = 'investigation-protocol@2'
 
+# Protocol v2: the ONE gap through which this investigation's sub-questions are
+# declared.  It is the only legal ``gap_id`` for ``plan_questions``, so that
+# tool can never be used to sidestep another open gap.
+GAP_PLAN = 'subquestions'
+
 
 def allowed_tools(inv):
     """Tools the current state may legally use (presentation only).
@@ -38,6 +44,9 @@ def allowed_tools(inv):
     if not inv.authority_read:
         return ('memory_write', 'memory_read')
     allowed = ['memory_write', 'memory_read']
+    if any(g['gap_id'] == GAP_PLAN and g['status'] == 'open' for g in inv.gaps):
+        # Sub-questions are not yet declared: planning is the only way forward.
+        allowed.append('plan_questions')
     if any(g['kind'] == 'patient_fact_missing' and g['status'] == 'open' and g.get('field') for g in inv.gaps):
         allowed.append('ask_clarification')
     if any(g['kind'] == 'evidence_missing' and g['status'] == 'open' for g in inv.gaps):
@@ -76,6 +85,15 @@ class InvestigationState:
     invalidations: list = field(default_factory=list)
     context_integrity: str = 'full_authority_checked_evidence_body_on_demand'
     mode: str = 'deterministic'
+    # Protocol v2.  Additive only — an older persisted state restores fine and
+    # simply reports 'unset'.  'model' means the model declared the
+    # sub-questions; 'code_default' means the degraded policy had to.
+    subquestion_source: str = 'unset'
+    # Materials the model has SEEN (index) versus READ BACK (item).  Only the
+    # latter can support a citation, mirroring the label-evidence rule that
+    # "found" is not "read and verified".
+    material_refs: list = field(default_factory=list)
+    material_read_refs: list = field(default_factory=list)
 
     @classmethod
     def restore(cls, raw, scope):
@@ -132,6 +150,115 @@ class InvestigationState:
                     assessments[ref].update(status='insufficient', source_status='invalid', condition_status='unknown')
             self.termination_reason = 'unrecoverable_failure'
         self._assess()
+
+    # ---- Protocol v2: sub-questions -------------------------------------
+
+    @property
+    def subquestions_delegated(self) -> bool:
+        """Whether the PLANNER owns the sub-question set.
+
+        Only a real model does by default.  A ``scripted`` planner is the
+        offline double: it proves the state machine and the execution
+        constraints, and it must not be credited with a planning capability it
+        was never given.  An evaluation may opt a script into the contract
+        explicitly with ``AGENT_SUBQUESTION_PLANNER=model`` — that is a
+        declared choice about who owns the decomposition, not a test branch.
+        """
+        if self.mode == 'llm':
+            return True
+        if self.mode == 'scripted':
+            return os.getenv('AGENT_SUBQUESTION_PLANNER', '').strip().lower() == 'model'
+        return False
+
+    def allowed_entities(self) -> set[str]:
+        """Names a sub-question may reference: the authoritative medication
+        names, plus the names carried by materials staged for this scope.  A
+        planner may not invent a drug."""
+        names = {str(m['display_name']) for m in self.facts.get('medications', []) if m.get('display_name')}
+        for entry in self.material_refs:
+            if not isinstance(entry, dict):
+                continue
+            candidate = entry.get('candidate') or {}
+            name = (candidate.get('fields') or {}).get('name')
+            if name:
+                names.add(str(name))
+        return names
+
+    def _new_claim(self, statement, entities, source):
+        # Id derived from the ENTITIES alone, which is the formula this contract
+        # has always used: persisted claim ids stay stable across the upgrade,
+        # and two sub-questions over the same drug set are the same evidence
+        # question rather than two colliding records.
+        identifier = 'claim:' + digest(list(entities))[:12]
+        if any(claim['claim_id'] == identifier for claim in self.claims):
+            return identifier
+        self.claims.append({'claim_id': identifier, 'statement': statement, 'entities': list(entities),
+            'status': 'insufficient', 'supporting_evidence': [], 'opposing_evidence': [],
+            'source_status': 'unknown', 'condition_status': 'unknown', 'source': source})
+        self.gap(identifier, 'evidence_missing',
+                 '核查' + '、'.join(entities) + '的支持和反对证据', claim_id=identifier)
+        return identifier
+
+    def apply_default_subquestions(self):
+        """The DEGRADED sub-question policy: every drug pair, bounded.
+
+        Used only where no planner can declare sub-questions (deterministic
+        mode) or where the planner failed and the loop fell back.  The source
+        is recorded so a report can never present this as model reasoning.
+        """
+        meds = self.facts.get('medications', [])
+        if self.claims or not meds:
+            return
+        names = [m['display_name'] for m in meds]
+        pairs = (list(itertools.islice(itertools.combinations(names, 2), MAX_CLAIMS + 1))
+                 if len(names) > 1 else [(names[0],)])
+        if len(pairs) > MAX_CLAIMS:
+            self.gap('coverage_limit', 'evidence_missing',
+                     '药物组合超过本轮有界核查范围，剩余组合未检查。')
+        for pair in pairs[:MAX_CLAIMS]:
+            self._new_claim('、'.join(pair) + '的标签证据', list(pair), 'code_default')
+        self.subquestion_source = 'code_default'
+        for g in self.gaps:
+            if g['gap_id'] == GAP_PLAN:
+                g['status'] = 'resolved'
+
+    def accept_questions(self, questions) -> list[str]:
+        """Validate and adopt planner-declared sub-questions.
+
+        Returns error codes; empty means accepted.  A rejection NEVER falls
+        back to a code-authored substitute — the model either satisfies the
+        contract or the degraded policy is used, labelled.  Validation here is
+        grounding, not scriptedness: any set of sub-questions is legal as long
+        as its entities exist in this scope and the authoritative list is
+        covered, so different-but-valid decompositions all pass.
+        """
+        if not isinstance(questions, list) or not 1 <= len(questions) <= MAX_CLAIMS:
+            return ['invalid_subquestion_count']
+        allowed = self.allowed_entities()
+        normalised = []
+        for item in questions:
+            if not isinstance(item, dict) or not isinstance(item.get('statement'), str) \
+                    or not item['statement'].strip() or len(item['statement']) > 200:
+                return ['invalid_subquestion_statement']
+            entities = item.get('entities')
+            if not isinstance(entities, list) or not entities \
+                    or any(not isinstance(entity, str) or not entity for entity in entities):
+                return ['invalid_subquestion_entities']
+            if any(entity not in allowed for entity in entities):
+                return ['subquestion_entity_not_in_scope']
+            normalised.append({'statement': item['statement'].strip(), 'entities': list(entities)})
+        covered = {entity for item in normalised for entity in item['entities']}
+        required = {str(m['display_name']) for m in self.facts.get('medications', []) if m.get('display_name')}
+        if not required.issubset(covered):
+            return ['subquestion_coverage_incomplete']
+        self.claims = []
+        for item in normalised:
+            self._new_claim(item['statement'], item['entities'], 'model')
+        self.subquestion_source = 'model'
+        for g in self.gaps:
+            if g['gap_id'] == GAP_PLAN:
+                g['status'] = 'resolved'
+        return []
 
     def gap(self, identifier, kind, description, **details):
         item = next((g for g in self.gaps if g['gap_id'] == identifier), None)
@@ -207,16 +334,16 @@ class InvestigationState:
             if resolved:
                 g['status'] = 'resolved'
         if not self.claims and meds:
-            names = [m['display_name'] for m in meds]
-            pairs = list(itertools.islice(itertools.combinations(names, 2), MAX_CLAIMS + 1)) if len(names) > 1 else [(names[0],)]
-            if len(pairs) > MAX_CLAIMS:
-                self.gap('coverage_limit', 'evidence_missing', '药物组合超过本轮有界核查范围，剩余组合未检查。')
-            for pair in pairs[:MAX_CLAIMS]:
-                identifier = 'claim:' + digest(pair)[:12]
-                self.claims.append({'claim_id': identifier, 'statement': '、'.join(pair) + '的标签证据',
-                    'entities': list(pair), 'status': 'insufficient', 'supporting_evidence': [], 'opposing_evidence': [],
-                    'source_status': 'unknown', 'condition_status': 'unknown'})
-                self.gap(identifier, 'evidence_missing', '核查' + '、'.join(pair) + '的支持和反对证据', claim_id=identifier)
+            if self.subquestions_delegated:
+                # Protocol v2: splitting the question into sub-questions is
+                # investigation strategy, so it belongs to the planner.  The
+                # code only opens the gap and states the contract.
+                self.gap(GAP_PLAN, 'plan_missing',
+                         '声明本轮要核查的子问题（拆分问题的唯一入口）。')
+            else:
+                # No planner here can propose sub-questions, so the degraded
+                # policy owns them — and says so.
+                self.apply_default_subquestions()
         if self.conflicts:
             self.gap('authority_conflict', 'evidence_conflict', '权威记录存在未决冲突；保留两侧，需通过现有审核流程核实。')
 
@@ -230,6 +357,16 @@ class InvestigationState:
             self.authority_read = True
         if observation.tool == 'ask_clarification':
             self.termination_reason = 'waiting_input'
+        if observation.tool == 'plan_questions':
+            # The sub-question set is adopted by the STATE, from the observed
+            # arguments — the executor only echoes what it saw.  A rejected set
+            # is a bounded no-progress stop, never a silent code substitute.
+            errors = self.accept_questions(observation.arguments.get('questions'))
+            if errors:
+                self.gap('plan:' + ','.join(errors), 'plan_missing',
+                         '子问题声明未通过校验：' + ','.join(errors))
+                self.termination_reason = 'no_progress'
+            return
         if observation.tool in {'rag_search', 'ddi_check'}:
             query = str(observation.arguments.get('query', '')).strip().casefold()
             repeated = query in self.queries
@@ -335,11 +472,22 @@ class InvestigationState:
         if any(g['kind'] == 'evidence_conflict' and g['status'] == 'open' for g in self.gaps):
             self.termination_reason = 'waiting_review'
         elif (self.claims and all(v == 'checked' for v in self.checks.values())
-              and not any(g['status'] == 'open' for g in self.gaps)):
+              and not any(g['status'] == 'open' for g in self.gaps)
+              and not self.unread_evidence()):
+            # A captured body that was never read back can carry the OPPOSING
+            # source.  Declaring completion with one outstanding would make
+            # coverage cheaper by skipping the read-back the evidence contract
+            # rests on, and would hide a disagreement behind "completed".
+            # Retrieval is not verification; this is the same rule the label
+            # path already states as "'搜到' 不等于 '已读取并验证'".
             self.termination_reason = 'checks_completed'
         elif len(self.queries) >= MAX_SEARCHES:
             self.termination_reason = 'budget_insufficient'
         return self.termination_reason
+
+    def unread_evidence(self) -> list:
+        """Captured evidence whose body was never read back in this run."""
+        return [ref for ref in self.evidence_refs if ref not in self.read_refs]
 
     def degraded_next_action(self):
         """The scripted, deterministic policy — the DEGRADED path only.
@@ -384,10 +532,19 @@ class InvestigationState:
         instead; only the degraded path plans an action."""
         return self.degraded_next_action()
 
+    def supply_default_subquestions(self):
+        """If the planner never declared sub-questions, the degraded policy
+        supplies them at wrap-up — labelled ``code_default``, so a report can
+        never present them as the model's own decomposition.  Never raises:
+        a bounded report with fewer questions is a valid outcome."""
+        if any(g['gap_id'] == GAP_PLAN and g['status'] == 'open' for g in self.gaps):
+            self.apply_default_subquestions()
+
     def finish(self, degraded_reason=None):
         if degraded_reason and degraded_reason.startswith('planner_circuit_break:') and self.termination_reason:
             # A code-verified result may finish after the planner was disabled.
             # The run still exposes its degraded planner status separately.
+            self.supply_default_subquestions()
             return
         if degraded_reason:
             self.termination_reason = ('cancelled' if degraded_reason == 'cancelled' else
@@ -396,6 +553,7 @@ class InvestigationState:
         if not self.termination_reason:
             self.next_action()
         self.termination_reason = self.termination_reason or 'no_progress'
+        self.supply_default_subquestions()
 
     def report_text(self):
         checked = [k for k, value in self.checks.items() if value == 'checked']
@@ -422,6 +580,10 @@ def proposal_errors(inv, proposal):
     gap = next((g for g in inv.gaps if g['gap_id'] == proposal.get('gap_id') and g['status'] == 'open'), None)
     if gap is None or not isinstance(proposal.get('expected_observation'), str) or not proposal['expected_observation'].strip():
         return ['invalid_gap_link']
+    if tool == 'plan_questions':
+        # Only the planning gap accepts it: this tool must never become a way
+        # to sidestep a different open gap.
+        return [] if gap['gap_id'] == GAP_PLAN else ['plan_questions_only_for_subquestions_gap']
     if tool not in {'memory_read', 'rag_search', 'read_evidence', 'ask_clarification', 'ddi_check'}:
         return ['investigation_tool_not_allowed']
     if tool == 'read_evidence' and args.get('evidence_id') not in inv.evidence_refs:

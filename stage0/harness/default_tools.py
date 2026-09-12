@@ -166,6 +166,34 @@ READ_EVIDENCE_SPEC = ToolSpec(
 )
 
 
+# Protocol v2: declaring an investigation's sub-questions.  This is the only
+# route by which claims come into existence on the model path, so it is
+# registered for every agent but advertised ONLY while an investigation's
+# 'subquestions' gap is open (see agent.INVESTIGATION_ONLY_TOOLS and
+# investigation.allowed_tools).  It reads nothing and writes nothing: the state
+# machine adopts the questions from the observation, the executor only echoes.
+PLAN_QUESTIONS_SPEC = ToolSpec(
+    name="plan_questions",
+    description=("声明本轮核查的子问题——拆分问题的唯一入口。每条子问题的 entities 必须取自权威药单"
+                 "或已上传材料的候选药名，且全部子问题合起来必须覆盖权威药单的每个药名；"
+                 "证据变化时可再次调用以修订。只在 subquestions 缺口打开时可用。"),
+    argument_schema={
+        "type": "object",
+        "properties": {"questions": {
+            "type": "array", "minItems": 1, "maxItems": 12,
+            "items": {"type": "object",
+                      "properties": {"statement": {"type": "string"},
+                                     "entities": {"type": "array", "items": {"type": "string"}}},
+                      "required": ["statement", "entities"]}}},
+        "required": ["questions"],
+    },
+    result_shape="dict(accepted, questions, allowed_entities, subquestion_source)",
+    kind="read",
+    required_permission="plan:questions",
+    idempotency="pure",
+)
+
+
 # Harness P3, both default-OFF (independent flags; see delegation.py and the
 # P3 report).  ``batch_read`` is the ordinary read-only batching CONTROL; the
 # planner proposes it like any single tool and the executor fans the pure
@@ -326,6 +354,18 @@ def build_default_executor(agent: Any, *, hooks: Any = None,
             return _callable(**request.arguments)
 
         executor.register(spec, handler)
+
+    def _plan_questions_handler(request):
+        # Pure echo.  The sub-question set is adopted by InvestigationState
+        # from the observed arguments, exactly as read_evidence is — the
+        # executor never mutates investigation state.
+        inv = getattr(request.state, "investigation", None)
+        return {"accepted": True,
+                "questions": request.arguments.get("questions"),
+                "allowed_entities": sorted(inv.allowed_entities()) if inv is not None else [],
+                "subquestion_source": "model"}
+
+    executor.register(PLAN_QUESTIONS_SPEC, _plan_questions_handler)
 
     if evidence_store is not None:
         executor.register(READ_EVIDENCE_SPEC, lambda request: evidence_store.read(

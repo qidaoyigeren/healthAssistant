@@ -257,6 +257,120 @@ class ResponsibilitySplitTest(unittest.TestCase):
         self.assertEqual(action.tool, 'rag_search')
 
 
+class _StubMemory:
+    """The two MemoryStore calls sync_authority actually makes."""
+
+    def __init__(self, medications=None):
+        self._meds = medications if medications is not None else [
+            {'display_name': '氨氯地平', 'ref': 'm1', 'dose': '5mg'},
+            {'display_name': '克拉霉素', 'ref': 'm2', 'dose': '250mg'}]
+
+    def snapshot(self):
+        return {'medications': self._meds, 'semantic': [], 'open_conflicts': []}
+
+    def scope_revision(self, name):
+        return 1
+
+
+class SubquestionsTest(unittest.TestCase):
+    """子问题拆解是调查策略（C 类），必须归模型。"""
+
+    def _inv(self, mode='llm'):
+        from stage0.investigation import InvestigationState
+        inv = InvestigationState('核对氨氯地平与克拉霉素能否同服', 'local-demo')
+        inv.mode = mode
+        inv.authority_read = True
+        inv.facts = {'medications': [{'display_name': '氨氯地平'}, {'display_name': '克拉霉素'}],
+                     'semantic': [], 'open_conflicts': []}
+        inv.sync_authority(_StubMemory())
+        return inv
+
+    def test_authority_read_leaves_a_subquestions_gap_instead_of_code_claims(self):
+        inv = self._inv()
+        self.assertEqual(inv.claims, [], '代码不得再自动穷举药对子问题')
+        ids = [g['gap_id'] for g in inv.gaps if g['status'] == 'open']
+        self.assertIn('subquestions', ids)
+        self.assertEqual(inv.subquestion_source, 'unset')
+
+    def test_deterministic_mode_keeps_the_existing_code_default(self):
+        """没有可规划子问题的规划器时，行为必须与改造前一致，且如实标记来源。"""
+        inv = self._inv(mode='deterministic')
+        self.assertTrue(inv.claims, '确定性路径必须仍然产生可核查的子问题')
+        self.assertEqual(inv.subquestion_source, 'code_default')
+
+    def test_model_questions_become_claims_and_close_the_gap(self):
+        inv = self._inv()
+        errors = inv.accept_questions([
+            {'statement': '氨氯地平与克拉霉素的相互作用', 'entities': ['氨氯地平', '克拉霉素']}])
+        self.assertEqual(errors, [])
+        self.assertEqual(inv.subquestion_source, 'model')
+        self.assertEqual([c['source'] for c in inv.claims], ['model'])
+        self.assertEqual([g['status'] for g in inv.gaps if g['gap_id'] == 'subquestions'],
+                         ['resolved'])
+
+    def test_invented_drug_names_are_refused(self):
+        inv = self._inv()
+        errors = inv.accept_questions([{'statement': 'x', 'entities': ['氨氯地平', '阿司匹林']}])
+        self.assertEqual(errors, ['subquestion_entity_not_in_scope'])
+        self.assertEqual(inv.claims, [])
+
+    def test_questions_must_cover_every_authoritative_medication(self):
+        """覆盖要求堵住"靠漏掉子问题让完成变便宜"。"""
+        inv = self._inv()
+        errors = inv.accept_questions([{'statement': 'x', 'entities': ['氨氯地平']}])
+        self.assertEqual(errors, ['subquestion_coverage_incomplete'])
+        self.assertEqual(inv.claims, [])
+
+    def test_empty_or_malformed_question_sets_are_refused(self):
+        inv = self._inv()
+        self.assertEqual(inv.accept_questions([]), ['invalid_subquestion_count'])
+        self.assertEqual(inv.accept_questions([{'statement': '', 'entities': ['氨氯地平']}]),
+                         ['invalid_subquestion_statement'])
+        self.assertEqual(inv.accept_questions([{'statement': 'x'}]),
+                         ['invalid_subquestion_entities'])
+
+    def test_material_candidate_names_count_as_allowed_entities(self):
+        """材料候选药名也允许——否则模型无法就材料里的差异提问。"""
+        inv = self._inv()
+        inv.material_refs = [{'candidate': {'fields': {'name': '阿司匹林'}}}]
+        errors = inv.accept_questions([
+            {'statement': '材料里的阿司匹林与权威记录的关系', 'entities': ['氨氯地平', '克拉霉素', '阿司匹林']}])
+        self.assertEqual(errors, [])
+
+    def test_the_gap_list_exposes_plan_questions_only_while_planning_is_open(self):
+        from stage0.investigation import allowed_tools
+        inv = self._inv()
+        self.assertIn('plan_questions', allowed_tools(inv))
+        inv.accept_questions([{'statement': 'x', 'entities': ['氨氯地平', '克拉霉素']}])
+        self.assertNotIn('plan_questions', allowed_tools(inv))
+
+    def test_plan_questions_cannot_bypass_other_gaps(self):
+        """规划缺口关闭后，plan_questions 不得被挂到别的缺口上继续使用。"""
+        from stage0.investigation import proposal_errors
+        inv = self._inv()
+        inv.accept_questions([{'statement': 'x', 'entities': ['氨氯地平', '克拉霉素']}])
+        evidence_gap = next(g for g in inv.gaps
+                            if g['kind'] == 'evidence_missing' and g['status'] == 'open')
+        errors = proposal_errors(inv, {'decision': 'tool', 'tool': 'plan_questions',
+                                       'gap_id': evidence_gap['gap_id'], 'expected_observation': 'x',
+                                       'arguments': {'questions': [
+                                           {'statement': 'x', 'entities': ['氨氯地平', '克拉霉素']}]}})
+        self.assertEqual(errors, ['plan_questions_only_for_subquestions_gap'])
+
+    def test_plan_questions_tool_is_only_visible_inside_an_investigation(self):
+        from stage0.agent import AgentState, LLMPlanner
+        from stage0.harness.default_tools import DEFAULT_TOOL_SPECS, PLAN_QUESTIONS_SPEC
+        schemas = {**{name: spec.model_schema for name, spec in DEFAULT_TOOL_SPECS.items()},
+                   PLAN_QUESTIONS_SPEC.name: PLAN_QUESTIONS_SPEC.model_schema}
+        planner = LLMPlanner(tool_schemas=schemas, proposal_provider=lambda payload: {})
+        state = AgentState(session_id='s', turn_id='t', event=CareEvent('user_message', 'x'))
+        names = [item['function']['name'] for item in planner.tool_definitions(state)]
+        self.assertNotIn('plan_questions', names)
+        state.investigation = self._inv()
+        names = [item['function']['name'] for item in planner.tool_definitions(state)]
+        self.assertIn('plan_questions', names)
+
+
 WARFARIN_WARNING = {
     'drug_a': '华法林', 'drug_b': '阿司匹林', 'effect': '出血风险增加',
     'source_text': '华法林与阿司匹林合用可增加出血风险，需监测凝血功能。',
