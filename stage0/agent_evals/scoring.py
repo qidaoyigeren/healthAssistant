@@ -104,10 +104,15 @@ def score_report_quality(task: dict, observed: dict) -> dict:
     # 被当成了主线，两者的修法不同。
     asked = set(observed.get('asked_fields') or [])
     required_questions = set(expected.get('must_ask_fields') or [])
-    if not required_questions.issubset(asked):
-        failures.append('necessary_question_missing')
-    if asked - required_questions:
-        failures.append('unnecessary_question')
+    # 任务没有声明必问字段，就是**没有**对"哪些问题重要"作出任何断言：问了不算
+    # 失败，没问也不算。仍然照判就会把这条检查判反——required 为空时
+    # ``asked - required`` 等于 ``asked``，于是**任何**提问都成了
+    # unnecessary_question，而被判失败的那个追问恰恰是本任务允许的正常结果。
+    if required_questions:
+        if not required_questions.issubset(asked):
+            failures.append('necessary_question_missing')
+        if asked - required_questions:
+            failures.append('unnecessary_question')
 
     if expected.get('forbid_supported_when_absent') and observed.get('supported_claims'):
         failures.append('unsupported_claim')
@@ -123,7 +128,9 @@ def score_report_quality(task: dict, observed: dict) -> dict:
 
     if observed.get('invalid_calls'):
         failures.append('invalid_tool_call')
-    return {'ok': not failures, 'failures': failures}
+    # 提问这一轴即使不判也要可见：不记下来，"模型到底问没问"就只能靠重跑才知道。
+    return {'ok': not failures, 'failures': failures,
+            'questions_asked': sorted(asked)}
 
 
 def score_autonomy(observed: dict) -> bool:

@@ -261,6 +261,13 @@ def run_task(task, arm, live=False):
                     'text': response.text,
                     'report_markdown': response.text,
                     'termination_reason': investigation.get('termination_reason'),
+                    # Carried onto `observed` because the autonomy axis reads it
+                    # from there.  It lives on the investigation object, so
+                    # without this line `score_autonomy` returns False for every
+                    # real run and `complete` can never be True — a condition
+                    # that can never be SATISFIED, the mirror image of the
+                    # unreachable checks this round exists to remove.
+                    'subquestion_source': investigation.get('subquestion_source'),
                     'goal_status': bundle.get('goal_status'),
                     'execution_status': bundle.get('execution_status'),
                     'diff_kinds_seen': sorted(kind for kind in kinds if kind),

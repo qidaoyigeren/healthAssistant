@@ -17,10 +17,29 @@ def _task(**expected):
 
 
 def _observed(**over):
+    # ``subquestion_source`` 是真实的 observed 形状的一部分（``run_task`` 会把它
+    # 从 investigation 搬到 outcome 上）。这里漏掉它，正是"永远返回 False 的
+    # 自主性轴"能从全部负向对照里溜过去的原因——默认值必须与生产形状一致。
     base = {'report_markdown': '', 'termination_reason': 'checks_completed',
-            'degraded_reason': None, 'attribution': {}, 'invalid_calls': 0}
+            'degraded_reason': None, 'subquestion_source': 'model',
+            'attribution': {}, 'invalid_calls': 0}
     base.update(over)
     return base
+
+
+def _clean_task():
+    return _task(required_report_sections=['3. 不同材料之间的差异'])
+
+
+def _clean_observed(**over):
+    """一份**应当判通过**的 observed：三轴全绿。"""
+    clean = {'report_markdown': ('## 3. 不同材料之间的差异\n\n'
+                                 '- 材料 case:1/item:2 的剂量与当前记录不同\n'),
+             'termination_reason': 'checks_completed', 'degraded_reason': None,
+             'subquestion_source': 'model', 'attribution': {'policy_fallback': 0},
+             'invalid_calls': 0}
+    clean.update(over)
+    return clean
 
 
 class TerminalStateTest(unittest.TestCase):
@@ -99,10 +118,30 @@ class RubricCoverageTest(unittest.TestCase):
         quality = scoring.score_report_quality(task, _observed(asked_fields=[]))
         self.assertEqual(quality['failures'], ['necessary_question_missing'])
 
-    def test_an_unnecessary_question_is_a_failure(self):
+    def test_an_unnecessary_question_is_a_failure_when_the_task_declares_required_ones(self):
         task = _task(must_ask_fields=['dose'])
         quality = scoring.score_report_quality(task, _observed(asked_fields=['dose', 'shoe_size']))
         self.assertEqual(quality['failures'], ['unnecessary_question'])
+
+    def test_a_task_declaring_no_required_question_does_not_punish_asking_one(self):
+        """没有声明必问字段的任务，就是没有对"哪些问题重要"作出断言。
+
+        此时 ``asked - required`` 等于 ``asked``，照判会让**任何**提问都成为
+        unnecessary_question——而那个追问恰恰是本任务允许的正常结果。
+        """
+        quality = scoring.score_report_quality(_task(), _observed(asked_fields=['dose']))
+        self.assertEqual(quality['failures'], [])
+        self.assertTrue(quality['ok'])
+
+    def test_asking_nothing_is_fine_when_the_task_declares_no_required_question(self):
+        """对称的另一半：不声明必问字段时，没问也不得判失败。"""
+        quality = scoring.score_report_quality(_task(), _observed(asked_fields=[]))
+        self.assertTrue(quality['ok'], quality)
+
+    def test_asked_questions_stay_visible_when_the_axis_is_not_scored(self):
+        """不判也要可见：否则"模型到底问没问"只能靠重跑才知道。"""
+        quality = scoring.score_report_quality(_task(), _observed(asked_fields=['q-b', 'q-a']))
+        self.assertEqual(quality['questions_asked'], ['q-a', 'q-b'])
 
     def test_a_supported_claim_where_none_was_expected_is_a_failure(self):
         task = _task(forbid_supported_when_absent=True)
@@ -127,6 +166,59 @@ class RubricCoverageTest(unittest.TestCase):
         self.assertEqual(quality['failures'], ['invalid_tool_call'])
 
 
+class AutonomyTest(unittest.TestCase):
+    """自主性这一轴必须**能被满足**，也必须能被证伪。
+
+    只写负向对照会让"恒返回 False"的坏实现看起来完全正确——这正是
+    ``subquestion_source`` 没有从 investigation 搬到 ``observed`` 时发生的事：
+    ``complete`` 永远为 False，而所有负向对照照样通过。所以这里的第一条是
+    正对照。
+    """
+
+    def test_a_clean_run_reaches_complete_and_the_autonomous_bucket(self):
+        outcome = scoring.score_outcome(_clean_task(), _clean_observed())
+        self.assertTrue(outcome['autonomy'])
+        self.assertTrue(outcome['complete'])
+        self.assertEqual(outcome['terminal_state'], 'completed')
+        self.assertEqual(outcome['bucket'], 'autonomous_without_degradation')
+
+    def test_a_degraded_run_is_not_autonomous(self):
+        outcome = scoring.score_outcome(
+            _clean_task(), _clean_observed(degraded_reason='provider_unavailable'))
+        self.assertFalse(outcome['autonomy'])
+        self.assertFalse(outcome['complete'])
+        self.assertEqual(outcome['bucket'], 'degraded_outcome')
+
+    def test_a_policy_fallback_is_not_autonomous(self):
+        """策略兜底拿不到自主性，也不得算完整完成。
+
+        注意计数落点是 ``report_quality_pass`` 而非 ``degraded_outcome``：bucket
+        的互斥定义属 Task 4 的收敛范围，本任务不擅自改它，所以这里把**实际**
+        取值钉进断言——真到 Task 4 改口径时，这条会响，而不是悄悄跟着变。
+        """
+        outcome = scoring.score_outcome(
+            _clean_task(), _clean_observed(attribution={'policy_fallback': 1}))
+        self.assertFalse(outcome['autonomy'])
+        self.assertFalse(outcome['complete'])
+        self.assertNotEqual(outcome['bucket'], 'autonomous_without_degradation')
+        self.assertEqual(outcome['bucket'], 'report_quality_pass')
+
+    def test_code_default_subquestions_are_not_autonomous(self):
+        """子问题由代码默认生成，就不是模型自主规划——即使报告本身完美。"""
+        outcome = scoring.score_outcome(
+            _clean_task(), _clean_observed(subquestion_source='code_default'))
+        self.assertFalse(outcome['autonomy'])
+        self.assertFalse(outcome['complete'])
+        self.assertEqual(outcome['bucket'], 'degraded_outcome')
+
+    def test_a_perfect_report_that_is_not_autonomous_is_not_complete(self):
+        """报告全绿但不自主，不得算完整完成——两条轴是独立的。"""
+        outcome = scoring.score_outcome(_clean_task(), _clean_observed(subquestion_source='unset'))
+        self.assertTrue(outcome['report_quality']['ok'])
+        self.assertFalse(outcome['complete'])
+        self.assertEqual(outcome['bucket'], 'degraded_outcome')
+
+
 class DelegationTest(unittest.TestCase):
     """``run_visitprep.evaluate`` 是薄委托，但旧口径的持久化键必须仍在。"""
 
@@ -137,6 +229,13 @@ class DelegationTest(unittest.TestCase):
             task, _observed(asked_fields=['dose'], unsupported_statements=['s1', 's2']))
         self.assertEqual(score['question_recall'], {'numerator': 1, 'denominator': 2})
         self.assertEqual(score['unsupported_conclusions'], 2)
+
+    def test_evaluate_passes_a_clean_run(self):
+        """``passed`` 必须能为 True——否则它只是个恒假的名字。"""
+        from stage0.agent_evals import run_visitprep
+        score = run_visitprep.evaluate(_clean_task(), _clean_observed())
+        self.assertTrue(score['passed'], score)
+        self.assertEqual(score['bucket'], 'autonomous_without_degradation')
 
     def test_evaluate_reports_the_protocol_and_delegated_failures(self):
         from stage0.agent_evals import run_visitprep
