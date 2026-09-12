@@ -330,12 +330,27 @@ class SubquestionsTest(unittest.TestCase):
                          ['invalid_subquestion_entities'])
 
     def test_material_candidate_names_count_as_allowed_entities(self):
-        """材料候选药名也允许——否则模型无法就材料里的差异提问。"""
-        inv = self._inv()
-        inv.material_refs = [{'candidate': {'fields': {'name': '阿司匹林'}}}]
-        errors = inv.accept_questions([
-            {'statement': '材料里的阿司匹林与权威记录的关系', 'entities': ['氨氯地平', '克拉霉素', '阿司匹林']}])
-        self.assertEqual(errors, [])
+        """材料候选药名也允许——否则模型无法就材料里的差异提问。
+
+        走**真实数据流**：导入 CSV → `MaterialIndex.index()` → `observe()`
+        记录 → `allowed_entities()`。改造前这里手工拼了一个候选字典，于是
+        写入端（字符串）与读取端（字典）的形状不符被掩盖过去，该分支在生产
+        中根本不可达——手工拼装的测试恰好绕开了它要验证的那段代码。
+        """
+        from stage0.agent import Observation
+        from stage0.product import MaterialIndex, ProductStore
+
+        with _env() as store:
+            product = ProductStore(store)
+            product.import_csv('chain', 'name,dose,unit,schedule,date,subject\n'
+                                        '维生素D,400,IU,每日一次,2026-01-05,local-demo\n')
+            inv = self._inv()
+            inv.observe(Observation(tool='list_materials', purpose='枚举材料', arguments={},
+                                    result=MaterialIndex(product).index(), ok=True), store)
+            self.assertIn('维生素D', inv.allowed_entities())
+            # 反面对照：没看到过的药名仍然不许出现，否则这条许可等于放开了
+            # 全部药名，"不许编造药物"就不成立了。
+            self.assertNotIn('布洛芬', inv.allowed_entities())
 
     def test_the_gap_list_exposes_plan_questions_only_while_planning_is_open(self):
         from stage0.investigation import allowed_tools

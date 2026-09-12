@@ -209,13 +209,16 @@ class InvestigationState:
     def allowed_entities(self) -> set[str]:
         """Names a sub-question may reference: the authoritative medication
         names, plus the names carried by materials staged for this scope.  A
-        planner may not invent a drug."""
+        planner may not invent a drug.
+
+        材料那一半读的是 ``material_items``——与写入端**同一个形状**。旧写法
+        在这里按字典取 ``entry['candidate']['fields']['name']``，而写入端放的
+        是字符串 ref，两处都不符，这段于是成了永不生效的死代码：材料独有的
+        药名（"维生素D"）从来没能进入规划范围。
+        """
         names = {str(m['display_name']) for m in self.facts.get('medications', []) if m.get('display_name')}
-        for entry in self.material_refs:
-            if not isinstance(entry, dict):
-                continue
-            candidate = entry.get('candidate') or {}
-            name = (candidate.get('fields') or {}).get('name')
+        for detail in self.material_items.values():
+            name = (detail or {}).get('name')
             if name:
                 names.add(str(name))
         return names
@@ -408,6 +411,13 @@ class InvestigationState:
                     ref = f"{material.get('case_id')}/{item.get('item_id')}"
                     if ref not in self.material_refs:
                         self.material_refs.append(ref)
+                    # 唯一规范形状，写入端与读取端共用：药名供
+                    # ``allowed_entities``，``current`` 供差异的双方具名。
+                    self.material_items[ref] = {
+                        'name': (item.get('fields') or {}).get('name'),
+                        'kind': item.get('kind'),
+                        'current': list(item.get('current') or []),
+                    }
             return
         if observation.tool == 'read_material_item':
             # A material item read back in this run; the ONLY way a material
@@ -722,6 +732,26 @@ class InvestigationState:
             '5. 就诊时可以向医生或药师确认什么': [
                 f"- {question['question']}" for question in self.questions],
         }
+
+    def citable_memory_refs(self) -> list:
+        """本报告有权引用的记忆 ref。
+
+        报告的差异一节会**点名双方**——材料条目与它所对比的当前记录，后者
+        是 ``memory:<kind>:<n>`` 形状。响应的最后一道安全校验把"报告里出现
+        而它没被告知"的 ref 判为 ``fabricated_memory_ref``，所以这些 ref 必须
+        一并交出去；否则双方具名会被自己的安全边界拦下，报告根本发不出去。
+        """
+        refs = []
+        for medication in self.facts.get('medications') or []:
+            if medication.get('ref'):
+                refs.append(str(medication['ref']))
+        for gap in self.gaps:
+            refs.extend(str(ref) for ref in (gap.get('counterparts') or []) if ref)
+        for conflict in self.conflicts or []:
+            for key in ('left_ref', 'right_ref', 'ref'):
+                if conflict.get(key):
+                    refs.append(str(conflict[key]))
+        return list(dict.fromkeys(refs))
 
     def empty_report_sections(self) -> list:
         """只渲染了空态句的节标题。

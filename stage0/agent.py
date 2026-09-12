@@ -3718,7 +3718,8 @@ class MedicationCoordinatorAgent:
             for conflict in conflicts:
                 text += f"\n未决矛盾 [{conflict['ref']}]：报告 [{conflict['left_ref']}]；证据 [{conflict['right_ref']}]。"
             errors = self._check_response(text, warnings=warnings, conflicts=conflicts,
-                memory_refs=memory_refs, escalation_required=True, refusal_required=False)
+                memory_refs=[*memory_refs, *inv.citable_memory_refs()],
+                escalation_required=True, refusal_required=False)
             if errors:
                 raise RuntimeError('investigation final response blocked: ' + ','.join(errors))
             state.trace.append({'phase': 'respond', 'cycle': state.cycle, 'source': 'template',

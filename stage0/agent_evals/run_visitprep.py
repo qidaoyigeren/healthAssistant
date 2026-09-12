@@ -328,8 +328,20 @@ def run_task(task, arm, live=False):
                         for entry in response.tool_trace if entry.get('phase') == 'plan'],
                 }
             except Exception as exc:
-                outcome = {'error': f'{type(exc).__name__}: {exc}',
-                           'invalid_calls': 0, 'planner_calls': 0}
+                # 异常路径必须与正常路径**同一个形状**。只放 error 会让评分器
+                # 读不到它要判的键（如 ``material_conflicts``），于是"这一轮没
+                # 观察到分歧"与"这一轮根本没跑完"变成同一个输入——归因方向
+                # 相反的两种情况被抹平。
+                outcome = {
+                    'error': f'{type(exc).__name__}: {exc}',
+                    'text': '', 'report_markdown': '', 'termination_reason': None,
+                    'subquestion_source': None, 'goal_status': None, 'execution_status': None,
+                    'diff_kinds_seen': [], 'asked_fields': [], 'supported_claims': [],
+                    'supported_claim_entities': [], 'unsupported_statements': [],
+                    'material_conflicts': [], 'empty_state_sections': [],
+                    'degraded_reason': None, 'attribution': _attribution([]),
+                    'invalid_calls': 0, 'planner_calls': 0, 'planner_steps': [],
+                }
             store.close()
             if client:
                 client.close()
