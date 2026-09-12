@@ -399,6 +399,79 @@ class SubquestionsTest(unittest.TestCase):
             [{'statement': '核查', 'entities': ['氨氯地平', '克拉霉素']}]), [])
         self.assertEqual(inv.plan_attempts, 0)
 
+    def test_new_evidence_reopens_planning_so_the_model_can_revise(self):
+        """接受之后出现新证据（材料差异）时，plan_questions 必须再次可用。
+
+        改造前的闸门是"`subquestions` 缺口是否打开"，而接受声明正好把它解析掉
+        ——于是接受之后**不可能**再修订，与工具自身描述"证据变化时可再次调用
+        以修订"直接矛盾。
+        """
+        from stage0.investigation import allowed_tools
+        inv = self._inv()
+        self.assertEqual(inv.accept_questions(
+            [{'statement': '核查', 'entities': ['氨氯地平', '克拉霉素']}]), [])
+        self.assertNotIn('plan_questions', allowed_tools(inv))
+        inv.gap('material:case:1/item:2', 'material_conflict', '材料差异',
+                material_ref='case:1/item:2')
+        self.assertIn('plan_questions', allowed_tools(inv))
+        self.assertEqual(inv.revision_trigger(), 'new_material_evidence')
+
+    def test_a_revision_is_recorded_with_its_history_and_retained_evidence(self):
+        inv = self._inv()
+        inv.accept_questions([{'statement': '核查', 'entities': ['氨氯地平', '克拉霉素']}])
+        inv.gap('material:case:1/item:2', 'material_conflict', '材料差异',
+                material_ref='case:1/item:2')
+        self.assertEqual(inv.accept_questions(
+            [{'statement': '核查材料差异', 'entities': ['氨氯地平', '克拉霉素']}]), [])
+        self.assertEqual(len(inv.plan_revisions), 1)
+        revision = inv.plan_revisions[0]
+        self.assertEqual(revision['trigger'], 'new_material_evidence')
+        self.assertEqual(revision['revision'], 1)
+        # 实体集未变的 claim 拿到同一个 claim_id，其 assessments 因此继续有效；
+        # 这一条必须**显式记录**，不能靠 id 恰好撞上。
+        self.assertEqual(revision['retained'], revision['after'])
+
+    def test_revisions_are_bounded_and_say_so_when_capped(self):
+        """修订有界，且到界时留下**可读、非失败**的记录。"""
+        from stage0.investigation import MAX_PLAN_REVISIONS, allowed_tools
+        inv = self._inv()
+        inv.accept_questions([{'statement': '核查', 'entities': ['氨氯地平', '克拉霉素']}])
+        for index in range(MAX_PLAN_REVISIONS):
+            inv.gap(f'material:case:1/item:{index}', 'material_conflict', '材料差异',
+                    material_ref=f'case:1/item:{index}')
+            self.assertIsNotNone(inv.revision_trigger(),
+                                 f'第 {index} 次修订前触发条件应当成立')
+            inv.accept_questions([{'statement': f'核查第{index}次',
+                                   'entities': ['氨氯地平', '克拉霉素']}])
+        inv.gap('material:case:1/item:99', 'material_conflict', '又一处材料差异',
+                material_ref='case:1/item:99')
+        self.assertIsNone(inv.revision_trigger(), '修订额度必须是有界的')
+        self.assertNotIn('plan_questions', allowed_tools(inv))
+
+    def test_retention_is_by_claim_id_and_the_id_is_order_sensitive(self):
+        """保留的判据是 claim_id，而它是 ``digest(list(entities))``——**对顺序
+        敏感**，这是本仓冻结的既有约定（持久化 claim id 的稳定性靠它）。
+
+        所以钉住两件事：同一实体集、只改措辞 → 同一个 id → 证据保留；实体集
+        相同但顺序变了 → 新 id → **不**保留。后者不是缺陷而是边界，写清楚比
+        让它留在"看起来应该保留"的错觉里好。
+        """
+        inv = self._inv()
+        inv.accept_questions([{'statement': '核查', 'entities': ['氨氯地平', '克拉霉素']}])
+        inv.gap('material:case:1/item:2', 'material_conflict', '材料差异',
+                material_ref='case:1/item:2')
+        inv.accept_questions([{'statement': '换成另一种说法',
+                               'entities': ['氨氯地平', '克拉霉素']}])
+        revision = inv.plan_revisions[0]
+        self.assertEqual(revision['retained'], revision['before'],
+                         '同一实体集、只改措辞时，assessments 必须仍然有效')
+
+        inv.gap('material:case:1/item:3', 'material_conflict', '材料差异',
+                material_ref='case:1/item:3')
+        inv.accept_questions([{'statement': '核查', 'entities': ['克拉霉素', '氨氯地平']}])
+        self.assertEqual(inv.plan_revisions[1]['retained'], [],
+                         'claim_id 对顺序敏感：换了顺序就是另一个 claim，不得假装保留')
+
     def test_the_gap_list_exposes_plan_questions_only_while_planning_is_open(self):
         from stage0.investigation import allowed_tools
         inv = self._inv()
@@ -407,7 +480,11 @@ class SubquestionsTest(unittest.TestCase):
         self.assertNotIn('plan_questions', allowed_tools(inv))
 
     def test_plan_questions_cannot_bypass_other_gaps(self):
-        """规划缺口关闭后，plan_questions 不得被挂到别的缺口上继续使用。"""
+        """没有修订触发条件时，plan_questions 不得被挂到别的缺口上继续使用。
+
+        闸门现在由"是否可以规划"决定，而不是由它链接到哪个 gap_id 决定——
+        但护栏本身不变：不满足触发条件时，挂到任何缺口上都应被拒。
+        """
         from stage0.investigation import proposal_errors
         inv = self._inv()
         inv.accept_questions([{'statement': 'x', 'entities': ['氨氯地平', '克拉霉素']}])
@@ -417,7 +494,7 @@ class SubquestionsTest(unittest.TestCase):
                                        'gap_id': evidence_gap['gap_id'], 'expected_observation': 'x',
                                        'arguments': {'questions': [
                                            {'statement': 'x', 'entities': ['氨氯地平', '克拉霉素']}]}})
-        self.assertEqual(errors, ['plan_questions_only_for_subquestions_gap'])
+        self.assertEqual(errors, ['plan_questions_only_when_revisable'])
 
     def test_plan_questions_tool_is_only_visible_inside_an_investigation(self):
         from stage0.agent import AgentState, LLMPlanner

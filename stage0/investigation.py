@@ -25,6 +25,9 @@ MAX_EVIDENCE = 12
 # allowed to spin. 界是**连续**的：一次成功即归零，所以反复摸索不会累积成
 # 一次停摆，而原地打转很快就会撞上。
 MAX_PLAN_ATTEMPTS = 3
+# 一次调查内**成功采用**的修订轮数上限。与"连续被拒次数"是两个不同的界：
+# 反复被拒不消耗修订额度，成功修订重置被拒计数。
+MAX_PLAN_REVISIONS = 2
 # Protocol v2: state-conditional tool exposure + structured rejection
 # feedback.  The state schema itself is unchanged (restore() still validates
 # VERSION/CONTRACT), so persisted investigations stay loadable.
@@ -41,7 +44,7 @@ GAP_PLAN = 'subquestions'
 # 关闭**，而完成条件要求"无任何开放缺口"，于是任何读到过材料差异的回合都
 # 只能以 no_progress 收尾：一个被声明为"结论"的东西实际上是一道永久闸门。
 # 清单是**白名单**：未知缺口种类一律照旧阻塞（fail-closed）。
-FINDING_GAPS = frozenset({'material_conflict'})
+FINDING_GAPS = frozenset({'material_conflict', 'plan_revision_capped'})
 
 
 def allowed_tools(inv):
@@ -60,8 +63,10 @@ def allowed_tools(inv):
     # attached these are not registered, so tool_definitions skips them (it
     # drops names with no schema) and a proposal naming one is unknown_tool.
     allowed = ['memory_write', 'memory_read', 'list_materials', 'read_material_item']
-    if any(g['gap_id'] == GAP_PLAN and g['status'] == 'open' for g in inv.gaps):
-        # Sub-questions are not yet declared: planning is the only way forward.
+    # 首次规划，或**有新证据**触发的修订。旧闸门问的是"``subquestions`` 缺口
+    # 是否打开"，而接受声明正好把它解析掉——接受之后便再也不能修订，与工具
+    # 自身的描述矛盾。
+    if inv.revision_trigger() is not None:
         allowed.append('plan_questions')
     if any(g['kind'] == 'patient_fact_missing' and g['status'] == 'open' and g.get('field') for g in inv.gaps):
         allowed.append('ask_clarification')
@@ -121,6 +126,10 @@ class InvestigationState:
     # 按 id 去重，而 id 是错误签名的拼接——同样的错误重复多少次都只有一个缺口
     # （上限永远够不到），三种不同的单次错误却会凑够三个（误触发）。
     plan_attempts: int = 0
+    # 追加式修订历史：每条记下触发原因、实体集的变更与**显式保留**的证据。
+    # 追加而非覆盖，因为"计划变过"本身是结论的一部分——哪一轮、因为什么、
+    # 哪些证据继续有效，都要能回看。
+    plan_revisions: list = field(default_factory=list)
     # Materials the model has SEEN (index) versus READ BACK (item).  Only the
     # latter can support a citation, mirroring the label-evidence rule that
     # "found" is not "read and verified".
@@ -266,6 +275,27 @@ class InvestigationState:
             if g['gap_id'] == GAP_PLAN:
                 g['status'] = 'resolved'
 
+    def revision_trigger(self) -> str | None:
+        """为什么当前子问题集**可以**被声明或修订——绝不是"重置计划"。
+
+        首次规划由 ``GAP_PLAN`` 打开；此后只有**新证据**才重新打开规划：
+        新读到的材料差异，或未被任何 claim 覆盖的开放证据缺口。这样"证据变了
+        就重新规划"是可达的，而原地重述一遍计划不是。修订次数有界。
+        """
+        if any(g['gap_id'] == GAP_PLAN and g['status'] == 'open' for g in self.gaps):
+            return 'first_plan'
+        if len(self.plan_revisions) >= MAX_PLAN_REVISIONS:
+            return None
+        revised_refs = {rev.get('material_ref') for rev in self.plan_revisions}
+        if any(g['kind'] == 'material_conflict' and g['status'] == 'open'
+               and g.get('material_ref') not in revised_refs for g in self.gaps):
+            return 'new_material_evidence'
+        claim_ids = {claim['claim_id'] for claim in self.claims}
+        if any(g['kind'] in {'evidence_missing', 'evidence_conflict'} and g['status'] == 'open'
+               and g.get('claim_id') not in claim_ids for g in self.gaps):
+            return 'uncovered_gap'
+        return None
+
     def accept_questions(self, questions) -> list[str]:
         """Validate and adopt planner-declared sub-questions.
 
@@ -302,9 +332,33 @@ class InvestigationState:
         required = {str(m['display_name']) for m in self.facts.get('medications', []) if m.get('display_name')}
         if not required.issubset(covered):
             return ['subquestion_coverage_incomplete']
+        trigger = self.revision_trigger()
+        before = [claim['claim_id'] for claim in self.claims]
+        is_revision = bool(self.claims)
         self.claims = []
         for item in normalised:
             self._new_claim(item['statement'], item['entities'], 'model')
+        after = [claim['claim_id'] for claim in self.claims]
+        if is_revision:
+            # 仍有效的证据：claim_id 由实体集决定，实体集未变的 claim 会拿到
+            # 同一个 id，其 assessments 因此继续有效。**显式记录**保留了哪些，
+            # 而不是让复用悄悄发生在"id 恰好撞上"里。
+            retained = sorted(set(before) & set(after))
+            self.plan_revisions.append({
+                'revision': len(self.plan_revisions) + 1,
+                'trigger': trigger,
+                'before': before,
+                'after': after,
+                'retained': retained,
+                'material_ref': next((g.get('material_ref') for g in self.gaps
+                                      if g['kind'] == 'material_conflict' and g['status'] == 'open'
+                                      and g.get('material_ref') not in
+                                      {rev.get('material_ref') for rev in self.plan_revisions}), None),
+            })
+        if len(self.plan_revisions) >= MAX_PLAN_REVISIONS:
+            # 到界时留一条**可读、非失败**的记录：这不是错误，是边界本身。
+            self.gap('plan_revision_capped', 'plan_revision_capped',
+                     f'本次调查已完成 {MAX_PLAN_REVISIONS} 轮计划修订，此后不再接受新的修订。')
         self.subquestion_source = 'model'
         self.plan_attempts = 0
         for g in self.gaps:
@@ -827,9 +881,10 @@ def proposal_errors(inv, proposal):
     if gap is None or not isinstance(proposal.get('expected_observation'), str) or not proposal['expected_observation'].strip():
         return ['invalid_gap_link']
     if tool == 'plan_questions':
-        # Only the planning gap accepts it: this tool must never become a way
-        # to sidestep a different open gap.
-        return [] if gap['gap_id'] == GAP_PLAN else ['plan_questions_only_for_subquestions_gap']
+        # 只在**真正可以规划**时可用：首次规划，或有新证据触发的修订。这条
+        # 闸门同时守住"不得用它绕开别的开放缺口"——绕不绕得开由触发条件决定，
+        # 不由它链接到哪个 gap_id 决定。
+        return [] if inv.revision_trigger() is not None else ['plan_questions_only_when_revisable']
     if tool == 'read_material_item':
         # Same rule as read_evidence: only a material this run actually
         # enumerated may be read, so an id cannot be probed into existence.

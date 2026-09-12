@@ -175,8 +175,9 @@ READ_EVIDENCE_SPEC = ToolSpec(
 PLAN_QUESTIONS_SPEC = ToolSpec(
     name="plan_questions",
     description=("声明本轮核查的子问题——拆分问题的唯一入口。每条子问题的 entities 必须取自权威药单"
-                 "或已上传材料的候选药名，且全部子问题合起来必须覆盖权威药单的每个药名；"
-                 "证据变化时可再次调用以修订。只在 subquestions 缺口打开时可用。"),
+                 "或已上传材料的候选药名，且全部子问题合起来必须覆盖权威药单的每个药名。"
+                 "首次规划之后，只有出现新证据（例如新读到的材料差异）时才可再次调用以修订；"
+                 "修订轮数有界，且修订不得删除仍未解决的问题。"),
     argument_schema={
         "type": "object",
         "properties": {"questions": {
