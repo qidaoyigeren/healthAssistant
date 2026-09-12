@@ -1127,6 +1127,9 @@ class PlannerPolicyGuard:
         if code == 'authority_requires_full_memory_read':
             return ("gap 'authority' 只接受 memory_read 且 arguments.query=\"snapshot\"（完整权威快照）；"
                     "其他工具不能关闭该缺口。缺省 query 会被自动补齐为 snapshot。")
+        if code == 'material_not_observed_in_scope':
+            return ("read_material_item 的 case_id/item_id 必须来自本 run 已 list_materials 列出的材料条目"
+                    "（列举不等于已读取；先 list_materials 再 read_material_item）。")
         if code == 'plan_questions_only_for_subquestions_gap':
             return ("plan_questions 只能在 'subquestions' 缺口打开时使用，且 gap_id 必须是 'subquestions'；"
                     "它不能被用来旁路其他缺口。当前 open gaps: " + str(open_gaps))

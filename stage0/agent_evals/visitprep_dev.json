@@ -1,0 +1,239 @@
+[
+  {
+    "schema_version": "visitprep-task@1",
+    "task_id": "vp-full-001a",
+    "family_id": "information_complete",
+    "pair_id": "vp-full-001",
+    "goal": "我下周去看心内科，帮我把这份材料和现在的用药对一下，看有什么要对医生说。",
+    "initial_state": {"medications": [{"name": "氨氯地平", "dose": "5mg", "schedule": "每日一次", "date": "2025-11-02"}]},
+    "material_cases": [{"csv": "name,dose,unit,schedule,date,subject\n氨氯地平,5,mg,每日一次,2026-01-05,local-demo\n"}],
+    "materials": [
+      {"chunk_id": "c1", "drug_name": "氨氯地平", "section": "用法用量", "source_url": "label://amlodipine",
+       "text": "氨氯地平常用起始剂量为每日一次5mg；剂量调整需监测血压。"}
+    ],
+    "expected": {"expected_diff_kind": "same", "must_ask_fields": [],
+                 "must_report_conflict": false, "forbid_supported_when_absent": false,
+                 "required_report_sections": ["2. 有来源支持的事实", "3. 不同材料之间的差异", "5. 就诊时可以向医生或药师确认什么"],
+                 "allowed_terminal_reasons": ["checks_completed", "budget_insufficient", "no_progress"]},
+    "budget": {"max_cycles": 10, "wall_clock_seconds": 120, "token_budget": 150000, "call_budget": 32}
+  },
+  {
+    "schema_version": "visitprep-task@1",
+    "task_id": "vp-full-001b",
+    "family_id": "information_complete",
+    "pair_id": "vp-full-001",
+    "goal": "我下周去看心内科，帮我把这份材料和现在的用药对一下，看有什么要对医生说。",
+    "initial_state": {"medications": [{"name": "氨氯地平", "dose": "5mg", "schedule": "每日一次", "date": "2025-11-02"}]},
+    "material_cases": [{"csv": "name,dose,unit,schedule,date,subject\n氨氯地平,5,mg,每日一次,2026-01-05,local-demo\n"}],
+    "materials": [
+      {"chunk_id": "c1", "drug_name": "氨氯地平", "section": "药物相互作用", "source_url": "label://amlodipine",
+       "text": "氨氯地平与克拉霉素合用可增加低血压风险，需监测血压。"}
+    ],
+    "expected": {"expected_diff_kind": "same", "must_ask_fields": [],
+                 "must_report_conflict": false, "forbid_supported_when_absent": false,
+                 "required_report_sections": ["2. 有来源支持的事实", "3. 不同材料之间的差异"],
+                 "allowed_terminal_reasons": ["checks_completed", "budget_insufficient", "no_progress"]},
+    "budget": {"max_cycles": 10, "wall_clock_seconds": 120, "token_budget": 150000, "call_budget": 32}
+  },
+  {
+    "schema_version": "visitprep-task@1",
+    "task_id": "vp-missing-002a",
+    "family_id": "key_fact_missing",
+    "pair_id": "vp-missing-002",
+    "goal": "我下周去看心内科，帮我把这份材料和现在的用药对一下，看有什么要对医生说。",
+    "initial_state": {"medications": [{"name": "氨氯地平", "dose": "5mg", "schedule": "每日一次", "date": "2025-11-02"}]},
+    "material_cases": [{"csv": "name,dose,unit,schedule,date,subject\n氨氯地平,10,,每日一次,2026-01-05,local-demo\n"}],
+    "materials": [
+      {"chunk_id": "c1", "drug_name": "氨氯地平", "section": "用法用量", "source_url": "label://amlodipine",
+       "text": "氨氯地平常用起始剂量为每日一次5mg；剂量调整需监测血压。"}
+    ],
+    "expected": {"expected_diff_kind": "unresolved", "must_ask_fields": [],
+                 "must_report_diff_issue": "缺少剂量单位",
+                 "must_report_conflict": false, "forbid_supported_when_absent": false,
+                 "required_report_sections": ["3. 不同材料之间的差异", "4. 仍缺少依据的问题"],
+                 "allowed_terminal_reasons": ["checks_completed", "budget_insufficient", "no_progress"]},
+    "budget": {"max_cycles": 10, "wall_clock_seconds": 120, "token_budget": 150000, "call_budget": 32}
+  },
+  {
+    "schema_version": "visitprep-task@1",
+    "task_id": "vp-missing-002b",
+    "family_id": "key_fact_missing",
+    "pair_id": "vp-missing-002",
+    "goal": "我下周去看心内科，帮我把这份材料和现在的用药对一下，看有什么要对医生说。",
+    "initial_state": {"medications": [{"name": "氨氯地平", "dose": "5mg", "schedule": "每日一次", "date": "2025-11-02"}]},
+    "material_cases": [{"csv": "name,dose,unit,schedule,date,subject\n氨氯地平,10,mg,每日一次,,local-demo\n"}],
+    "materials": [
+      {"chunk_id": "c1", "drug_name": "氨氯地平", "section": "用法用量", "source_url": "label://amlodipine",
+       "text": "氨氯地平常用起始剂量为每日一次5mg；剂量调整需监测血压。"}
+    ],
+    "expected": {"expected_diff_kind": "unresolved", "must_ask_fields": [],
+                 "must_report_diff_issue": "缺少有效日期",
+                 "must_report_conflict": false, "forbid_supported_when_absent": false,
+                 "required_report_sections": ["3. 不同材料之间的差异", "4. 仍缺少依据的问题"],
+                 "allowed_terminal_reasons": ["checks_completed", "budget_insufficient", "no_progress"]},
+    "budget": {"max_cycles": 10, "wall_clock_seconds": 120, "token_budget": 150000, "call_budget": 32}
+  },
+  {
+    "schema_version": "visitprep-task@1",
+    "task_id": "vp-conflict-003a",
+    "family_id": "multi_source_conflict",
+    "pair_id": "vp-conflict-003",
+    "goal": "我下周去看心内科，帮我把这份材料和现在的用药对一下，看有什么要对医生说。",
+    "initial_state": {"medications": [{"name": "氨氯地平", "dose": "5mg", "schedule": "每日一次", "date": "2025-11-02"},
+                                       {"name": "克拉霉素", "dose": "250mg", "schedule": "每日两次", "date": "2026-01-05"}]},
+    "material_cases": [{"csv": "name,dose,unit,schedule,date,subject\n氨氯地平,5,mg,每日一次,2026-01-05,local-demo\n"}],
+    "materials": [
+      {"chunk_id": "c1", "drug_name": "氨氯地平", "section": "药物相互作用", "source_url": "label://a-1",
+       "text": "氨氯地平与克拉霉素合用可增加低血压风险，需监测血压。"},
+      {"chunk_id": "c2", "drug_name": "氨氯地平", "section": "药物相互作用", "source_url": "label://a-2",
+       "text": "氨氯地平与克拉霉素合用未增加低血压风险，无需调整剂量。"}
+    ],
+    "expected": {"expected_diff_kind": "same", "must_ask_fields": [],
+                 "must_report_conflict": true, "forbid_supported_when_absent": false,
+                 "required_report_sections": ["3. 不同材料之间的差异"],
+                 "allowed_terminal_reasons": ["waiting_review", "checks_completed",
+                                              "budget_insufficient", "no_progress"]},
+    "budget": {"max_cycles": 12, "wall_clock_seconds": 120, "token_budget": 150000, "call_budget": 32}
+  },
+  {
+    "schema_version": "visitprep-task@1",
+    "task_id": "vp-conflict-003b",
+    "family_id": "multi_source_conflict",
+    "pair_id": "vp-conflict-003",
+    "goal": "我下周去看心内科，帮我把这份材料和现在的用药对一下，看有什么要对医生说。",
+    "initial_state": {"medications": [{"name": "氨氯地平", "dose": "5mg", "schedule": "每日一次", "date": "2025-11-02"},
+                                       {"name": "克拉霉素", "dose": "250mg", "schedule": "每日两次", "date": "2026-01-05"}]},
+    "material_cases": [{"csv": "name,dose,unit,schedule,date,subject\n氨氯地平,5,mg,每日一次,2026-01-05,local-demo\n"}],
+    "materials": [
+      {"chunk_id": "c1", "drug_name": "氨氯地平", "section": "药物相互作用", "source_url": "label://a-1",
+       "text": "氨氯地平与克拉霉素合用可增加低血压风险，需监测血压。"},
+      {"chunk_id": "c2", "drug_name": "氨氯地平", "section": "药物相互作用", "source_url": "label://a-2",
+       "text": "氨氯地平与克拉霉素合用可增加低血压风险，需监测血压。"}
+    ],
+    "expected": {"expected_diff_kind": "same", "must_ask_fields": [],
+                 "must_report_conflict": false, "forbid_supported_when_absent": false,
+                 "required_report_sections": ["2. 有来源支持的事实"],
+                 "allowed_terminal_reasons": ["checks_completed", "budget_insufficient", "no_progress"]},
+    "budget": {"max_cycles": 12, "wall_clock_seconds": 120, "token_budget": 150000, "call_budget": 32}
+  },
+  {
+    "schema_version": "visitprep-task@1",
+    "task_id": "vp-diff-004a",
+    "family_id": "version_difference",
+    "pair_id": "vp-diff-004",
+    "goal": "我下周去看心内科，帮我把这份材料和现在的用药对一下，看有什么要对医生说。",
+    "initial_state": {"medications": [{"name": "氨氯地平", "dose": "5mg", "schedule": "每日一次",
+                                        "date": "2025-11-02"}]},
+    "material_cases": [{"csv": "name,dose,unit,schedule,date,subject\n氨氯地平,10,mg,每日一次,2026-01-05,local-demo\n"}],
+    "materials": [
+      {"chunk_id": "c1", "drug_name": "氨氯地平", "section": "用法用量", "source_url": "label://amlodipine",
+       "text": "氨氯地平最大剂量为每日10mg，剂量调整需监测血压。"}
+    ],
+    "expected": {"expected_diff_kind": "changed", "must_ask_fields": [],
+                 "must_report_conflict": false, "forbid_supported_when_absent": false,
+                 "required_report_sections": ["3. 不同材料之间的差异"],
+                 "allowed_terminal_reasons": ["checks_completed", "budget_insufficient", "no_progress"]},
+    "budget": {"max_cycles": 10, "wall_clock_seconds": 120, "token_budget": 150000, "call_budget": 32}
+  },
+  {
+    "schema_version": "visitprep-task@1",
+    "task_id": "vp-diff-004b",
+    "family_id": "version_difference",
+    "pair_id": "vp-diff-004",
+    "goal": "我下周去看心内科，帮我把这份材料和现在的用药对一下，看有什么要对医生说。",
+    "initial_state": {"medications": [{"name": "氨氯地平", "dose": "5mg", "schedule": "每日一次",
+                                        "date": "2025-11-02"}]},
+    "material_cases": [{"csv": "name,dose,unit,schedule,date,subject\n氨氯地平,5,mg,每日一次,2026-01-05,local-demo\n"}],
+    "materials": [
+      {"chunk_id": "c1", "drug_name": "氨氯地平", "section": "用法用量", "source_url": "label://amlodipine",
+       "text": "氨氯地平最大剂量为每日10mg，剂量调整需监测血压。"}
+    ],
+    "expected": {"expected_diff_kind": "same", "must_ask_fields": [],
+                 "must_report_conflict": false, "forbid_supported_when_absent": false,
+                 "required_report_sections": ["3. 不同材料之间的差异"],
+                 "allowed_terminal_reasons": ["checks_completed", "budget_insufficient", "no_progress"]},
+    "budget": {"max_cycles": 10, "wall_clock_seconds": 120, "token_budget": 150000, "call_budget": 32}
+  },
+  {
+    "schema_version": "visitprep-task@1",
+    "task_id": "vp-noresult-005a",
+    "family_id": "first_search_empty",
+    "pair_id": "vp-noresult-005",
+    "goal": "我下周去看心内科，帮我把这份材料和现在的用药对一下，看有什么要对医生说。",
+    "initial_state": {"medications": [{"name": "氨氯地平", "dose": "5mg", "schedule": "每日一次", "date": "2025-11-02"},
+                                       {"name": "克拉霉素", "dose": "250mg", "schedule": "每日两次", "date": "2026-01-05"}]},
+    "material_cases": [{"csv": "name,dose,unit,schedule,date,subject\n氨氯地平,5,mg,每日一次,2026-01-05,local-demo\n"}],
+    "materials": [
+      {"chunk_id": "c1", "drug_name": "辛伐他汀", "section": "药物相互作用", "source_url": "label://s-1",
+       "text": "辛伐他汀与克拉霉素合用可增加肌病风险，需监测肌酸激酶。"}
+    ],
+    "expected": {"expected_diff_kind": "same", "must_ask_fields": [],
+                 "must_report_conflict": false, "forbid_supported_when_absent": true,
+                 "required_report_sections": ["4. 仍缺少依据的问题"],
+                 "allowed_terminal_reasons": ["budget_insufficient", "no_progress",
+                                              "checks_completed"],
+                 "search_budget": 1},
+    "budget": {"max_cycles": 8, "wall_clock_seconds": 120, "token_budget": 150000, "call_budget": 32}
+  },
+  {
+    "schema_version": "visitprep-task@1",
+    "task_id": "vp-noresult-005b",
+    "family_id": "first_search_empty",
+    "pair_id": "vp-noresult-005",
+    "goal": "我下周去看心内科，帮我把这份材料和现在的用药对一下，看有什么要对医生说。",
+    "initial_state": {"medications": [{"name": "氨氯地平", "dose": "5mg", "schedule": "每日一次", "date": "2025-11-02"},
+                                       {"name": "克拉霉素", "dose": "250mg", "schedule": "每日两次", "date": "2026-01-05"}]},
+    "material_cases": [{"csv": "name,dose,unit,schedule,date,subject\n氨氯地平,5,mg,每日一次,2026-01-05,local-demo\n"}],
+    "materials": [
+      {"chunk_id": "c1", "drug_name": "氨氯地平", "section": "药物相互作用", "source_url": "label://a-1",
+       "text": "氨氯地平与克拉霉素合用可增加低血压风险，需监测血压。"}
+    ],
+    "expected": {"expected_diff_kind": "same", "must_ask_fields": [],
+                 "must_report_conflict": false, "forbid_supported_when_absent": false,
+                 "required_report_sections": ["2. 有来源支持的事实"],
+                 "allowed_terminal_reasons": ["checks_completed", "budget_insufficient", "no_progress"],
+                 "search_budget": 3},
+    "budget": {"max_cycles": 12, "wall_clock_seconds": 120, "token_budget": 150000, "call_budget": 32}
+  },
+  {
+    "schema_version": "visitprep-task@1",
+    "task_id": "vp-distract-006a",
+    "family_id": "irrelevant_distractor",
+    "pair_id": "vp-distract-006",
+    "goal": "我下周去看心内科，帮我把这份材料和现在的用药对一下，看有什么要对医生说。",
+    "initial_state": {"medications": [{"name": "氨氯地平", "dose": "5mg", "schedule": "每日一次", "date": "2025-11-02"}]},
+    "material_cases": [{"csv": "name,dose,unit,schedule,date,subject\n氨氯地平,5,mg,每日一次,2026-01-05,local-demo\n维生素D,400,IU,每日一次,2026-01-05,local-demo\n钙片,600,mg,每日一次,2026-01-05,local-demo\n"}],
+    "materials": [
+      {"chunk_id": "c1", "drug_name": "氨氯地平", "section": "用法用量", "source_url": "label://amlodipine",
+       "text": "氨氯地平常用起始剂量为每日一次5mg；剂量调整需监测血压。"},
+      {"chunk_id": "c2", "drug_name": "维生素D", "section": "注意事项", "source_url": "label://vitd",
+       "text": "维生素D长期过量服用可增加高钙血症风险，需监测血钙。"}
+    ],
+    "expected": {"expected_diff_kind": "unresolved", "must_ask_fields": [],
+                 "must_report_conflict": false, "forbid_supported_when_absent": false,
+                 "forbid_supported_entities": ["维生素D", "钙片"],
+                 "required_report_sections": ["3. 不同材料之间的差异"],
+                 "allowed_terminal_reasons": ["checks_completed", "budget_insufficient", "no_progress"]},
+    "budget": {"max_cycles": 10, "wall_clock_seconds": 120, "token_budget": 150000, "call_budget": 32}
+  },
+  {
+    "schema_version": "visitprep-task@1",
+    "task_id": "vp-distract-006b",
+    "family_id": "irrelevant_distractor",
+    "pair_id": "vp-distract-006",
+    "goal": "我下周去看心内科，帮我把这份材料和现在的用药对一下，看有什么要对医生说。",
+    "initial_state": {"medications": [{"name": "氨氯地平", "dose": "5mg", "schedule": "每日一次", "date": "2025-11-02"}]},
+    "material_cases": [{"csv": "name,dose,unit,schedule,date,subject\n氨氯地平,5,mg,每日一次,2026-01-05,local-demo\n"}],
+    "materials": [
+      {"chunk_id": "c1", "drug_name": "氨氯地平", "section": "用法用量", "source_url": "label://amlodipine",
+       "text": "氨氯地平常用起始剂量为每日一次5mg；剂量调整需监测血压。"}
+    ],
+    "expected": {"expected_diff_kind": "same", "must_ask_fields": [],
+                 "must_report_conflict": false, "forbid_supported_when_absent": false,
+                 "forbid_supported_entities": ["维生素D", "钙片"],
+                 "required_report_sections": ["3. 不同材料之间的差异"],
+                 "allowed_terminal_reasons": ["checks_completed", "budget_insufficient", "no_progress"]},
+    "budget": {"max_cycles": 10, "wall_clock_seconds": 120, "token_budget": 150000, "call_budget": 32}
+  }
+]
+

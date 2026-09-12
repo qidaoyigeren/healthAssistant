@@ -458,6 +458,58 @@ class MaterialVisibilityTest(unittest.TestCase):
             self.assertIn('list_materials', agent.planner.llm_planner.tool_schemas)
 
 
+class VisitPrepDatasetTest(unittest.TestCase):
+    """任务集本身的性质：成对、只改证据、评分规则先定。"""
+
+    @staticmethod
+    def _tasks():
+        return json.loads((Path(__file__).with_name('agent_evals')
+                           / 'visitprep_dev.json').read_text(encoding='utf-8'))
+
+    def test_twelve_tasks_in_six_families_arranged_in_pairs(self):
+        tasks = self._tasks()
+        self.assertEqual(len(tasks), 12)
+        self.assertEqual(len({task['family_id'] for task in tasks}), 6)
+        pairs = {}
+        for task in tasks:
+            pairs.setdefault(task['pair_id'], []).append(task)
+        self.assertEqual(len(pairs), 6)
+        self.assertTrue(all(len(group) == 2 for group in pairs.values()),
+                        '每个 pair_id 必须恰好两个任务')
+
+    def test_paired_tasks_differ_only_in_the_evidence(self):
+        pairs = {}
+        for task in self._tasks():
+            pairs.setdefault(task['pair_id'], []).append(task)
+        for pair_id, (left, right) in pairs.items():
+            self.assertEqual(left['goal'], right['goal'],
+                             f'{pair_id}: 成对任务的用户问题必须逐字一致')
+            self.assertEqual(left['initial_state'], right['initial_state'],
+                             f'{pair_id}: 成对任务的患者事实必须一致')
+            self.assertNotEqual(left['expected'], right['expected'],
+                                f'{pair_id}: 成对任务的预期结论必须不同，否则不成对')
+
+    def test_every_task_states_the_rubric_before_the_run(self):
+        for task in self._tasks():
+            expected = task['expected']
+            self.assertIn('expected_diff_kind', expected, task['task_id'])
+            self.assertIn('allowed_terminal_reasons', expected, task['task_id'])
+            self.assertIn('must_ask_fields', expected, task['task_id'])
+            self.assertTrue(expected['allowed_terminal_reasons'], task['task_id'])
+            self.assertLessEqual(task['budget']['max_cycles'], 12, task['task_id'])
+
+    def test_the_evaluator_has_no_per_task_branching(self):
+        """评分器不得认识具体任务：只读 expected，不按 id/文件名/族名分支。"""
+        source = (Path(__file__).with_name('agent_evals')
+                  / 'run_visitprep.py').read_text(encoding='utf-8')
+        body = source.split('def evaluate', 1)[1].split('\ndef ', 1)[0]
+        for task in self._tasks():
+            self.assertNotIn(task['task_id'], body)
+            self.assertNotIn(task['family_id'], body)
+        self.assertNotIn('task_id ==', body)
+        self.assertNotIn('pair_id ==', body)
+
+
 UNSUPPORTED = '两药合用会导致严重出血，必须立即停药'
 
 

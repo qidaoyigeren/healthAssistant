@@ -43,7 +43,10 @@ def allowed_tools(inv):
         return ('respond',)
     if not inv.authority_read:
         return ('memory_write', 'memory_read')
-    allowed = ['memory_write', 'memory_read']
+    # Read-only, always legal inside a review.  When no MaterialIndex is
+    # attached these are not registered, so tool_definitions skips them (it
+    # drops names with no schema) and a proposal naming one is unknown_tool.
+    allowed = ['memory_write', 'memory_read', 'list_materials', 'read_material_item']
     if any(g['gap_id'] == GAP_PLAN and g['status'] == 'open' for g in inv.gaps):
         # Sub-questions are not yet declared: planning is the only way forward.
         allowed.append('plan_questions')
@@ -365,12 +368,33 @@ class InvestigationState:
             self.authority_read = True
         if observation.tool == 'ask_clarification':
             self.termination_reason = 'waiting_input'
+        if observation.tool == 'list_materials':
+            # Enumerate what this run may subsequently read.  Listing is not
+            # reading: these refs only become citations once read back.
+            for material in (observation.result or {}).get('materials', []) or []:
+                for item in material.get('items', []) or []:
+                    ref = f"{material.get('case_id')}/{item.get('item_id')}"
+                    if ref not in self.material_refs:
+                        self.material_refs.append(ref)
+            return
         if observation.tool == 'read_material_item':
             # A material item read back in this run; the ONLY way a material
             # entry can support a report citation (the index alone cannot).
             ref = f"{observation.arguments.get('case_id')}/{observation.arguments.get('item_id')}"
             if ref not in self.material_read_refs:
                 self.material_read_refs.append(ref)
+            detail = observation.result if isinstance(observation.result, dict) else {}
+            kind = detail.get('kind')
+            if kind and kind != 'same':
+                # A difference between a material and the authoritative record
+                # that the planner actually READ.  Recorded as a finding, not a
+                # stop: a discrepancy is something to report, not something
+                # that ends the review (that is what evidence_conflict is for).
+                issues = [str(item) for item in (detail.get('issues') or [])]
+                self.gap('material:' + ref, 'material_conflict',
+                         f"材料 {ref} 与当前记录的差异：{kind}"
+                         + ('；未决问题：' + '、'.join(issues) if issues else ''),
+                         material_ref=ref)
             return
         if observation.tool == 'plan_questions':
             # The sub-question set is adopted by the STATE, from the observed
@@ -585,7 +609,8 @@ class InvestigationState:
             if claim.get('source') != 'model':
                 continue
             refs = set(claim.get('supporting_evidence') or []) | set(claim.get('opposing_evidence') or [])
-            if claim.get('status') == 'insufficient' or not refs:
+            if not refs:
+                # Nothing read back supports it at all.
                 pending.append({'claim_id': claim['claim_id'], 'statement': claim['statement'],
                                 'reason': 'no_read_evidence'})
             elif not refs.issubset(read):
@@ -673,7 +698,15 @@ def proposal_errors(inv, proposal):
         # Only the planning gap accepts it: this tool must never become a way
         # to sidestep a different open gap.
         return [] if gap['gap_id'] == GAP_PLAN else ['plan_questions_only_for_subquestions_gap']
-    if tool not in {'memory_read', 'rag_search', 'read_evidence', 'ask_clarification', 'ddi_check'}:
+    if tool == 'read_material_item':
+        # Same rule as read_evidence: only a material this run actually
+        # enumerated may be read, so an id cannot be probed into existence.
+        ref = f"{args.get('case_id')}/{args.get('item_id')}"
+        if ref not in inv.material_refs:
+            return ['material_not_observed_in_scope']
+        return []
+    if tool not in {'memory_read', 'rag_search', 'read_evidence', 'ask_clarification',
+                    'ddi_check', 'list_materials'}:
         return ['investigation_tool_not_allowed']
     if tool == 'read_evidence' and args.get('evidence_id') not in inv.evidence_refs:
         return ['evidence_not_observed_in_scope']
