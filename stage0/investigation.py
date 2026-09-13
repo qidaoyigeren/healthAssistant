@@ -13,6 +13,7 @@ import json
 import os
 import re
 
+from . import answer_grounding as grounding
 from .claim_support import assess_support
 from .evidence_quality import assess_claim
 from .response_safety import composed_text_prescribes
@@ -169,6 +170,37 @@ def utcnow_iso() -> str:
 def _normalise_answer(value) -> str:
     """答案比对前的归一化：去空白、去全角空格、统一大小写。"""
     return re.sub(r'\s+', '', str(value or '')).lower()
+
+
+def _row_field(row, key):
+    """从一行记录里取字段。这行**没有**这一列时返回 None，而不是抛错。
+
+    sqlite3.Row 与测试用的最小替身（普通 dict）都能走这一条；"没有这一列"与
+    "这一列是空值"因此能分开——前者表示这条记录没有声明该字段，判定会在
+    ``reason`` 里写明未做该部分核对，而不是把"没声明"当成"声明为 None"。
+    """
+    if row is None:
+        return None
+    try:
+        keys = row.keys()
+    except AttributeError:
+        keys = row
+    if key not in keys:
+        return None
+    try:
+        return row[key]
+    except (IndexError, KeyError, TypeError):
+        return None
+
+
+#: 值里带的单位。剂量类字段是"数值+单位"写在一个字符串里的，所以单位不是
+#: 单独一列，而是从值里读出来的——核对时它随值一起比，不在别处再比一遍。
+_UNIT = re.compile(r'^\s*[\d.]+\s*([A-Za-z%]{1,6}|毫克|微克|克|毫升|国际单位|单位|片|粒|滴|喷|次)\s*$')
+
+
+def _unit_of(value):
+    match = _UNIT.match(str(value if value is not None else ''))
+    return match.group(1) if match else None
 
 
 def strategy_can_serve(target, strategy) -> bool:
@@ -396,6 +428,15 @@ class InvestigationState:
     candidates: list = field(default_factory=list)
     evidence_refs: list = field(default_factory=list)
     read_refs: list = field(default_factory=list)
+    #: **证据回读回执的正文**：`{'ref','offset','content'}`，每次 ``read_evidence``
+    #: 真的返回给模型的那一段（材料走 `material_items[ref]['fields']`，见观察阶段）。
+    #:
+    #: 为什么连正文一起存：答案依据的核对要判"引文是不是**这个来源**已读片段里
+    #: 逐字存在的一段"。只存 ref 名单的话，核对时只能把整篇原文再读一遍——那正好
+    #: 是"校验时悄悄读取模型没看过的内容"。存窗口则核对的是**当时的回执本身**，
+    #: 跨会话恢复后仍然有效（`read_refs` 一并保留，两者同步失效）。
+    #: 旧状态没有这个键，缺省为空表：那时按 `read_refs` 的旧口径恢复成整篇窗口。
+    read_windows: list = field(default_factory=list)
     content_hashes: list = field(default_factory=list)
     queries: list = field(default_factory=list)
     search_keys: list = field(default_factory=list)
@@ -504,6 +545,12 @@ class InvestigationState:
         # 旧契约的载荷逐字不变。
         if self.case_context:
             view['case_context'] = self.case_context
+        # 回读回执的**正文**是核对用的，不是给模型看的一份原文副本——模型已经
+        # 在它自己的对话里看过那一段了。这里换成定位摘要，载荷与 content_hashes
+        # 同一量级，不会因为"多存了回执"就把模型上下文顶爆。
+        view['read_windows'] = [{'ref': w['ref'], 'offset': w['offset'],
+                                 'chars': len(w.get('content') or '')}
+                                for w in (view.get('read_windows') or [])]
         # 列过索引 ≠ 读过原文。两份清单分开给出，与 evidence_unread 同一口径：
         # 只有读回原文的条目才能作为引用。
         read_materials = set(self.material_read_refs)
@@ -791,6 +838,11 @@ class InvestigationState:
             return ref == case.get('case_id')
         if ref.startswith('material:'):
             return ref.split(':', 1)[1] in self.material_refs
+        # 材料条目的规范形状是 ``<case_id>/<item_id>``（``list_materials`` 写入、
+        # ``read_material_item`` 读取，两端共用）。这个形状没有前缀，所以它既不是
+        # ``memory:`` 也不是 ``ev-``——不在这里放行，材料答案会被当成"引用不存在"。
+        if ref in self.material_refs:
+            return True
         return False
 
     # ---- 采纳：一次完整的生效点 ---------------------------------------------
@@ -1066,6 +1118,7 @@ class InvestigationState:
                 self.claims.clear()
                 self.gaps.clear()
                 self.read_refs.clear()
+                self.read_windows.clear()
                 self.evidence_refs.clear()
                 self.queries.clear()
                 self.search_keys.clear()
@@ -1080,6 +1133,7 @@ class InvestigationState:
                 # must be re-read so applicability is checked against the
                 # corrected facts (read_refs cleared, evidence_refs kept).
                 self.read_refs.clear()
+                self.read_windows.clear()
             self.authority_read = False
             self.no_progress_count = 0
             self.termination_reason = None
@@ -1193,6 +1247,11 @@ class InvestigationState:
             if ref not in self.material_read_refs:
                 self.material_read_refs.append(ref)
             detail = observation.result if isinstance(observation.result, dict) else {}
+            if isinstance(detail.get('fields'), dict):
+                # 回读到的字段值留下来：材料答案的支持关系要按**这条记录真的记了
+                # 什么**核对，而不是按"条目存在"或索引里的差异标题。列表阶段不写
+                # 这个键——列过索引 != 读过原文，两个清单一直是分开的。
+                self.material_items.setdefault(ref, {})['fields'] = dict(detail['fields'])
             kind = detail.get('kind')
             if kind and kind != 'same':
                 # A difference between a material and the authoritative record
@@ -1253,7 +1312,7 @@ class InvestigationState:
             outcome = self.answer_question(
                 str(args.get('question_id') or ''), source=str(args.get('source') or ''),
                 value=args.get('value'), field=args.get('field'), quote=args.get('quote'),
-                source_ref=args.get('source_ref'),
+                source_ref=args.get('source_ref'), object_ref=args.get('object_ref'),
                 basis_refs=args.get('basis_refs') or ())
             observation.result = {**outcome, 'allowed_tools': list(allowed_tools(self))}
             return
@@ -1313,9 +1372,13 @@ class InvestigationState:
             if ref not in self.evidence_refs:
                 return  # Arbitrary tool-visible references cannot join this investigation.
             # Re-read using the same authorised store; observations never author authority.
-            page = evidence_store.read(ref, scope_id=self.scope_id, offset=observation.arguments.get('offset', 0), limit=2000)
-            if ref not in self.read_refs:
-                self.read_refs.append(ref)
+            # **按模型声明的窗口重读**，与执行器交给它的那一页逐字相同：回执要记的
+            # 就是它真的看到的那一段。旧写法固定读 offset=0/limit=2000，模型读的是
+            # 后 1000 字时，回执里却多出 2000 字它没看过的内容——那不是回执，是补读。
+            page = evidence_store.read(ref, scope_id=self.scope_id,
+                                       offset=observation.arguments.get('offset', 0),
+                                       limit=observation.arguments.get('limit', self.READ_BACK_CHARS))
+            self._record_read(ref, page.get('offset', 0), page.get('content', ''))
             meta = evidence_store.get_meta(ref) or {}
             namespaces = {f['namespace'] for f in self.facts.get('semantic', [])}
             for claim in self.claims:
@@ -1529,95 +1592,186 @@ class InvestigationState:
     # 这里补上那条生产路径。它**不是**一个"把问题设成已回答"的通用开关：
     # 采纳要按来源、对象、版本与支持关系逐条校验，校验不过就如实说明差什么。
 
-    def _source_supports(self, question, *, source, value, quote, field) -> dict:
-        """来源**真的支持**这个答案吗。
-
-        "引用真实存在"只证明来源存在，不证明它支持答案——所以这里逐类核对：
-
-        * ``patient_record``：值必须与**当前权威记录**里的对应字段一致。这类
-          答案由**程序**直接复用，不需要模型重新批准已确认的记录。
-        * ``evidence``：引文必须是**本 run 回读过**的原文的精确子串。
-          搜到不等于读过，读到不等于支持。
-        * ``material`` / ``user_answer`` / ``professional``：保留原文定位与
-          不确定性；材料/用户来源**不构成已核实事实**。
-        """
-        if source == ANSWER_SOURCE_PATIENT_RECORD:
-            recorded = self._recorded_value(question, field)
-            if recorded is None:
-                return {'supported': False, 'reason': 'record_missing',
-                        'detail': f'当前权威记录里没有 {field or "该字段"} 的值'}
-            if _normalise_answer(value) != _normalise_answer(recorded):
-                return {'supported': False, 'reason': 'record_differs',
-                        'detail': f'当前记录记的是 {recorded}，与候选答案不一致'}
-            return {'supported': True, 'provenance': SOURCE_PROVENANCE[source],
-                    'detail': '与当前权威记录一致，直接复用'}
-        if source == ANSWER_SOURCE_EVIDENCE:
-            if quote and quote not in self._read_contents():
-                return {'supported': False, 'reason': 'quote_not_read_back',
-                        'detail': '引文不是本 run 回读过的原文片段；先 read_evidence 再引用'}
-            if not quote:
-                return {'supported': False, 'reason': 'no_quote',
-                        'detail': '引用证据必须给出原文片段，否则无法建立支持关系'}
-            return {'supported': True, 'provenance': SOURCE_PROVENANCE[source],
-                    'detail': '引文可在已回读原文中定位'}
-        if source == ANSWER_SOURCE_MATERIAL:
-            return {'supported': True, 'provenance': SOURCE_PROVENANCE[source],
-                    'detail': '材料记录；保留原文定位，未经核实'}
-        if source == ANSWER_SOURCE_USER:
-            return {'supported': True, 'provenance': SOURCE_PROVENANCE[source],
-                    'detail': '用户报告；不是已验证的临床记录'}
-        if source == ANSWER_SOURCE_PROFESSIONAL:
-            return {'supported': True, 'provenance': SOURCE_PROVENANCE[source],
-                    'detail': '专业意见；本项目未连接真实医护服务'}
-        return {'supported': False, 'reason': 'unknown_source', 'detail': '未识别的来源种类'}
-
-    def _recorded_value(self, question, field):
-        """当前权威记录里这条问题对应字段的值。"""
-        memory = getattr(self, 'memory', None)
-        if memory is None or not field:
-            return None
-        for ref in question.get('subject_refs') or ():
-            match = re.fullmatch(r'memory:medication:(\d+)(?:@v\d+)?', str(ref))
-            if not match:
-                continue
-            row = memory.connection.execute(
-                'SELECT display_name, dose, schedule, start_at FROM medications '
-                'WHERE id=?', (int(match.group(1)),)).fetchone()
-            if row is None:
-                continue
-            value = {'dose': row['dose'], 'schedule': row['schedule'],
-                     'start_date': row['start_at'], 'name': row['display_name']}.get(field)
-            if value:
-                return value
-        return None
+    # ---- 答案可信性：真实记录、回读回执、判定内核 ---------------------------
+    #
+    # 判定本身在 `answer_grounding` 里（纯函数、可独立测试）。这里只负责把
+    # **本模块掌握的真实记录**接进去：权威快照里的版本化记录、本 run 的回读
+    # 回执、作用域可见性。模块不替它下结论，也不替它补默认值。
 
     #: 与 harness.evidence.MAX_READ_LIMIT 同一口径：证据回读一次的上限。
     #: 本模块不 import harness（避免环），所以这里自己声明一个同样的值。
     READ_BACK_CHARS = 2000
 
-    def _read_contents(self) -> str:
-        """本 run **回读过的**原文拼在一起，用于精确子串核对。
+    #: 问题字段 → ``medications`` 表上的列。答案里的字段名与列名不是一回事。
+    RECORD_COLUMNS = {
+        'dose': 'dose', 'schedule': 'schedule', 'route': 'route',
+        'start_date': 'start_at', 'start_at': 'start_at',
+        'end_date': 'end_at', 'end_at': 'end_at',
+        'name': 'display_name', 'display_name': 'display_name',
+        'status': 'status', 'version': 'version',
+    }
 
-        搜到 != 读过：只有 `read_refs`（真的 read_evidence 回读过）里的原文才算数。
+    def _record_facts(self, object_ref, field):
+        """``object_ref`` 这条**真实记录**里 ``field`` 的事实。
+
+        先看权威快照（``facts['medications']``——只含**当前有效**的用药，每条带
+        自己的版本化 ``ref``），再看 ``medications`` 表里那条 id 行。
+
+        两者是**互补**的，不是重复：快照保证"这是现在的用药"，表行保证"这条记录
+        本身怎么说"。状态与版本**记录声明了才核对**（真实表的这两列都是 NOT NULL，
+        所以生产路径上一定核得到；只回值的最小替身没有列，判定会在 reason 里
+        写明"未做该部分核对"，而不是假装核过）。
         """
-        store = getattr(self, 'evidence_store', None)
-        if store is None:
-            return ''
-        parts = []
-        for ref in self.read_refs:
-            try:
-                parts.append(store.read(ref, scope_id=self.scope_id,
-                                        offset=0, limit=self.READ_BACK_CHARS)['content'])
-            except Exception:
-                continue
-        return '\n'.join(parts)
+        memory = getattr(self, 'memory', None)
+        if not object_ref or not field:
+            return None
+        column = self.RECORD_COLUMNS.get(str(field))
+        if column is None:
+            return None
+        row = self._snapshot_record(object_ref)
+        current = True
+        if row is None:
+            if memory is None:
+                return None
+            row = self._table_record(object_ref)
+            # 快照里**带版本化引用**（生产路径一定如此）而这条不在其中：它已经不是
+            # 当前的用药了。历史版本按 id 照样取得出来，所以"取得到"不等于
+            # "还是现在的值"——这一步正是把这两件事分开的地方。
+            current = not self._snapshot_refs() or str(object_ref) in self._snapshot_refs()
+        if row is None:
+            return None
+        value = _row_field(row, column)
+        if value in (None, ''):
+            return None
+        return grounding.RecordFacts(
+            value=value,
+            unit=_unit_of(value),
+            status=_row_field(row, 'status'),
+            version=_row_field(row, 'version'),
+            locator=f'{object_ref}#{field}',
+            current=current)
+
+    def _snapshot_refs(self) -> set:
+        """权威快照里**带版本化引用**的那些用药。空集 = 这份快照不声明引用。"""
+        return {str(item['ref']) for item in (self.facts.get('medications') or ())
+                if isinstance(item, dict) and item.get('ref')}
+
+    def _snapshot_record(self, object_ref):
+        """权威快照里 ``object_ref`` 那条记录；没有就 None。"""
+        for item in self.facts.get('medications') or ():
+            if str((item or {}).get('ref') or '') == str(object_ref):
+                return item
+        return None
+
+    def _table_record(self, object_ref):
+        """按 id 读 ``medications`` 那一行。引用里的版本与行上的版本要一致。
+
+        版本一致性由既有的严格解析器判（``memory.resolve_ref`` 对不上就抛），
+        所以这里只负责把行取出来。旧版本 / 别的对象因此在这里就过不去。
+        """
+        memory = getattr(self, 'memory', None)
+        match = re.fullmatch(r'memory:medication:(\d+)@v(\d+)', str(object_ref or ''))
+        if memory is None or not match:
+            return None
+        row = memory.connection.execute(
+            'SELECT * FROM medications WHERE id=?', (int(match.group(1)),)).fetchone()
+        if row is None:
+            return None
+        stated = _row_field(row, 'version')
+        if stated is not None and int(stated) != int(match.group(2)):
+            return None
+        return row
+
+    def _material_facts(self, material_ref, field):
+        """本 run **回读过的**材料条目里 ``field`` 的事实。
+
+        只列过索引不算读到（``material_refs`` 与 ``material_read_refs`` 是两个
+        清单），所以这里只认后者。
+        """
+        if material_ref not in self.material_read_refs:
+            return None
+        detail = self.material_items.get(material_ref) or {}
+        fields = detail.get('fields') or {}
+        if field and field in fields:
+            value = fields.get(field)
+        else:
+            value = fields.get('name')
+        if value in (None, ''):
+            return None
+        return grounding.RecordFacts(
+            value=value, unit=_unit_of(value),
+            locator=f'{material_ref}#{field or "name"}')
+
+    def _read_ledger(self):
+        """本 run（含跨会话复用）的回读回执。
+
+        ``read_windows`` 是**正文**回执，核对的是模型当时真的看到的那一段，不是
+        校验时重新翻开原文。旧状态只有 ``read_refs`` 名单、没有窗口：那种记录
+        按旧口径恢复成"整篇读过"，否则滚动升级前存下的调查会集体失去引用能力。
+        """
+        ledger = grounding.ReadLedger.from_list(self.read_windows)
+        legacy = [ref for ref in self.read_refs if not ledger.has_ref(ref)]
+        if legacy:
+            store = getattr(self, 'evidence_store', None)
+            if store is not None:
+                def content_of(ref):
+                    try:
+                        return store.read(ref, scope_id=self.scope_id, offset=0,
+                                          limit=self.READ_BACK_CHARS)['content']
+                    except Exception:
+                        return None
+                ledger.merge(grounding.ReadLedger.legacy(legacy, content_of))
+        return ledger
+
+    def _record_read(self, ref, offset, content) -> None:
+        if ref not in self.read_refs:
+            self.read_refs.append(ref)
+        entry = {'ref': str(ref), 'offset': int(offset or 0), 'content': str(content or '')}
+        if entry not in self.read_windows:
+            self.read_windows.append(entry)
+
+    def _grounding_context(self) -> grounding.GroundingContext:
+        return grounding.GroundingContext(
+            ledger=self._read_ledger(),
+            lookup_record=self._record_facts,
+            visible_ref=lambda ref: self._reference_is_visible(ref, self.allowed_entities()),
+            lookup_material=self._material_facts,
+            # 本项目**没有**连接真实医护服务，所以这个口永远解析不出真实来源。
+            # 保留它而不是删掉：将来接上真实服务时，改的是这一处注入，判定逻辑
+            # 不用动——"没有真实来源就不算专业确认"这条规则本身是常驻的。
+            lookup_professional=lambda ref: None)
+
+    def question_objects(self, question) -> list:
+        """这条问题涉及的**对象**（去重、保序）。
+
+        直接用 ``subject_refs``：它已经是"这条问题针对谁"的唯一声明处，另立一套
+        只会让两者漂移。规范化后比较，避免同一对象因大小写/空白被算成两个。
+        """
+        seen, objects = set(), []
+        for ref in question.get('subject_refs') or ():
+            key = _normalise_answer(ref)
+            if key and key not in seen:
+                seen.add(key)
+                objects.append(str(ref))
+        return objects
+
+    def _grounding(self, question, *, source, value, quote, source_ref, field,
+                   object_ref=None) -> grounding.Grounding:
+        return grounding.assess(
+            declared_source=source, value=value, quote=quote, source_ref=source_ref,
+            target_field=field or question.get('target_field'),
+            object_ref=object_ref, question_objects=self.question_objects(question),
+            ctx=self._grounding_context())
 
     def answer_question(self, question_id, *, source, value, field=None, quote=None,
                         source_ref=None, origin='model', answer_ref=None,
-                        basis_refs=()) -> dict:
-        """把一条候选答案提交给服务端校验；**通过才采纳**。
+                        basis_refs=(), object_ref=None) -> dict:
+        """把一条候选答案提交给服务端校验；**核对通过才算已有依据**。
 
-        返回真实结果：采纳了没有、依据是什么、这条问题还剩什么没确定。
+        返回真实结果：记下了没有、可信到什么程度、这条问题还剩什么没确定。
+
+        ``source`` 是**模型的说法**，不是事实：来源种类由真实记录解析（见
+        ``answer_grounding.resolve_source``），解析不出真实来源的提交不会被记录。
         校验不过时问题保持未决并写明原因——不提供任何"直接置为已回答"的开关。
         """
         question = self.question(question_id)
@@ -1637,63 +1791,115 @@ class InvestigationState:
             return {'accepted': False, 'errors': ['empty_answer'],
                     'question': self.question_view(question),
                     'detail': '空值不是答案'}
-        if source_ref and not self._reference_is_visible(source_ref, self.allowed_entities()):
-            return {'accepted': False, 'errors': ['source_not_in_scope'],
-                    'question': self.question_view(question),
-                    'detail': f'来源引用不存在或不在当前作用域：{source_ref}'}
-        verdict = self._source_supports(question, source=source, value=value,
-                                        quote=quote, field=field or question.get('target_field'))
-        if not verdict['supported']:
-            # **来源存在但不支持答案**：保持未决，如实记下差什么。
+        answered_field = field or question.get('target_field')
+        verdict = self._grounding(question, source=source, value=value, quote=quote,
+                                  source_ref=source_ref, field=answered_field,
+                                  object_ref=object_ref)
+        if not verdict.accepted:
+            # **来源存在但不支持答案**（或根本没有真实来源）：保持未决，如实记下
+            # 差什么。这里**不写**答案元素——写下去就等于承认了一个不成立的来源。
             self.record_question_attempt(question_id, {
                 'tool': 'answer_question', 'ok': True, 'found_information': False,
-                'rejected': verdict['reason'], 'information_state': INFO_ATTEMPTED_NO_RESULT})
-            return {'accepted': False, 'errors': [verdict['reason']],
-                    'detail': verdict['detail'], 'question': self.question_view(question)}
-        partial = str(value).strip()
-        remaining = self._unanswered_parts(question, field or question.get('target_field'))
-        question['answers'] = [*(question.get('answers') or []), {
-            'value': partial, 'field': field or question.get('target_field'),
-            'source': source, 'provenance': verdict['provenance'],
+                'rejected': verdict.errors[0], 'information_state': INFO_ATTEMPTED_NO_RESULT})
+            return {'accepted': False, 'errors': list(verdict.errors),
+                    'detail': verdict.detail, 'stage': verdict.stage,
+                    # 解析到哪一类来源、卡在哪一步，一起给出来：模型据此才能改对。
+                    'source_kind': verdict.kind,
+                    'question': self.question_view(question)}
+        # 这条答案针对的对象：模型指明了就用它，没指且问题只有一个对象就是它。
+        objects = self.question_objects(question)
+        answer_object = object_ref or (source_ref if source_ref in objects else None) \
+            or (objects[0] if len(objects) == 1 else None)
+        assessment = verdict.assessment
+        answer = {
+            'value': str(value).strip(), 'field': answered_field,
+            # 来源种类取**解析出来的**那个（``verdict.kind``），不是模型自报的
+            # 字符串。两者不等时说明模型报错了来源身份——那种提交根本到不了这里。
+            'source': verdict.kind, 'provenance': SOURCE_PROVENANCE[verdict.kind],
             'source_ref': source_ref, 'quote': quote, 'origin': origin,
             'answer_ref': answer_ref, 'at': utcnow_iso(),
             'version': dict(self.patient_version or {}),
-            'still_uncertain': list(remaining),
-        }]
+            'object_ref': answer_object,
+            'assessment': assessment,
+        }
+        remaining = self._unanswered_parts(question, answered_field, answer_object,
+                                           provisional=answer)
+        answer['still_uncertain'] = list(remaining)
+        if self._same_answer_recorded(question, answer):
+            # 同一条答案重复提交：不改写历史，也不重复计入进展。
+            return {'accepted': False, 'errors': ['answer_already_recorded'],
+                    'detail': '这条答案已经记过，重复提交不产生新的记录',
+                    'assessment': assessment, 'question': self.question_view(question)}
+        question['answers'] = [*(question.get('answers') or []), answer]
         question['answer_ref'] = answer_ref or source_ref
-        # 结构化字段答上了、且这条问题没有别的缺口 → 才有适用答案。
-        if not remaining:
+        # **只有核对通过的答案才算"已有依据"。** 依据未核对到通过的（候选 / 无依据）
+        # 如实保留在答案历史里，问题继续未决——这正是"被标为已有依据的答案，
+        # 必须关联到真实、适用且支持该答案的来源"这一条硬约束的落点。
+        if not remaining and assessment['status'] == grounding.STATUS_VERIFIED:
             self.settle_question(question_id, QUESTION_STATUS_ANSWERED,
                                  information_state=INFO_AVAILABLE,
                                  answered_at=utcnow_iso())
             if question.get('information_target') == TARGET_GENERAL_REFERENCE:
                 self._mark_claim_supported(question_id, source_ref)
         else:
-            # **部分回答**：保留已知部分，把剩余缺口写清楚，问题保持未决。
+            # 保留了已知部分，把剩余缺口写清楚，问题保持未决。
             self.settle_question(question_id, QUESTION_STATUS_OPEN,
                                  information_state=INFO_RECEIVED_UNCONFIRMED)
-            for part in remaining:
+            for part in [p for p in remaining if p not in ('', None)]:
                 self.gap(f"answer_missing:{question_id}:{part}", 'question_open',
                          f'{question["statement"]}：还缺 {part}',
                          question_id=question_id, missing_field=part)
         return {'accepted': True, 'partial': bool(remaining),
                 'answered': [] if remaining else [question.get('target_field')],
                 'still_open': list(remaining),
-                'provenance': verdict['provenance'], 'detail': verdict['detail'],
+                'assessment': assessment, 'assessment_status': assessment['status'],
+                'provenance': answer['provenance'], 'detail': verdict.detail,
                 'question': self.question_view(question)}
 
     @staticmethod
-    def _unanswered_parts(question, answered_field):
+    def _same_answer_recorded(question, answer) -> bool:
+        """同一条答案是不是已经记过（同一对象、同一字段、同一值、同一来源）。"""
+        for existing in question.get('answers') or ():
+            if (_normalise_answer(existing.get('value')) == _normalise_answer(answer.get('value'))
+                    and existing.get('field') == answer.get('field')
+                    and existing.get('object_ref') == answer.get('object_ref')
+                    and existing.get('source') == answer.get('source')
+                    and existing.get('source_ref') == answer.get('source_ref')):
+                return True
+        return False
+
+    def _unanswered_parts(self, question, answered_field, answered_object=None,
+                          provisional=None):
         """这条问题**还没答上**的部分。
 
         结构化字段的问题：目标字段答上了就算答上了。开放问题没有任何字段约束，
         就按"至少给了一个有来源的值"处理——但那最多是 `received_unconfirmed`，
         绝不自动升级成"已有依据"。
+
+        **多对象问题保留对象与答案的对应关系**：问题涉及 N 个对象时，每个对象都
+        要有自己那条答案才算答上；只答上一个对象，剩下的对象仍然缺。单对象问题
+        的写法保持原样（字段名就是缺口名），所以既有口径逐字不变。
+
+        判"答上了"看的是**核对通过**：`candidate` / `unsupported` / `stale` 的答案
+        在历史里保留，但不填缺口。
         """
         target = question.get('target_field')
         if not target:
             return []
-        return [] if answered_field == target else [target]
+        objects = self.question_objects(question)
+        if len(objects) < 2:
+            return [] if answered_field == target else [target]
+
+        def verified(entry):
+            assessment = grounding.assessment_of(entry) or {}
+            return assessment.get('status') == grounding.STATUS_VERIFIED
+
+        covered = {entry.get('object_ref') for entry in (question.get('answers') or [])
+                   if verified(entry) and entry.get('field') == target}
+        if provisional and verified(provisional):
+            covered.add(answered_object)
+        # 只答了一个对象，剩下的对象按"字段@对象"逐条写清楚缺哪一条。
+        return [f'{target}@{obj}' for obj in objects if obj not in covered]
 
     def _sync_question_from_claim(self, claim) -> None:
         """把一条 claim 的证据状态同步到它对应的问题上。"""
@@ -2172,6 +2378,9 @@ def _answer_question_errors(inv, args) -> list[str]:
 
     这里只挡明显不合格的：问题不存在、来源种类未知、值为空、指到别的问题的缺口。
     真正的"来源是否支持答案"是业务判断，放在采纳入口里，结果如实回给模型。
+
+    **来源是模型自报的，所以这里不替它背书**：用户回答与专业意见不是模型能声明
+    的种类，这里就挡下来，不必等到业务判定那一步。
     """
     question = inv.question(str(args.get('question_id') or ''))
     if question is None:
@@ -2180,12 +2389,16 @@ def _answer_question_errors(inv, args) -> list[str]:
         return ['question_already_answered']
     if str(args.get('source') or '') not in ANSWER_SOURCES:
         return ['unknown_answer_source']
+    if str(args.get('source') or '') not in grounding.MODEL_SUBMITTABLE_SOURCES:
+        return ['answer_source_not_model_declarable']
     value = args.get('value')
     if value is None or not str(value).strip():
         return ['empty_answer']
     if args.get('source_ref') and not inv._reference_is_visible(
             str(args['source_ref']), inv.allowed_entities()):
         return ['source_not_in_scope']
+    if args.get('object_ref') and str(args['object_ref']) not in inv.question_objects(question):
+        return ['object_not_in_question']
     return []
 
 
