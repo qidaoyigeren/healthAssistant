@@ -674,6 +674,51 @@ def _ensure_safety_schema(connection: sqlite3.Connection) -> bool:
     return "necessary_checks" not in existing or altered
 
 
+FOLLOW_UP_SCHEMA_VERSION = "6-follow-up"
+
+#: 长期跟进的**触发实例**队列。每一条安排版本 × 触发实例最多产生一行，因此
+#: 重复扫描与进程重启只会命中同一条记录，不会创建第二次调查。
+#:
+#: 这不是第二套调度框架：列的形状、租约语义与重试口径全部沿用既有队列
+#: （`necessary_checks` / `dependency_tasks` / `resume_tasks`），并且由**同一个**
+#: `OutboxWorker.drain_once` 驱动——没有新的后台循环。
+#:
+#: `UNIQUE(case_id, schedule_revision, trigger_key)` 就是幂等触发身份
+#: （事项 + 安排版本 + 触发实例），存在数据库里而不是靠进程内记忆。
+FOLLOW_UP_TABLES = """
+CREATE TABLE IF NOT EXISTS follow_up_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope_id TEXT NOT NULL DEFAULT 'local-demo',
+    case_id TEXT NOT NULL,
+    schedule_revision INTEGER NOT NULL,
+    trigger_key TEXT NOT NULL,
+    trigger_reason TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('open','running','done','failed','cancelled')),
+    attempts INTEGER NOT NULL DEFAULT 0,
+    lease_token TEXT,
+    lease_expires_at TEXT,
+    care_task_id TEXT,
+    result_json TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(case_id, schedule_revision, trigger_key)
+);
+CREATE INDEX IF NOT EXISTS idx_follow_up_runs_status ON follow_up_runs(status, id);
+CREATE INDEX IF NOT EXISTS idx_follow_up_runs_case ON follow_up_runs(case_id, schedule_revision);
+"""
+
+
+def _ensure_follow_up_schema(connection: sqlite3.Connection) -> bool:
+    """长期跟进队列。Additive only — 既有行、既有字段一概不动。"""
+    existing = {
+        row[0] for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    connection.executescript(FOLLOW_UP_TABLES)
+    return "follow_up_runs" not in existing
+
+
 def _ensure_r0_schema(connection: sqlite3.Connection) -> bool:
     """Reliability P0 migration.  Additive only: existing rows keep their
     identity; new columns are nullable so no historical data is rewritten."""
@@ -1080,6 +1125,7 @@ class MemoryStore:
         migrated = _ensure_r0_schema(self.connection) or migrated
         migrated = _ensure_p2harness_schema(self.connection) or migrated
         migrated = _ensure_safety_schema(self.connection) or migrated
+        migrated = _ensure_follow_up_schema(self.connection) or migrated
         if migrated:
             self.connection.execute(
                 "INSERT OR REPLACE INTO schema_meta(key,value) VALUES('schema_version',?)",

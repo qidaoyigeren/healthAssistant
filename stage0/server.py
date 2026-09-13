@@ -415,6 +415,17 @@ class OutboxWorker:
                 receipts.append({"task_type": "necessary_checks", **report})
         except Exception:
             logger.warning("necessary-check pass failed", exc_info=True)
+        # 长期跟进：已确认的安排在时间到达或相关记录变化时**由这里**恢复成一次调查，
+        # 不依赖用户再点一次"调查"。位置是刻意的——放在必要检查**之后**，所以
+        # 相关变化触发的确定性安全检查总是先跑完，之后才轮到这一版模型调查。
+        # 租约、重试、失败可见性沿用既有队列口径；没有新的后台循环。
+        try:
+            from .followup_runtime import run_follow_ups
+            report = run_follow_ups(self.store, product=self.product)
+            if report["registered"] or report["triggered"] or report["blocked"]:
+                receipts.append({"task_type": "follow_ups", **report})
+        except Exception:
+            logger.warning("follow-up pass failed", exc_info=True)
         # Unified loop: durable rechecks ride the same worker.  A recheck
         # failure is logged, never swallowed silently (Reliability P0).
         try:

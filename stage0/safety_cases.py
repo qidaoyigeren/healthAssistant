@@ -25,6 +25,7 @@ import re
 import uuid
 from typing import Any, Iterable, Sequence
 
+from . import followup_runtime as _follow_up
 from .memory import utc_now
 from .product import ProductError, SCOPE, packed
 
@@ -201,28 +202,29 @@ def classify_answer(value: Any) -> str:
 
 
 def _normalise_follow_up(raw: dict[str, Any] | None) -> dict[str, Any]:
-    """把"持续跟进"落成一条**可持久化**的安排。
+    """把"持续跟进"落成一条**可持久化、未确认**的安排。
 
     模型不能凭自己的判断生成临床复查周期：调用方没有给出时间或触发条件时，
     这里记的是"尚无可信依据的待确认安排"，而不是编一个周期出来。
+
+    **有时间或条件不等于已确认。** 这里产出的 `confirmed` 恒为 `False`——确认只能
+    由 `confirm_follow_up` 写入确认记录后产生。历史实现把 `bool(at or condition)`
+    当成 `confirmed`，于是"给了一个时间"就被读成"有人确认过"；那些确认从来没有人
+    做过。语义澄清见 [CONTRACT §4.5]。
     """
     if not isinstance(raw, dict):
-        return {'kind': 'arrangement', 'confirmed': False,
-                'note': '尚无可信依据的复核时间或触发条件；这是一项待确认的安排',
-                'at': None, 'condition': None, 'owner': None,
-                'recorded_at': utc_now()}
+        return _follow_up.build_arrangement(kind='arrangement')
     kind = str(raw.get('kind') or 'arrangement')
     if kind not in FOLLOW_UP_KINDS:
-        kind = 'arrangement'
-    at = raw.get('at') if kind == 'review_at' else None
-    condition = raw.get('condition') if kind == 'on_event' else None
-    confirmed = bool(at or condition)
-    return {'kind': kind if confirmed else 'arrangement', 'confirmed': confirmed,
-            'at': at, 'condition': condition,
-            'owner': raw.get('owner') or 'caregiver',
-            'note': raw.get('note') or (None if confirmed else
-                                        '尚无可信依据的复核时间或触发条件；这是一项待确认的安排'),
-            'recorded_at': utc_now()}
+        # 未知的**种类词**是调用方错误，不是"没给时间"。降级成 arrangement 会让
+        # 一次拼错的请求看起来像一条正常排上的安排。
+        raise ProductError(f'不支持的安排类型：{kind!r}', 422)
+    return _follow_up.build_arrangement(
+        kind=kind,
+        at=raw.get('at'),
+        condition=raw.get('condition'),
+        owner=raw.get('owner'),
+        note=raw.get('note'))
 
 
 # ---- 身份：dedup_key ---------------------------------------------------------
@@ -979,6 +981,133 @@ class SafetyCaseStore:
              'disposition': disposition, 'basis_kind': basis_kind,
              'decision_id': decision_id}, execute)
 
+    # ---- 长期跟进：安排 / 改期 / 取消 / 确认 ---------------------------------
+    #
+    # 在此之前 `follow_up` 是**只写一次、不可改、不可取消**的：唯一的写入点是
+    # `accepted_monitoring` 处置分支，而且 `confirmed` 是派生的。要支持"长期跟进"
+    # 就必须补上这三个动作，并让确认成为一件**发生过的事**而不是一个派生布尔量。
+    #
+    # 三个动作都推进**事项** revision（CAS 令牌），但只有"安排/取消"推进**安排**
+    # revision——确认改变的是"谁承诺了"，不是"安排是什么"，推进它会让一条刚确认的
+    # 安排作废自己已经排好的触发。
+
+    def schedule_follow_up(self, key: str, *, expected_revision: int, kind: str,
+                           at: str | None = None, condition: dict | None = None,
+                           owner: str | None = None, note: str | None = None,
+                           actor: str | None = None,
+                           command_key: str | None = None) -> dict[str, Any]:
+        """登记或改期一条跟进安排。
+
+        **不接受 `confirmed`。** 请求体送了也不读，更不会因此把 `confirmed` 置真：
+        确认是一次单独的、有记录的承诺（``confirm_follow_up``）。
+        """
+        effective_key = command_key or f'{key}:follow-up:schedule:{expected_revision}:{kind}'
+
+        def execute():
+            case = self.get(key)
+            if case['revision'] != expected_revision:
+                raise ProductError('事项已被其他操作更新，请刷新', 409)
+            if case['current_status'] in TERMINAL_STATUSES:
+                raise ProductError(
+                    '事项已有依据的处置，不能再安排跟进；如情况变化请重新打开', 409)
+            previous = case.get('follow_up') or {}
+            arrangement = _follow_up.build_arrangement(
+                kind=kind, at=at, condition=condition, owner=owner, note=note,
+                revision=int(previous.get('revision') or 0) + 1)
+            _follow_up.cancel_pending_runs(self.memory, case['id'],
+                                           reason='安排已改期，旧触发作废')
+            case['follow_up'] = arrangement
+            case['history'].append({
+                'at': utc_now(), 'event': 'follow_up_scheduled', 'actor': actor,
+                'kind': arrangement['kind'], 'at_time': arrangement['at'],
+                'condition': arrangement['condition'],
+                'schedule_state': arrangement['schedule_state'],
+                'note': arrangement['note']})
+            case['updated_at'] = utc_now()
+            case['revision'] += 1
+            self.p.save(KIND, case)
+            return case
+        return self.p.command(effective_key, {
+            'type': 'safety_case_follow_up_schedule', 'case_id': key,
+            'kind': kind, 'at': at, 'condition': condition}, execute)
+
+    def cancel_follow_up(self, key: str, *, expected_revision: int,
+                         reason: str | None = None, actor: str | None = None,
+                         command_key: str | None = None) -> dict[str, Any]:
+        """取消一条安排。**不清空** `at`/`condition`/`owner`/`note`——历史要留着，
+        靠状态表达"已取消"。
+
+        取消推进安排 revision，因此**已经排上的触发身份随之作废**：一条取消了的安排
+        不会在后台继续执行副作用。
+        """
+        effective_key = command_key or f'{key}:follow-up:cancel:{expected_revision}'
+
+        def execute():
+            case = self.get(key)
+            if case['revision'] != expected_revision:
+                raise ProductError('事项已被其他操作更新，请刷新', 409)
+            current = case.get('follow_up')
+            if not isinstance(current, dict):
+                raise ProductError('这件事项还没有跟进安排，没有可取消的东西', 409)
+            state = _follow_up.schedule_state(current)
+            if state == _follow_up.SCHEDULE_CANCELLED:
+                raise ProductError('该跟进安排已经取消', 409)
+            if state == _follow_up.SCHEDULE_TRIGGERED:
+                raise ProductError('该跟进安排已经执行，不能再取消', 409)
+            cancelled = dict(current)
+            cancelled['schedule_state'] = _follow_up.SCHEDULE_CANCELLED
+            cancelled['blocked_reason'] = None
+            cancelled['revision'] = int(current.get('revision') or 1) + 1
+            _follow_up.cancel_pending_runs(self.memory, case['id'], reason=reason
+                                           or '安排已取消')
+            case['follow_up'] = cancelled
+            case['history'].append({
+                'at': utc_now(), 'event': 'follow_up_cancelled', 'actor': actor,
+                'reason': reason, 'previous_state': state})
+            case['updated_at'] = utc_now()
+            case['revision'] += 1
+            self.p.save(KIND, case)
+            return case
+        return self.p.command(effective_key, {
+            'type': 'safety_case_follow_up_cancel', 'case_id': key,
+            'reason': reason}, execute)
+
+    def confirm_follow_up(self, key: str, *, expected_revision: int,
+                          actor: str | None = None, note: str | None = None,
+                          command_key: str | None = None) -> dict[str, Any]:
+        """确认一条**已安排**的安排，产生一条可追溯的确认记录。
+
+        `confirmed_by` 取认证主体（调用方传入的 ``actor``），不接受请求体自称。
+        前置条件：存在一条 `scheduled`/`due` 的安排——**没有安排就没有可确认的东西**。
+        """
+        effective_key = command_key or f'{key}:follow-up:confirm:{expected_revision}'
+
+        def execute():
+            case = self.get(key)
+            if case['revision'] != expected_revision:
+                raise ProductError('事项已被其他操作更新，请刷新', 409)
+            current = case.get('follow_up')
+            state = _follow_up.schedule_state(current) if isinstance(current, dict) else None
+            if state not in _follow_up.CONFIRMABLE_STATES:
+                raise ProductError(
+                    '没有可确认的跟进安排：请先登记一条有时间的安排，再确认由谁跟进', 409)
+            confirmed = _follow_up.apply_confirmation(
+                current, by=actor, at=utc_now(), note=note,
+                # 指向**真实存在的**确认记录：产品命令的幂等回执。自报的确认不是确认，
+                # 而没有落点的"确认"和没有确认是一回事。
+                confirmation_ref=f'product:{effective_key}')
+            case['follow_up'] = confirmed
+            case['history'].append({
+                'at': confirmed['confirmed_at'], 'event': 'follow_up_confirmed',
+                'actor': actor, 'confirmation_ref': confirmed['confirmation_ref'],
+                'note': note})
+            case['updated_at'] = utc_now()
+            case['revision'] += 1
+            self.p.save(KIND, case)
+            return case
+        return self.p.command(effective_key, {
+            'type': 'safety_case_follow_up_confirm', 'case_id': key}, execute)
+
     def _build_basis(self, case: dict[str, Any], *, basis_kind: str, actor: str,
                      decision_id: str | None,
                      conclusion_refs: Sequence[str] | None) -> dict[str, Any]:
@@ -1121,7 +1250,9 @@ def case_view(store: SafetyCaseStore, case: dict[str, Any]) -> dict[str, Any]:
         'answered_inputs': [dict(item) for item in inputs
                             if item.get('status') == 'answered'],
         'answered_inputs_count': sum(1 for item in inputs if item.get('status') == 'answered'),
-        'follow_up': case.get('follow_up'),
+        # 投影是只读的：拿不出确认记录的 `confirmed=True` 一律按 `false` 读。
+        # 在此之前"给了一个时间"会被读成"已确认"，而那个确认从来没有人做过。
+        'follow_up': _follow_up.project_follow_up(case.get('follow_up')),
         'linked_review_case_ids': case.get('linked_review_case_ids') or [],
         'linked_run_ids': case.get('linked_run_ids') or [],
         'next_action_summary': case.get('next_action_summary'),
@@ -1318,6 +1449,45 @@ def register_safety_routes(app, product, access, invoke, principal=None,
             actor=actor, roles=roles, note=body.get('note'),
             decision_id=body.get('decision_id'), follow_up=body.get('follow_up'),
             command_key=body.get('key'))))
+
+    @app.post('/v1/safety-cases/{case_id}/follow-up')
+    def follow_up(case_id: str, request: Request, body: dict):
+        """安排 / 改期 / 取消一条长期跟进。**同一路径，靠 `action` 分流。**
+
+        请求体里的 `confirmed` 一律不读：确认是一次单独的、有记录的承诺，走
+        `.../follow-up/confirmation`。给了时间就自动算"已确认"是这里要修掉的缺陷。
+        """
+        access(request, True)
+        store = SafetyCaseStore(product)
+        actor, _roles = _actor(request)
+        action = body.get('action') or 'schedule'
+        if action == 'schedule':
+            return invoke(lambda: case_view(store, store.schedule_follow_up(
+                case_id, expected_revision=body.get('expected_revision'),
+                kind=body.get('kind') or 'arrangement', at=body.get('at'),
+                condition=body.get('condition'), owner=body.get('owner'),
+                note=body.get('note'), actor=actor,
+                command_key=body.get('key'))))
+        if action == 'cancel':
+            return invoke(lambda: case_view(store, store.cancel_follow_up(
+                case_id, expected_revision=body.get('expected_revision'),
+                reason=body.get('reason'), actor=actor,
+                command_key=body.get('key'))))
+        # 未知动作是调用方错误，不是"什么都不做"。
+        raise ProductError(f'不支持的跟进动作：{action!r}', 422)
+
+    @app.post('/v1/safety-cases/{case_id}/follow-up/confirmation')
+    def confirm_follow_up(case_id: str, request: Request, body: dict):
+        """确认一条已安排的跟进安排。
+
+        `confirmed_by` 取**认证主体**——请求体里的自称不被读取。自报的身份不是身份。
+        """
+        access(request, True)
+        store = SafetyCaseStore(product)
+        actor, _roles = _actor(request)
+        return invoke(lambda: case_view(store, store.confirm_follow_up(
+            case_id, expected_revision=body.get('expected_revision'),
+            actor=actor, note=body.get('note'), command_key=body.get('key'))))
 
     @app.post('/v1/safety-cases/{case_id}/answer')
     def answer(case_id: str, request: Request, body: dict):
