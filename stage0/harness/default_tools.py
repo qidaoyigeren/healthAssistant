@@ -174,29 +174,35 @@ READ_EVIDENCE_SPEC = ToolSpec(
 ANSWER_QUESTION_SPEC = ToolSpec(
     name="answer_question",
     description=("把**已经取得的来源**落成某条问题的答案——采纳的唯一入口。"
-                 "先说明在回答哪条问题（question_id），再给出候选答案与它的来源："
-                 "source=patient_record（当前权威记录里的字段值，程序会直接比对）/ "
-                 "evidence（本 run 回读过的原文，必须给出 quote 原文片段）/ "
-                 "material（材料里记的）/ user_answer（用户说的）/ professional（专业意见）。"
-                 "服务端会按来源、对象与版本核对**来源是否真的支持这个答案**："
-                 "引用存在不等于支持答案；对不上就保持未决并说明差什么。"
-                 "来源不同，认识论属性也不同——用户报告与材料记录不等于已核实事实。"
-                 "不要用它把问题直接设成已回答；采纳由校验结果决定。"),
+                 "先说明在回答哪条问题（question_id），再给出候选答案与它的**引用**："
+                 "source=patient_record（当前权威记录里的字段值，source_ref 写那条版本化记录）"
+                 "/ evidence（本 run 回读过的原文，source_ref 写那条证据，并给出 quote 原文片段）"
+                 "/ material（本 run 回读过的材料条目，source_ref 写条目 ref）。"
+                 "**来源种类由服务端的真实记录解析，不由这里声明决定**：用户回答与专业意见"
+                 "不是模型能声明的种类，写了会被拒绝。"
+                 "服务端按来源、对象、内容版本与实际读过的片段核对**来源是否真的支持这个答案**："
+                 "引用存在不等于支持答案，引文属实也不等于它陈述了这个答案，引用 A 不能用 B 的原文。"
+                 "问题涉及多个对象时用 object_ref 指明这次回答的是哪一个——只答一个对象不算答完。"
+                 "不要用它把问题直接设成已回答：只有核对通过的答案才算有依据，"
+                 "其余如实记成候选或无依据并继续未决。"),
     argument_schema={
         "type": "object",
         "properties": {
             "question_id": {"type": "string"},
             "source": {"type": "string", "enum": [
-                "patient_record", "evidence", "material", "user_answer", "professional"]},
+                "patient_record", "evidence", "material"]},
             "value": {"type": "string"},
             "field": {"type": "string"},
             "quote": {"type": "string"},
             "source_ref": {"type": "string"},
+            "object_ref": {"type": "string",
+                           "description": "这条问题涉及的多个对象中，本次回答的是哪一个"},
             "basis_refs": {"type": "array", "items": {"type": "string"}},
         },
-        "required": ["question_id", "source", "value"],
+        "required": ["question_id", "source", "value", "source_ref"],
     },
-    result_shape=("dict(accepted, partial, answered[], still_open[], provenance, detail, "
+    result_shape=("dict(accepted, partial, answered[], still_open[], provenance, "
+                  "assessment{status, reason, source_ref, locator, dependency_refs}, detail, "
                   "question[{question_id, information_state, blocking}])"),
     kind="read",
     required_permission="answer:submit",
