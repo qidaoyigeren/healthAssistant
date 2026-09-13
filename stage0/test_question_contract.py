@@ -300,24 +300,37 @@ class AnswerAdoptionTests(unittest.TestCase):
         self.assertTrue(accepted['accepted'], accepted)
         self.assertEqual('reference_evidence', accepted['provenance'])
 
-    def test_a_user_report_is_recorded_with_its_own_provenance(self):
-        """用户报告不等于已核实事实——来源属性如实保留。"""
+    def test_a_model_cannot_declare_a_user_report(self):
+        """模型写一句"用户说过"造不出一条用户报告——来源由真实记录解析，不由它声明。
+
+        原用例断言的是**相反**的行为（`source='user_answer'` 被接受），那正是本轮
+        要修掉的缺陷。用户报告的**真实**写入路径是
+        `/v1/safety-cases/{id}/answer` → `care_tasks._sync_answers_to_investigation`，
+        它写出的 `user_reported` 由产品级验收覆盖：`test_safety_mainline_e2e` 的
+        路径二，以及 `test_parallel_product_acceptance` 的
+        `test_a_user_answer_is_kept_with_its_source_and_does_not_close_the_case`。
+        """
         inv = case_state()
         qid = self._read_question(inv, field='schedule')
         outcome = inv.answer_question(qid, source='user_answer', value='每日一次',
                                       field='schedule')
-        self.assertTrue(outcome['accepted'])
-        self.assertEqual('user_reported', outcome['provenance'])
-        answer = inv.question(qid)['answers'][-1]
-        self.assertEqual('user_reported', answer['provenance'])
+        self.assertFalse(outcome['accepted'])
+        self.assertIn('user_answer_not_model_declarable', outcome['errors'])
+        self.assertFalse(inv.question(qid).get('answers'),
+                         '没有真实来源的答案不该在历史里留下一个看起来像答案的元素')
 
     def test_a_partial_answer_keeps_the_question_open_and_says_what_is_missing(self):
-        """只答上一部分：保留已知部分，明确剩余缺口。"""
+        """只答上一部分：保留已知部分，明确剩余缺口。
+
+        答的是**记录真的有的**另一个字段（名称），问的是剂量——于是已知部分保留
+        下来，`dose` 作为剩余缺口写清楚。原用例用 `user_answer` 造这个部分回答，
+        那条来源现在不可由模型声明；换一条不改变这条用例要验的东西。
+        """
         inv = case_state()
         qid = self._read_question(inv)
-        outcome = inv.answer_question(qid, source='user_answer', value='每日一次',
-                                      field='schedule')
-        self.assertTrue(outcome['accepted'])
+        outcome = inv.answer_question(qid, source='patient_record', value='合成药甲',
+                                      field='name', source_ref='memory:medication:1@v1')
+        self.assertTrue(outcome['accepted'], outcome)
         self.assertTrue(outcome['partial'])
         self.assertEqual(['dose'], outcome['still_open'])
         question = inv.question(qid)

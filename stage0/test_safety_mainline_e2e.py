@@ -336,7 +336,11 @@ class Scenario3InvalidationTests(SafetyMainlineTests):
         case_id = self._case_with_disposition()
         synced = SafetyCaseStore(self.api.product).sync(case_id)
         self.assertEqual(sc.STATUS_MONITORING, synced["current_status"])
-        self.assertTrue(synced["follow_up"]["confirmed"])
+        # CONTRACT §4.5：给了时间不等于有人确认过。常量同步不得把它置真，也不得
+        # 把它清掉——安排原样留着，确认仍然为空。
+        self.assertFalse(synced["follow_up"]["confirmed"])
+        self.assertIsNone(synced["follow_up"]["confirmation_ref"])
+        self.assertEqual("2026-10-01T00:00:00+00:00", synced["follow_up"]["at"])
 
     def test_seen_and_old_confirmations_cannot_approve_the_new_state(self):
         case_id = self._case_with_disposition()

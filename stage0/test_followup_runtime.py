@@ -456,16 +456,28 @@ class _RuntimeFixture(_StoreFixture):
 class FollowUpRuntimeTimingTests(_RuntimeFixture):
     """到期才触发。等待中的安排**不消费模型预算**。"""
 
-    def test_an_unconfirmed_arrangement_never_triggers(self):
-        """有时间 ≠ 已确认 ≠ 会执行。没有确认就不该有人在后台替用户开工。"""
+    def test_an_arrangement_with_nothing_to_fire_on_never_triggers(self):
+        """没有可触发的东西（`kind='arrangement'` 备忘，无时间无条件）就不开工。
+
+        > 集成说明：本用例原先断言的是"**未确认**的安排永不执行"
+        > （`test_an_unconfirmed_arrangement_never_triggers`）。那一条**与冻结契约
+        > 冲突**，集成时按契约改掉了：CONTRACT §4.5 把"已安排"与"已确认"定成两件
+        > 事，§4.7 又要求 `schedule_state` 必须能前进、**不得**"永远停在 scheduled
+        > 来伪装成功"。若执行以 `confirmed` 为前置条件，则经由处置端点建立的安排
+        > （本轮之前**唯一**的写入路径，其 `confirmed` 恒为 false）在到期后永远
+        > 停在 scheduled——那正是 §4.7 点名禁止的形态。
+        > "别在没承诺时花模型预算"这个关切由**别的**东西承担：未到期不执行
+        > （下一条用例）、取消即不再执行、以及本条的"没有可触发的东西就不开工"。
+        """
         case = self.open_case()
         scheduled = self.cases.schedule_follow_up(
-            case['id'], expected_revision=case['revision'], kind='review_at',
-            at=_ago(hours=1), command_key='s1')
+            case['id'], expected_revision=case['revision'], kind='arrangement',
+            command_key='s1')
         self.sweep()
         self.assertEqual([], self.care_tasks(scheduled['id']))
         self.assertEqual([], self.run_rows(scheduled['id']))
-        self.assertEqual('scheduled', self.cases.get(scheduled['id'])['follow_up']['schedule_state'])
+        self.assertEqual('unscheduled',
+                         self.cases.get(scheduled['id'])['follow_up']['schedule_state'])
 
     def test_an_arrangement_that_is_not_due_yet_does_not_run(self):
         case = self.open_case()
@@ -485,6 +497,29 @@ class FollowUpRuntimeTimingTests(_RuntimeFixture):
         self.assertEqual('triggered', follow_up['schedule_state'])
         self.assertIsNotNone(follow_up['last_triggered_at'])
         self.assertEqual(tasks[0]['id'], follow_up['care_task_id'])
+
+    def test_an_arrangement_that_is_not_confirmed_still_runs(self):
+        """已安排 ≠ 已确认（CONTRACT §4.5）。
+
+        确认记录回答的是"谁承诺了这件事"，不是"这条安排存不存在"。拿 `confirmed`
+        当可执行的前置条件，会让每一条经由处置端点建立的安排在到期后**永远停在
+        scheduled**——而处置端点是本轮之前唯一的写入路径，它产出的 confirmed
+        恒为 false，等于长期跟进对主要路径整个失效。
+        """
+        case = self.open_case()
+        scheduled = self.cases.schedule_follow_up(
+            case['id'], expected_revision=case['revision'], kind='review_at',
+            at=_ago(minutes=5), command_key='unconfirmed-schedule')
+        self.assertFalse(scheduled['follow_up']['confirmed'],
+                         '只给了时间，不该被算成已确认')
+        self.assertEqual('scheduled', scheduled['follow_up']['schedule_state'])
+
+        report = self.sweep()
+        self.assertEqual(1, len(report['triggered']),
+                         f'未确认但已到期的安排没有执行：{report}')
+        follow_up = self.cases.get(case['id'])['follow_up']
+        self.assertNotEqual('scheduled', follow_up['schedule_state'],
+                            '未确认的安排永远停在 scheduled——"有人会跟进"只是墙上的字')
 
     def test_the_trigger_time_is_controllable_not_wall_clock_guessed(self):
         """同一个安排，在"还没到"和"已过点"两个时刻扫描，结果不同。"""
@@ -1196,7 +1231,7 @@ class AssessmentProjectionTests(_StoreFixture):
 
     def test_an_assessment_is_projected_verbatim(self):
         marker = {'status': 'verified', 'reason': '引用片段与已读回的证据原文逐字一致',
-                  'source_ref': 'evidence:8842', 'locator': '第 3 段第 2 行',
+                  'source_ref': 'ev-8842', 'locator': '第 3 段第 2 行',
                   'dependency_refs': ['memory:medication:45@2']}
         case = self._case_with_answer(marker)
         view = sc.case_view(self.cases, case)
@@ -1219,15 +1254,83 @@ class AssessmentProjectionTests(_StoreFixture):
 
 
 class AnswerDependencyBoundaryTests(_RuntimeFixture):
-    """B 只定义**调用边界**并记录交接，不复制一套答案判定规则。"""
+    """B 只定义**调用边界**并把结果搬回去，不复制一套答案判定规则。
 
-    def test_the_boundary_reports_unavailable_when_a_has_not_delivered(self):
-        """A 未交付时如实说"没做"，而不是自己编一套答案判定。"""
+    集成后 A 的判定接口（`answer_grounding.revalidate` / `dependency_state`）已经
+    在位，所以这一组验的是**交接真的发生**、且**只降级受影响的那一条**——不是
+    "接口还在不在"。
+    """
+
+    def _case_with_a_dependent_answer(self, drug_ref: str) -> dict:
+        """在事项上挂一条已核对的答案，依赖 `drug_ref` 的那个版本。"""
         case = self.open_case()
+        request_id = f"case:{case['id']}:q:1"
+        answer = {
+            'value': '5mg', 'field': 'dose', 'source': 'patient_record',
+            'provenance': 'authoritative_record', 'answer_ref': 'answer:1',
+            'origin': 'model', 'still_uncertain': [],
+            'assessment': {'status': 'verified',
+                           'reason': '与当前权威记录逐字一致',
+                           'source_ref': drug_ref, 'locator': 'dose',
+                           'dependency_refs': [drug_ref]}}
+        task = {'id': 'task-answer-1', 'kind': 'care_task',
+                'goal_type': 'safety_case', 'safety_case_id': case['id'],
+                'status': 'completed', 'revision': 1,
+                'created_at': fr._now(), 'updated_at': fr._now(),
+                'investigation': {'questions': [
+                    {'question_id': 'q:1', 'statement': '合成药甲的剂量是多少？',
+                     'target_field': 'dose', 'answers': [answer]}]}}
+        stored = self.cases.get(case['id'])
+        stored['required_inputs'] = [{
+            'request_id': request_id, 'status': 'answered',
+            'question': '合成药甲的剂量是多少？', 'answers': [answer],
+            'answered_parts': [answer],
+            'answered_against': self.product.revisions()}]
+        with self.product.transaction():
+            self.product.save('care_task', task)
+            self.product.save(sc.KIND, stored)
+        return self.cases.get(case['id'])
+
+    def test_only_the_answer_whose_dependency_changed_is_downgraded(self):
+        """依赖的那条记录变了 ⇒ 那条答案不再算已核对，并且**前端看得见**。
+
+        本仓库里改剂量是**取代**：`memory:medication:1@v1` 不再是当前记录，
+        新记录换了 id。所以这条走 A 的 `withdraw`（来源已不可用）→ `unsupported`；
+        若只是同一条记录版本前进，同一段代码走 `retire` → `stale`。
+        两种情况共同的性质是**不再是 `verified`**，这正是要守的那条。
+        """
+        drug_ref = self.add_drug('卡马西平', key='dep-1')['medication']['ref']
+        case = self._case_with_a_dependent_answer(drug_ref)
+        # 记录的版本前进一格：那条答案依赖的已经不是当前版本了。
+        self.memory.apply_medication_change(
+            action='dose_change', name='卡马西平', dose='200mg',
+            ingredients=[], session_id='s', turn_id='dep-1-change',
+            source='caregiver')
+
         result = fr.recheck_answer_dependencies(
-            self.product, case, changed_refs=['memory:medication:45@2'], reason='用药变化')
-        self.assertEqual('unavailable', result['status'])
-        self.assertTrue(result['reason'])
+            self.product, case, changed_refs=[drug_ref], reason='用药变化')
+        self.assertEqual(1, result['affected'],
+                         f'改了一条依赖，却降级了 {result["affected"]} 条答案：{result}')
+        self.assertIn(result['updated'][0]['to'], ('stale', 'unsupported'))
+        self.assertNotEqual('verified', result['updated'][0]['to'])
+
+        projected = sc.case_view(self.cases, self.cases.get(case['id']))
+        parts = projected['answered_inputs'][0]['answered_parts'][0]
+        self.assertNotEqual('verified', parts['assessment']['status'],
+                            '降级只写进调查、没有搬到事项投影，前端看到的仍是"已核对"')
+
+    def test_a_change_no_answer_depends_on_is_left_alone(self):
+        """与这次变化无关的答案不动——一次局部变化不该放大成一次全面重问。"""
+        case = self._case_with_a_dependent_answer(
+            self.add_drug('丙戊酸钠', key='dep-2')['medication']['ref'])
+        result = fr.recheck_answer_dependencies(
+            self.product, case, changed_refs=['memory:conclusion:999@1'],
+            reason='另一个结论被记录')
+        self.assertEqual(0, result['affected'], result)
+        projected = sc.case_view(self.cases, self.cases.get(case['id']))
+        parts = projected['answered_inputs'][0]['answered_parts'][0]
+        self.assertEqual('verified', parts['assessment']['status'],
+                         '不相关的答案被降级了——相关判断必须由 A 的接口给出')
 
     def test_the_boundary_does_not_write_any_assessment_of_its_own(self):
         """B 不产生 assessment——那是 A 的产物。缺失就保持缺失。"""

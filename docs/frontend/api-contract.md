@@ -100,6 +100,8 @@ interface OperationOutcomeDto =
 | POST | `/v1/safety-cases/{case_id}/seen` | body `{key}`。**只**写 `user_seen_at` 时间戳:不关闭事项、不清空未决项。界面上不得表述为「已处理」 |
 | POST | `/v1/safety-cases/{case_id}/answer` | body `{key, expected_revision, request_id, value, answer_kind?}`;`answer_kind` ∈ `provided`/`unknown`/`empty`,省略则由服务端按内容判定。返回新的 CaseView。空值与「不知道」走**不同**路径:空值什么都不关;「不知道」结束追问但**不消除**不确定性,仍阻止关闭 |
 | POST | `/v1/safety-cases/{case_id}/disposition` | body `{key, expected_revision, disposition, basis_kind, note?, decision_id?, follow_up?}`。**不含 `actor`**:身份由服务端从认证上下文取,请求体里的 `actor` 不被读取。`follow_up` = `{kind: review_at\|on_event\|arrangement, at?, condition?, owner?, note?}` |
+| POST | `/v1/safety-cases/{case_id}/follow-up` | body `{key, expected_revision, action: "schedule"\|"cancel", kind?, at?, condition?, owner?, note?, reason?}`。`kind` ∈ `review_at`/`on_event`/`arrangement`;`at` **必须带时区**(naive → 422,响应统一规范化成 `+00:00` 秒精度);`condition` 是白名单结构 `{kind, ref, ...}`,未知 kind 或自由文本 → 422(**不静默降级**)。**不接受 `confirmed`**:给了时间或条件不等于有人确认过。返回新的 CaseView |
+| POST | `/v1/safety-cases/{case_id}/follow-up/confirmation` | body `{key, expected_revision, note?}`。产生一条确认记录,使 `confirmed: true` 并写入 `confirmed_at`/`confirmed_by`/`confirmation_ref`;`confirmed_by` 取认证主体,**不接受请求体自称**。前置条件是存在 `schedule_state ∈ {scheduled, due}` 的安排,否则 409 |
 | POST | `/v1/safety-cases/{case_id}/investigate` | body `{key, budget?, goal?}`;建 `care_task`(goal_type=`safety_case`)并排队,返回任务;进度用 `/v1/runs/{run_id}/progress` 轮询 |
 | POST | `/v1/care-tasks/{task_id}/input` | body `{key, revision, review_request_ids: string[], answers?: [{request_id, value, kind?}]}`;kind ∈ `user_report`/`material_note`。只关闭**指名回答**的那条 request_id(安全事项的补充现在直接走上面的 `/answer`) |
 | POST | `/v1/care-tasks/{task_id}/resume` | 提交补充后用 `revision+1` 继续;`record_input` 恰好把任务版本 +1 |
@@ -107,6 +109,19 @@ interface OperationOutcomeDto =
 CaseView 字段以 `case_view()` 序列化为准(见 `frontend/src/api/types.ts` 的 `SafetyCaseDto`)。
 `necessary_checks.note` 是服务端对队列语义的原文说明,必须在界面上可见:
 未运行时检查队列不会自动推进,「没有提示」不等于「检查通过」。
+
+`answered_parts` 的每个元素现在还带一个可选的 `assessment`
+(`{status: verified|candidate|stale|unsupported, reason, source_ref, locator, dependency_refs}`)。
+**没有这个键就是「未核实」**,不得按 `verified` 读,也不得补默认值。
+`verified` 只表示"约定范围内的答案依据已核对",不表示整体用药安全、也不是专业医疗判断。
+
+`follow_up` 在既有 6 键之上新增 `confirmed`(只由确认端点置真,存量记录里的
+`confirmed: true` 但拿不出 `confirmed_at`/`confirmation_ref` 的一律按 `false` 读)、
+`confirmed_at`/`confirmed_by`/`confirmation_ref`/`revision`/`schedule_state`/
+`last_triggered_at`/`last_trigger_reason`/`care_task_id`/`blocked_reason`。
+`kind`(安排的种类)与 `schedule_state`(走到哪了)是两件事,不要合并。
+`schedule_state` 由 worker 周期推进;`worker_thread=False` 时不跑,界面不得
+宣称「后台已在执行」。
 
 ### 状态与结论语义(前端必须照此显示)
 

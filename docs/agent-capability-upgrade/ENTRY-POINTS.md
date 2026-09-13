@@ -23,6 +23,7 @@
 | `scripts/analyze-planner-metrics.py` | 否 | 逐次指标；被 `stage0/test_planner_reliability.py` **直接调用**，不另建口径 |
 | `scripts/replay-agent-closeout.py` | 否 | 零网络回放既有失败提案；被 `stage0/agent_evals/run_eval.py` 调用 |
 | `scripts/create-product-dev-tasks.py` | 否 | 离线重新生成 `stage0/product_evals/tasks/dev` 夹具 |
+| `python -m stage0.test_parallel_product_acceptance --report <path>` | 否 | 独立验收：答案可信性 / 长期跟进 / 整条闭环。按类别分开报告**通过 / 未通过 / 未测到**——"未测到"**不**折算成通过。脚本化规划器，不调模型 |
 
 ## 常用开发入口（不是脚本）
 

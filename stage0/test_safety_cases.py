@@ -227,7 +227,13 @@ class SafetyCaseTests(unittest.TestCase):
         self.assertIn('待确认', follow_up['note'])
         self.assertIsNone(follow_up['at'])
 
-    def test_monitoring_with_an_explicit_schedule_keeps_it(self):
+    def test_monitoring_with_an_explicit_schedule_keeps_it_unconfirmed(self):
+        """安排留下来了，但**给了一个时间不等于有人确认过**（CONTRACT §4.5）。
+
+        原用例断言的是 `confirmed` 由 `at` 派生（`bool(at or condition)`）——
+        那正是 §4.5 点名要修掉的缺陷。这里改成断言目标语义：时间与负责人原样
+        保留，确认仍然为空，直到有一条真实的确认记录。
+        """
         a = self.add_drug('阿司匹林')['medication']
         b = self.add_drug('华法林')['medication']
         case = self.observe(self.warn('阿司匹林×华法林：出血风险升高。', [a['ref'], b['ref']], 'w1'), 'k1')
@@ -238,7 +244,11 @@ class SafetyCaseTests(unittest.TestCase):
             follow_up={'kind': 'review_at', 'at': '2026-10-01T00:00:00+00:00',
                        'owner': 'caregiver'})
         follow_up = monitored['follow_up']
-        self.assertTrue(follow_up['confirmed'])
+        self.assertFalse(follow_up['confirmed'])
+        self.assertIsNone(follow_up['confirmed_at'])
+        self.assertIsNone(follow_up['confirmation_ref'])
+        self.assertEqual('scheduled', follow_up['schedule_state'],
+                         '已安排与已确认是两件事：给了时间就应当是可调度的安排')
         self.assertEqual('2026-10-01T00:00:00+00:00', follow_up['at'])
         self.assertEqual('caregiver', follow_up['owner'])
 
@@ -248,6 +258,38 @@ class SafetyCaseTests(unittest.TestCase):
         self.assertFalse(follow_up['confirmed'])
         self.assertIsNone(follow_up['at'])
         self.assertEqual('arrangement', follow_up['kind'])
+
+    def test_projected_answers_do_not_collide_across_runs(self):
+        """已答问题的投影是**幂等**的，但每跑一次调查集合都可能变。
+
+        `ProductStore.command` 对"同一个 key 配不同内容"返回 409——投影用固定
+        key 的话，第二轮调查会直接撞上去。所以幂等键必须带调用方的判别项。
+        """
+        a = self.add_drug('阿司匹林')['medication']
+        b = self.add_drug('华法林')['medication']
+        case = self.observe(
+            self.warn('阿司匹林×华法林：出血风险升高。', [a['ref'], b['ref']], 'w1'), 'k1')
+        prefix = f"case:{case['id']}"
+        one = self.cases.project_answered_questions(
+            case['id'], [{'request_id': f'{prefix}:q1', 'status': 'answered'}],
+            command_key='run-1')
+        self.assertEqual(1, len(one['required_inputs']))
+
+        two = self.cases.project_answered_questions(
+            case['id'],
+            [{'request_id': f'{prefix}:q1', 'status': 'answered'},
+             {'request_id': f'{prefix}:q2', 'status': 'answered'}],
+            command_key='run-2')
+        self.assertEqual(2, len(two['required_inputs']),
+                         '第二轮调查多答上一条，投影必须跟得上')
+
+        replay = self.cases.project_answered_questions(
+            case['id'],
+            [{'request_id': f'{prefix}:q1', 'status': 'answered'},
+             {'request_id': f'{prefix}:q2', 'status': 'answered'}],
+            command_key='run-2')
+        self.assertEqual(2, len(replay['required_inputs']),
+                         '重放同一次运行不该重复登记')
 
     def test_an_old_check_cannot_approve_a_new_medication_state(self):
         """检查之后又改过记录：旧结论不能用来关闭事项。

@@ -636,6 +636,41 @@ class CareTasks:
                 strategy_history=list(question.get('strategy_history') or []),
                 subject_refs=list(question.get('subject_refs') or []),
                 command_key=f"{task['id']}:ask:{request_id}:{len(task['runs'])}")
+
+        # **已经答上的问题也要落到事项上。** `answered_inputs` 是消费方读取答案的
+        # 唯一入口（前端「已经查清的部分」），而它来自 required_inputs 里
+        # status='answered' 的那些。只写"还开着的问题"，模型在调查里**自己核对
+        # 通过**的答案（连同它的 assessment）就永远到不了界面——用户报告的答案能
+        # 上屏、模型核实出来的反而不能，`verified`/`stale`/`unsupported` 三个状态
+        # 无人可见。走专用的投影方法，**不**记 input_requested：那条历史的意思是
+        # "请求您补充信息"，对一条从没问过用户的问题是假的。
+        answered = [q for q in (inv.get('questions') or [])
+                    if q.get('answers') and q.get('status', 'open') != 'open']
+        if answered:
+            store.project_answered_questions(case['id'], [
+                {'request_id': safety_case_request_id(case['id'], q),
+                 'question': str(q.get('statement') or q.get('question')
+                                 or q.get('target_field') or '已查清的问题'),
+                 'fields': [q['target_field']] if q.get('target_field') else [],
+                 'for_professional': q.get('strategy') == 'professional_review',
+                 'why_needed': q.get('why'),
+                 'question_kind': q.get('information_target'),
+                 'question_strategy': q.get('strategy'),
+                 'strategy_history': list(q.get('strategy_history') or []),
+                 'subject_refs': list(q.get('subject_refs') or []),
+                 # 立刻就是"已答"：紧接着的 `_sync_questions_to_case` 会把
+                 # `answered_parts`（含 assessment）与剩余不确定填上。初始值就写成
+                 # 已答，是为了在两次同步之间不留一个"假装还在等回答"的窗口。
+                 'status': 'answered',
+                 'answered_parts': list(q.get('answers') or []),
+                 # 必须写 `answered_against`：`retire_stale_answers` 按它判断
+                 # "这条回答是不是针对旧记录版本给的"。不写就会被读成"版本对不上"
+                 # 而**立刻重开**——一条刚核对通过的答案会退回"等您补充"。
+                 'answered_against': dict(q.get('dependency_version') or versions),
+                 'asked_at': None}
+                for q in answered[:MAX_CLAIMS]],
+                command_key=f"{task['id']}:projected:{len(task['runs'])}")
+
         task['missing_inputs'] = [
             {'request_id': safety_case_request_id(case['id'], q),
              'field': q.get('target_field'), 'question': q.get('statement'),
@@ -734,7 +769,17 @@ class CareTasks:
                 'value': str(value), 'field': question.get('target_field'),
                 'source': 'user_answer', 'provenance': 'user_reported',
                 'answer_ref': f'care-task-input:{key}', 'origin': 'user',
-                'still_uncertain': ['尚未与权威记录或材料核对']})
+                'still_uncertain': ['尚未与权威记录或材料核对'],
+                # 缺 assessment 就是"未核实"（CONTRACT §3.4）。对一条**有真实提交
+                # 记录**的用户报告来说，那会丢掉一个事实：它确实有一份来源（这次
+                # 提交本身），只是还没与权威记录或材料核对过。§3.5 规定 user_reported
+                # 记 `candidate`，且**不得**仅因用户陈述就 verified——所以这里既不
+                # 留空、也不升级。dependency_refs 为空是如实的：这条答案不派生自任何
+                # 版本化记录，它派生的对象是这次提交。
+                'assessment': {
+                    'status': 'candidate',
+                    'reason': '用户报告：来源是这次提交本身，尚未与权威记录或材料核对',
+                    'source_ref': None, 'locator': None, 'dependency_refs': []}})
             changed = True
         if changed:
             task['investigation'] = investigation.to_dict()

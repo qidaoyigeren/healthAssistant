@@ -464,7 +464,14 @@ class CitationTests(AcceptanceTest):
     def _provider(seen: list):
         """脚本化规划器：检索 → 回读 → 拿**真实回读过的**原文当引文，
         去支撑一句与它毫无关系的答案。
+
+        `source_ref` 必须给出：A 之后，`answer_question` 要求模型**指认**
+        自己依据的是哪一条来源（服务端按真实记录解析这个引用，不信自报的种类）。
+        少了它，这次提交连采纳层都到不了——那样验的就不是"引文能不能支撑答案"，
+        而是"缺参数会不会被拒"，是另一回事。
         """
+        state = {'evidence_id': None}
+
         def provider(payload):
             inv = payload['investigation']
             seen.append(inv)
@@ -485,75 +492,76 @@ class CitationTests(AcceptanceTest):
                 gap = _gap_for(inv, 'read_evidence')
                 if gap is None:
                     return {'decision': 'respond'}
+                state['evidence_id'] = unread[0]
                 return {'decision': 'tool', 'tool': 'read_evidence', 'gap_id': gap,
                         'expected_observation': '回读原文之后才谈得上引用',
                         'arguments': {'evidence_id': unread[0]}}
             question = (inv['questions'] or [{}])[0]
             if question.get('information_state') != 'available':
+                if not state['evidence_id']:
+                    return {'decision': 'respond'}
                 return {'decision': 'tool', 'tool': 'answer_question',
                         'gap_id': question.get('question_id'),
                         'expected_observation': '把这条答案落到问题上',
                         'arguments': {'question_id': question.get('question_id'),
                                       'source': 'evidence',
+                                      'source_ref': state['evidence_id'],
                                       'value': UNRELATED_VALUE,
                                       'field': 'schedule',
                                       'quote': QUOTE_TEXT}}
             return {'decision': 'respond'}
         return provider
 
-    def _quoted_answers(self, task: dict) -> list[dict]:
+    def _attempt_and_question(self, key: str) -> tuple[dict, dict]:
+        """跑一次脚本化调查，返回 (care task, 那条问题)。"""
+        seen: list = []
+        task = self.run_investigation(self._provider(seen), key)
         questions = self.questions_of(task)
         self.assertTrue(questions, '脚本化调查应当建立一条问题')
-        quoted = [answer for answer in (questions[0].get('answers') or [])
-                  if answer.get('quote')]
-        self.require_implemented(
-            bool(quoted),
-            '引文路径没有产出任何带 quote 的答案元素',
-            evidence=f'该问题的答案 {len(questions[0].get("answers") or [])} 条，'
-                     f'带 quote 的 {len(quoted)} 条；'
-                     f'内容状态={questions[0].get("information_state")!r}')
-        return quoted
+        return task, questions[0]
 
-    def test_a_read_back_quote_is_recorded_verbatim_alongside_its_answer(self):
-        """先确认前提：基线**确实**会让一段真实回读的引文支撑一句无关的答案。
+    def test_the_unrelated_quote_was_really_read_back_first(self):
+        """先确认前提：那条引文**确实被回读过**。
 
-        这条不是缺陷报告，它记录的是 A 要解决的问题真的存在——如果这一条
-        不成立，后面那条"引文不应让无关答案 verified"就无从谈起。
+        没有这一条，后面的"它没让答案变成已核对"就可能是因为引文根本
+        没读到——那是另一回事，也说明不了 A 解决了什么。
         """
-        task = self.run_investigation(self._provider([]), 'citation-0')
-        quoted = self._quoted_answers(task)
-        self.assertEqual(QUOTE_TEXT, quoted[-1].get('quote'),
-                         '引文必须是**回读过的**原文片段，逐字一致')
-        self.assertEqual(UNRELATED_VALUE, quoted[-1].get('value'))
-        self.assertEqual('evidence', quoted[-1].get('source'))
-        self.assertEqual('reference_evidence', quoted[-1].get('provenance'))
+        task, question = self._attempt_and_question('citation-0')
+        read = [step for step in (question.get('attempts') or [])
+                if step.get('tool') == 'read_evidence' and step.get('ok')]
+        self.assertTrue(read, f'回读没有发生，前提不成立：{question.get("attempts")}')
+        self.assertNotEqual('available', question.get('information_state'))
 
     def test_a_real_quote_does_not_make_an_unrelated_answer_verified(self):
-        """引文真实存在、确实被回读过，但它支持不了这句话 —— 那就不能算"已核对"。
+        """引文真实存在、确实被回读过，但它支持不了这句话 —— 那就不算"已核对"。
 
-        `_source_supports` 只证明引文**读过**，不证明引文**支持**答案。
-        `assessment.status` 若在这种情况下仍是 `verified`，这四个字就不承载信息。
+        基线只证明引文**读过**，不证明引文**支持**答案（`_source_supports`）。
+        A 之后这件事被做成了结构性的：这种提交在**支持关系**那一段就被拒，
+        既不写下答案元素，也不留下任何 `verified`。
         """
-        seen: list = []
-        provider = self._provider(seen)
-        task = self.run_investigation(provider, 'citation-1')
-        quoted = self._quoted_answers(task)
+        _task, question = self._attempt_and_question('citation-1')
 
-        assessments = _assessments(quoted)
-        self.require_implemented(
-            bool(assessments),
-            '答案元素上没有 assessment 键（A 的交付尚未落到记录里）',
-            evidence=f'答案元素键：{sorted(quoted[-1].keys())}')
+        assessments = _assessments(question.get('answers') or [])
+        for assessment in assessments:
+            self.assertIn(assessment.get('status'), ASSESSMENT_STATUSES,
+                          f'assessment.status 取值超出冻结集合：{assessment["status"]!r}')
+        self.assertNotIn(
+            'verified', {item.get('status') for item in assessments},
+            '一段真实回读、但与答案无关的引文让答案变成了 verified——'
+            '「已核对」在这种情况下不承载任何信息。')
+        self.assertNotEqual(
+            'available', question.get('information_state'),
+            '引文读过 ≠ 引文支持：这条问题不该被读成"已有依据"')
 
-        for answer in quoted:
-            status = (answer.get('assessment') or {}).get('status')
-            self.assertIn(status, ASSESSMENT_STATUSES,
-                          f'assessment.status 取值超出冻结集合：{status!r}')
-            self.assertNotEqual(
-                'verified', status,
-                '一段真实回读、但与答案无关的引文被判定为 verified——'
-                '「已核对」在这种情况下不承载任何信息。'
-                f'答案={answer.get("value")!r} 引文={answer.get("quote")!r} ')
+        rejected = [step for step in (question.get('attempts') or [])
+                    if step.get('tool') == 'answer_question' and step.get('rejected')]
+        self.assertTrue(
+            rejected,
+            '这条不受支持的提交既没有被拒、也没有留下可判定的 assessment——'
+            f'那它到底被怎么处理了？问题状态={question.get("information_state")!r} '
+            f'答案={question.get("answers")}')
+        self.assertIn('quote_does_not_state_value', rejected[-1]['rejected'],
+                      f'拒的理由应当是"引文没有陈述这个答案"：{rejected[-1]}')
 
 
 # ---------------------------------------------------------------------------
@@ -619,7 +627,17 @@ class SelfReportedSourceTests(AcceptanceTest):
                 '「用户说的一句话」被判成了已核对——自述来源不能制造真实记录')
 
     def test_a_professional_opinion_is_never_verified(self):
-        """模型自称"这是专业意见"，不能变成一条已核实的记录。"""
+        """模型自称"这是专业意见"，不能变成一条已核实的记录。
+
+        本项目**没有连接真实医护服务**，所以 `professional` 不是模型能声明的
+        来源种类：服务端在**解析来源**那一步就把它挡掉，而不是"记下来但不置
+        verified"。提交被拒是更强的保证——一条根本不存在的记录，不会被谁
+        误读成依据。
+
+        （这条在基线是"未测到"：当时没有任何闸门，模型自报即可采纳。）
+        """
+        emitted = {'professional': 0}
+
         def provider(payload):
             inv = payload['investigation']
             if not (inv.get('questions') or []):
@@ -628,61 +646,136 @@ class SelfReportedSourceTests(AcceptanceTest):
                                 strategy='general_reference', field='schedule')
             question = (inv['questions'] or [{}])[0]
             if question.get('information_state') != 'available':
+                emitted['professional'] += 1
                 return {'decision': 'tool', 'tool': 'answer_question',
                         'gap_id': question.get('question_id'),
                         'expected_observation': '把"专业意见"记下来',
                         'arguments': {'question_id': question.get('question_id'),
                                       'source': 'professional',
+                                      'source_ref': 'professional:note:1',
                                       'value': '药师说可以继续合用',
                                       'field': 'schedule'}}
             return {'decision': 'respond'}
 
         task = self.run_investigation(provider, 'professional-source')
-        answers = (self.questions_of(task)[0].get('answers') or [])
-        professional = [answer for answer in answers
-                        if answer.get('provenance') == 'professional_opinion'
-                        or answer.get('source') == 'professional']
-        self.require_implemented(
-            bool(professional),
-            '「专业意见」来源没有产出任何答案元素（调查路径未采纳）',
-            evidence=f'答案 {len(answers)} 条；provenance 取值'
-                     f'{[answer.get("provenance") for answer in answers]}')
-        assessments = _assessments(professional)
-        self.require_implemented(
-            bool(assessments),
-            '专业意见的答案元素上没有 assessment 键（A 的交付尚未落到记录里）',
-            evidence=f'答案元素键：{sorted(professional[-1].keys())}')
-        for answer in professional:
-            self.assertNotEqual('verified', answer['assessment'].get('status'),
-                                '模型自报的「专业意见」被判成了已核对')
+        self.assertTrue(
+            emitted['professional'],
+            '脚本没有真的提交过这条"专业意见"——那样这条用例什么都没验到')
+        question = self.questions_of(task)[0]
+        answers = question.get('answers') or []
+        self.assertFalse(
+            [answer for answer in answers
+             if answer.get('provenance') == 'professional_opinion'
+             or answer.get('source') == 'professional'],
+            f'模型自报的专业意见被记成了答案：{answers}')
+        self.assertNotIn('verified',
+                         {a.get('status') for a in _assessments(answers)},
+                         '模型自报的「专业意见」被判成了已核对')
+        self.assertNotEqual('available', question.get('information_state'),
+                            '没有专业复核记录，这条问题不该被读成"已有依据"')
 
     def test_the_status_is_not_a_single_constant(self):
-        """不能永远只吐一个值 —— 否则前面所有「不得 verified」都虚假通过。"""
-        observed: set[str] = set()
-        provider = self._provider([])
-        task = self.run_investigation(provider, 'constant-1')
-        case_id = self.api.cases()[0]['case_id']
-        case = self.api.case(case_id)
-        revision = case['revision']
-        self.api.client.post(
-            f'/v1/safety-cases/{case_id}/answer',
-            json={'key': 'constant-answer', 'expected_revision': revision,
-                  'request_id': case['required_inputs'][0]['request_id'],
-                  'value': '每天一次'})
-        stored = self.api.product.get(task['id'], 'care_task')
-        answers = self.questions_of(stored)[0].get('answers') or []
-        observed |= {answer['assessment']['status'] for answer in answers
-                     if isinstance(answer.get('assessment'), dict)
-                     and answer['assessment'].get('status')}
+        """不能永远只吐一个值 —— 否则前面所有「不得 verified」都虚假通过。
 
-        self.require_implemented(
-            bool(observed),
-            '答案元素上没有 assessment 键（A 的交付尚未落到记录里）',
-            evidence=f'答案 {len(answers)} 条，assessment {len(observed)} 种')
-        self.require_implemented(
-            len(observed) > 1,
-            '本轮能造出的情形只产出了一致的 status；无法证明它不是一个常量',
-            evidence=f'观察到的取值：{sorted(observed)}')
+        同一件事项上造出**两种**情形：
+
+        * 模型对着**当前权威记录**回答（对象、值、状态逐项核对）→ `verified`；
+        * 用户在补问里回答同一件事的另一面 → 用户报告，只能到 `candidate`。
+
+        两种 status 必须同时出现。若实现只会吐一个值，前面每一条"不得 verified"
+        都是虚假通过。
+        """
+        seen_evidence = {'ref': None}
+        # 情形二要真的检索并回读：语料挂上，否则它连"有依据未核对"都到不了。
+        self.rag_factory = SyntheticRAG
+
+        def provider(payload):
+            inv = payload['investigation']
+            questions = inv.get('questions') or []
+            if not questions:
+                return {'decision': 'tool', 'tool': 'plan_questions',
+                        'gap_id': 'subquestions',
+                        'expected_observation': '问题集建立',
+                        'arguments': {'questions': [
+                            {'statement': '合成药乙现在还是有效的用药吗？',
+                             'information_target': 'patient_actual_state',
+                             'strategy': 'patient_record',
+                             'subject_refs': ['合成药乙'],
+                             'target_field': 'status',
+                             'why': '是否仍在用药决定这条提示是否成立'},
+                            {'statement': '合成药甲贮存上要注意什么？',
+                             'information_target': 'general_reference',
+                             'strategy': 'general_reference',
+                             'subject_refs': ['合成药甲'],
+                             'target_field': 'storage_note',
+                             'why': '贮存条件影响这条提示是否成立'}]}}
+            record = next((item for item in
+                           ((inv.get('facts') or {}).get('medications') or [])
+                           if item.get('display_name') == '合成药乙'), None)
+            from_record = next((q for q in questions
+                                if q.get('target_field') == 'status'), None)
+            from_reading = next((q for q in questions
+                                 if q.get('target_field') == 'storage_note'), None)
+            # 情形一：对着**当前权威记录**逐项核对 → 应当 verified。
+            if (record and from_record
+                    and from_record.get('information_state') != 'available'):
+                return {'decision': 'tool', 'tool': 'answer_question',
+                        'gap_id': from_record.get('question_id'),
+                        'expected_observation': '按当前权威记录回答',
+                        'arguments': {'question_id': from_record.get('question_id'),
+                                      'source': 'patient_record',
+                                      'source_ref': record.get('ref'),
+                                      'value': record.get('status'),
+                                      'field': 'status'}}
+            # 情形二：引文属实、但问题是**开放字段** → 支持关系无法机械核对，
+            # 只能到 candidate。
+            if from_reading and from_reading.get('information_state') != 'available':
+                if not inv.get('evidence_searched_count'):
+                    gap = _gap_for(inv, 'rag_search')
+                    if gap:
+                        return {'decision': 'tool', 'tool': 'rag_search', 'gap_id': gap,
+                                'expected_observation': '检索说明书原文',
+                                'arguments': {'query': '合成药甲 贮存'}}
+                unread = inv.get('evidence_unread') or []
+                if unread:
+                    seen_evidence['ref'] = unread[0]
+                    gap = _gap_for(inv, 'read_evidence')
+                    if gap:
+                        return {'decision': 'tool', 'tool': 'read_evidence',
+                                'gap_id': gap,
+                                'expected_observation': '回读原文',
+                                'arguments': {'evidence_id': unread[0]}}
+                if seen_evidence['ref']:
+                    return {'decision': 'tool', 'tool': 'answer_question',
+                            'gap_id': from_reading.get('question_id'),
+                            'expected_observation': '把读到的内容记成候选答案',
+                            'arguments': {'question_id': from_reading.get('question_id'),
+                                          'source': 'evidence',
+                                          'source_ref': seen_evidence['ref'],
+                                          'value': '避光密封，阴凉干燥处保存',
+                                          'field': 'storage_note',
+                                          'quote': QUOTE_TEXT}}
+            return {'decision': 'respond'}
+
+        task = self.run_investigation(provider, 'constant-1')
+        answers = [answer for question in self.questions_of(task)
+                   for answer in (question.get('answers') or [])]
+        observed = {answer['assessment']['status'] for answer in answers
+                    if isinstance(answer.get('assessment'), dict)
+                    and answer['assessment'].get('status')}
+        self.assertTrue(
+            observed,
+            '答案元素上没有 assessment 键（A 的交付尚未落到记录里）：'
+            f'{[(a.get("source"), sorted(a.keys())) for a in answers]}')
+        self.assertIn('verified', observed,
+                      f'对当前权威记录逐项核对通过的答案没有出现 verified：{observed}')
+        self.assertNotIn(
+            'verified', {a['assessment']['status'] for a in answers
+                         if a.get('field') == 'storage_note'
+                         and isinstance(a.get('assessment'), dict)},
+            '引文属实、但问题是开放字段，支持关系无法机械核对——不该是 verified')
+        self.assertIn('candidate', observed,
+                      f'开放字段的引文答案没有出现 candidate：{observed}')
 
 
 # ---------------------------------------------------------------------------
@@ -1121,6 +1214,13 @@ class ArrangementTriggersOnceTests(AcceptanceTest):
 # ---------------------------------------------------------------------------
 class CancelledArrangementStopsTests(AcceptanceTest):
     def test_cancelling_stops_the_arrangement_from_advancing_again(self):
+        """已经到期、但还没被扫描到的安排被取消之后，不得再被推进。
+
+        这一条是**负例**，所以必须能证明"不取消就会触发"：同一条到期安排在
+        `test_rescheduling_replaces_the_old_due_time` 与
+        `ArrangementTriggersOnceTests` 里都有正向对照。取消发生在第一次
+        `pump` **之前**——已经执行过的安排本就不可取消（409），那不是这条要验的。
+        """
         case = self.api.seed_one_case()
         case_id = case['case_id']
         status, body = self.monitoring_case(case_id, {
@@ -1132,9 +1232,6 @@ class CancelledArrangementStopsTests(AcceptanceTest):
             'POST /v1/safety-cases/{id}/follow-up 不存在（B 的交付尚未落地）',
             evidence=f'探测返回 {code}')
 
-        self.api.pump(rounds=2)
-        triggered = self.api.case(case_id)['follow_up'].get('last_triggered_at')
-
         cancelled = self.api.client.post(
             FOLLOW_UP_PATH.format(case_id=case_id),
             json={'key': 'stop-cancel',
@@ -1145,8 +1242,8 @@ class CancelledArrangementStopsTests(AcceptanceTest):
         self.api.pump(rounds=3)
         after = self.api.case(case_id)['follow_up']
         self.assertEqual('cancelled', after['schedule_state'])
-        self.assertEqual(triggered, after.get('last_triggered_at'),
-                         '取消之后又被扫描触发了一次——已取消的安排不得继续推进')
+        self.assertIsNone(after.get('last_triggered_at'),
+                          '已取消的安排仍然被扫描触发了——取消没有让旧安排失效')
 
     def test_rescheduling_replaces_the_old_due_time(self):
         """改期之后，**旧**的到期时刻不再触发。"""
@@ -1204,15 +1301,22 @@ class FollowUpFailureTests(AcceptanceTest):
             'POST /v1/safety-cases/{id}/follow-up 不存在（B 的交付尚未落地）',
             evidence=f'探测返回 {code}')
 
-        state_before = self.api.case(case_id)['follow_up'].get('schedule_state')
+        before = self.api.case(case_id)
+        state_before = before['follow_up'].get('schedule_state')
+        # 进入持续跟进时本来就登记了一条"凭什么说风险还在"的记录
+        # （`kind='monitoring_arrangement'`）。它不是关闭依据，也不该被这次失败
+        # 改写——要验的是**失败没有制造新的依据**，不是"这里必须什么都没有"。
+        basis_before = before['resolution_basis']
+        self.assertIsNotNone(basis_before, '持续跟进应当登记它凭什么说风险还在')
+
         self.rebuild(agent_error=RuntimeError('acceptance: agent unavailable'))
         self.api.pump(rounds=3)
 
         after = self.api.case(case_id)
         self.assertNotEqual(sc.STATUS_RESOLVED, after['status'],
                             '跟进运行失败却把事项关掉了')
-        self.assertIsNone(after['resolution_basis'],
-                          '没有任何依据却留下了处置依据')
+        self.assertEqual(basis_before, after['resolution_basis'],
+                         '一次失败的跟进运行改写了处置依据')
         self.assertIn(after['status'], sc.UNSETTLED_STATUSES,
                       f'失败之后事项必须仍然是未解决的：{after["status"]}')
         self.assertTrue(after['next_action_summary'],
@@ -1221,16 +1325,128 @@ class FollowUpFailureTests(AcceptanceTest):
         follow_up = after.get('follow_up') or {}
         state = follow_up.get('schedule_state')
         if state == 'blocked':
+            # 安排**本身**没能落地：必须写明为什么，否则"卡住"和"在等"分不开。
             self.assertTrue(follow_up.get('blocked_reason'),
                             '进入 blocked 必须带上原因，否则"卡住"和"在等"分不开')
-        else:
-            self.assertEqual(
-                state_before, state,
-                '失败之后状态必须要么进 blocked，要么**原样不动**；'
-                f'不能悄悄前进到看起来正常的状态：{state!r}')
-            self.skipTest(
-                '基线缺失/等待实现：跟进失败没有在任何字段上留下痕迹'
-                f'（schedule_state 仍为 {state!r}，也无 blocked_reason）')
+            return
+        # 另一种（也是这里实际发生的）失败形态：安排**确实触发了**，失败发生在
+        # 它启动的那次调查里。那时 `schedule_state` 前进到 triggered 是对的——
+        # 要验的是失败**看得见**，而不是把合法的前进当成缺陷。
+        self.assertEqual('triggered', state,
+                         f'失败之后安排停在一个含混的状态：{state!r}')
+        self.assertTrue(follow_up.get('last_triggered_at'),
+                        'triggered 必须留下触发时间')
+        self.assertTrue(follow_up.get('care_task_id'),
+                        'triggered 必须指向它启动的那次执行任务')
+        runs = [task for task in self.api.product.objects('care_task')
+                if task.get('goal_type') == 'safety_case'
+                and task.get('safety_case_id') == case_id
+                and task['id'] == follow_up['care_task_id']]
+        self.assertTrue(runs, f'关联的执行任务不存在：{follow_up["care_task_id"]}')
+        self.assertEqual('failed', runs[0]['status'],
+                         '调查失败了，关联的执行任务却不是 failed——失败不可见')
+
+
+# ---------------------------------------------------------------------------
+# 十一、整条闭环接得上吗（集成阶段新增）
+#
+# 每一环各自的验收在别的类别里。这一条只回答一个问题：把它们**串起来**跑，
+# 接得上吗——尤其是 A 的 assessment 有没有经过 B 的投影原样到得了消费方，
+# 以及到期触发是不是在**同一件事项**上增量恢复，而不是另起一件。
+# ---------------------------------------------------------------------------
+class IntegrationClosureTests(AcceptanceTest):
+    @staticmethod
+    def _provider():
+        """脚本化规划器：只对**当前权威记录**回答一条问题。
+
+        这不是模型能力测试——它验证的是确定性系统与接口衔接（脚本规划器）。
+        """
+        def provider(payload):
+            inv = payload['investigation']
+            questions = inv.get('questions') or []
+            if not questions:
+                return _declare('合成药乙现在还是有效的用药吗？',
+                                strategy='patient_record', field='status')
+            record = next((item for item in
+                           ((inv.get('facts') or {}).get('medications') or [])
+                           if item.get('display_name') == '合成药乙'), None)
+            question = questions[0]
+            if record and question.get('information_state') != 'available':
+                return {'decision': 'tool', 'tool': 'answer_question',
+                        'gap_id': question.get('question_id'),
+                        'expected_observation': '按当前权威记录回答',
+                        'arguments': {'question_id': question.get('question_id'),
+                                      'source': 'patient_record',
+                                      'source_ref': record.get('ref'),
+                                      'value': record.get('status'),
+                                      'field': 'status'}}
+            return {'decision': 'respond'}
+        return provider
+
+    def test_the_whole_chain_runs_on_one_case(self):
+        """相关变化 → 检查 → 事项 → 取得信息 → 可信答案可见 → 确认跟进 →
+        到期触发 → **同一事项**增量恢复。"""
+        # 一、相关变化与必要安全检查 → 建立事项
+        seeded = self.api.seed_one_case()
+        case_id = seeded['case_id']
+        self.assertTrue(seeded['status'], '事项必须有状态')
+        self.assertEqual(1, len(self.api.cases()), '应当恰好一件事项')
+
+        # 二、取得信息 → 可信答案，并且**经过投影**到了消费方看得见的地方
+        task = self.run_investigation(self._provider(), 'closure-1', seed=False)
+        answers = [answer for question in self.questions_of(task)
+                   for answer in (question.get('answers') or [])]
+        self.assertTrue(answers, '脚本化调查没有产出任何答案元素')
+        assessed = _assessments(answers)
+        self.assertTrue(assessed, '答案元素上没有 assessment（A 的交付没落到记录里）')
+        self.assertEqual('verified', assessed[-1]['status'],
+                         f'A 的判定没有给出 verified：{assessed[-1]}')
+
+        view = self.api.case(case_id)
+        projected = _answer_elements(view)
+        self.assertTrue(projected, '事项投影里没有答案元素——A 的产出到不了消费方')
+        self.assertEqual(assessed[-1], projected[-1].get('assessment'),
+                         'assessment 必须经过投影**原样**到达消费方（§3.6）')
+
+        # 三、确认跟进安排：安排（未确认）→ 确认（有一条真实确认记录）
+        status, body = self.monitoring_case(case_id, {
+            'kind': 'review_at', 'at': PAST, 'owner': 'caregiver'})
+        self.assertEqual(200, status, body)
+        follow_up = body['follow_up']
+        self.assertFalse(follow_up['confirmed'], '给了时间不等于有人确认过')
+        self.assertEqual('scheduled', follow_up['schedule_state'])
+
+        # 确认要在它被扫描到**之前**：已经触发过的安排不再可确认（409）。
+        confirmed = self.api.client.post(
+            CONFIRMATION_PATH.format(case_id=case_id),
+            json={'key': 'closure-confirm',
+                  'expected_revision': self.api.case(case_id)['revision'],
+                  'note': '已知悉'})
+        self.assertEqual(200, confirmed.status_code, confirmed.text)
+        follow_up = confirmed.json()['follow_up']
+        self.assertTrue(follow_up['confirmed'])
+        self.assertTrue(follow_up['confirmation_ref'],
+                        'confirmed 必须指向一条真实的确认记录')
+
+        # 四、到期触发
+        self.api.pump(rounds=3)
+        after = self.api.case(case_id)['follow_up']
+        self.assertEqual('triggered', after['schedule_state'],
+                         f'已确认且已到期的安排没有执行：{after}')
+        care_task_id = after['care_task_id']
+        self.assertTrue(care_task_id)
+
+        # 五、**同一事项**增量恢复：不是另起一件，而且早先那条答案还在
+        runs = [item for item in self.api.product.objects('care_task')
+                if item['id'] == care_task_id]
+        self.assertEqual([case_id], [item['safety_case_id'] for item in runs],
+                         '到期触发的调查必须落在同一件事项上')
+        self.assertEqual(sc.STATUS_MONITORING, self.api.case(case_id)['status'],
+                         '一次跟进调查不该把事项的持续跟进状态抹掉')
+        still_there = _answer_elements(self.api.case(case_id))
+        self.assertTrue(
+            [item for item in still_there if item.get('assessment')],
+            '增量恢复之后，先前那批带着 assessment 的答案不见了')
 
 
 # ---------------------------------------------------------------------------
@@ -1287,7 +1503,7 @@ CATEGORY_OF = {
         'test_claim_support_is_not_inferred_from_a_shared_entity_name',
         'test_a_question_read_as_available_can_name_its_answer'),
     'citation_cannot_support_an_unrelated_answer': (
-        'test_a_read_back_quote_is_recorded_verbatim_alongside_its_answer',
+        'test_the_unrelated_quote_was_really_read_back_first',
         'test_a_real_quote_does_not_make_an_unrelated_answer_verified',),
     'self_reported_source_cannot_make_a_record': (
         'test_a_user_answer_is_kept_with_its_source_and_does_not_close_the_case',

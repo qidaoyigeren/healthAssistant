@@ -418,8 +418,13 @@ def scan_follow_ups(memory, product, *, now: str | None = None) -> list[dict]:
     registered: list[dict] = []
     for case in store.objects():
         follow_up = project_follow_up(case.get('follow_up'))
-        if not follow_up or not follow_up.get('confirmed'):
+        if not follow_up:
             continue
+        # **不把 `confirmed` 当成可执行的前置条件。** CONTRACT §4.5 把"已安排"与
+        # "已确认"定成两件事：确认记录回答的是"谁承诺了这件事"，不是"这条安排存不
+        # 存在"。拿它做闸门会让每一条经由处置端点建立的安排在到期后**永远停在
+        # scheduled**——而处置端点是本轮之前唯一的写入路径，它产出的 confirmed
+        # 恒为 false，等于整个长期跟进对主要路径失效。
         if follow_up.get('schedule_state') not in (SCHEDULE_SCHEDULED, SCHEDULE_DUE,
                                                    SCHEDULE_BLOCKED):
             continue
@@ -501,33 +506,145 @@ def _stamp(product, case_id: str, *, expected_revision, state: str,
 
 
 # ---- 执行 ---------------------------------------------------------------------
+def _ref_head(ref) -> str:
+    """引用的"版本号之前"部分：``memory:medication:45@v2`` → ``memory:medication:45``。
+
+    版本的真实形状是 ``@v<数字>``（``answer_grounding.parse_versioned_ref`` 只认它）；
+    解析不出来的原样返回——**不猜**它在指哪条记录。
+    """
+    from .answer_grounding import parse_versioned_ref
+    parsed = parse_versioned_ref(ref)
+    return parsed[0] if parsed else str(ref or '')
+
+
 def recheck_answer_dependencies(product, case: dict, *, changed_refs=(),
                                 reason: str | None = None) -> dict:
-    """向 A 的答案依赖接口提请重新核对**相关**答案。
+    """记录变了之后，请 A 的接口判定**哪几条**答案不再算已核对，并把结果搬回去。
 
-    B 只做两件事：把"哪些记录变了"交给约定接口，再把结果搬回去。**答案是否仍然
-    成立、哪一条受影响，由 A 判定**——B 不复制一套答案判定规则。
+    边界分工（CONTRACT §3.6）：B 只做两件事——把"哪些记录变了"交过去、把结果搬
+    回来。**一条答案现在还成不成立、哪一条受影响，由 A 判定**：这里调用的
+    `answer_grounding.revalidate` / `dependency_state` 就是答案写入时用的同一套
+    判定，B **不复制**第二套规则，也不新建第二套版本机制。
 
-    这一点很重要：把所有已答问题一律重开，会把一次局部变化放大成一次全面重问，
-    用户会觉得"它又把什么都问了一遍"。相关性判断是 A 的交付物。
+    三条守住的性质，和"把所有已答问题一律重开"划清界限：
 
-    A 尚未交付时如实返回 `unavailable`，并且**不写任何东西**：编一个"未核实"不算
-    核对，只会让界面显示一个没人做过的结论。
+    * **只动受影响的。** 传了 `changed_refs` 就只处理依赖里确实牵涉到那些引用的
+      答案。一次局部变化不该放大成一次全面重问。
+    * **只降不升。** A 的 `revalidate` 只会走到 `stale` / `unsupported`。
+    * **没有 assessment 的老答案一个字节都不写**（§3.4）：缺失就是"未核实"，
+      给它们补一个状态等于凭空造出一条核对记录。
+
+    A 的判定接口不可用时如实返回 `unavailable` 并且**不写任何东西**——编一个
+    "未核实"不算核对，只会让界面显示一个没人做过的结论。
     """
     try:
-        from . import answer_grounding
+        from . import answer_grounding as ag
     except ImportError:
         return {'status': 'unavailable',
                 'reason': 'A 的答案依赖接口（stage0/answer_grounding.py）尚未交付；'
                           '本次不改变任何答案的核对状态'}
-    hook = getattr(answer_grounding, 'recheck_dependencies', None)
-    if hook is None:
+    if not hasattr(ag, 'revalidate'):
         return {'status': 'unavailable',
-                'reason': 'A 的答案依赖接口尚未提供 recheck_dependencies；'
+                'reason': 'A 的答案依赖接口尚未提供 revalidate；'
                           '本次不改变任何答案的核对状态'}
-    return {'status': 'requested',
-            'result': hook(product, case, changed_refs=list(changed_refs),
-                           reason=reason)}
+
+    from .safety_cases import KIND, SafetyCaseStore
+    store = SafetyCaseStore(product)
+    detail = reason or '来源记录发生变化，这条答案需要重新核对'
+    changed_heads = {_ref_head(ref) for ref in changed_refs or ()}
+    versions = ag.versions_from_snapshot(
+        (product.memory.snapshot() or {}).get('medications') or [])
+
+    checked = affected = 0
+    updated: list[dict] = []
+    unchecked: list[dict] = []
+    projections: dict[str, list] = {}
+    changed_tasks: list[dict] = []
+
+    for task in product.objects('care_task'):
+        if (task.get('goal_type') != 'safety_case'
+                or task.get('safety_case_id') != case.get('id')):
+            continue
+        investigation = task.get('investigation')
+        if not isinstance(investigation, dict):
+            continue
+        touched = False
+        for question in investigation.get('questions') or []:
+            answers = question.get('answers') or []
+            for index, answer in enumerate(answers):
+                assessment = ag.assessment_of(answer)
+                if assessment is None:
+                    continue                     # §3.4：缺失就是缺失，不补
+                checked += 1
+                deps = assessment.get('dependency_refs') or []
+                if changed_heads and not ({_ref_head(ref) for ref in deps}
+                                          & changed_heads):
+                    continue                     # 与这次变化无关：不动
+                state = ag.dependency_state(deps, current_version_of=versions)
+                # 来源**还在不在**由调用方判定（`revalidate` 的口径）。本仓库里
+                # 改剂量会**取代**旧记录：`memory:medication:1@v1` 直接不在当前
+                # 用药集合里了，新记录换了 id（`memory:medication:2@v2`）。所以
+                # "用药类依赖查不到"就是"这条答案依据的那条记录已经不在了" ——
+                # 按 A 的口径走 `withdraw`，不是"没变"。
+                #
+                # 只对**真能查**的这一类下判断。其余依赖（如 `memory:conclusion:`）
+                # 没有版本来源可查，如实记进 `unchecked`，**不猜**、也不当成没变。
+                resolvable = [head for head in state['unknown']
+                              if head.startswith('memory:medication:')]
+                unresolvable = [head for head in state['unknown']
+                                if not head.startswith('memory:medication:')]
+                if unresolvable:
+                    unchecked.append({'question_id': question.get('question_id'),
+                                      'detail': '这些依赖没有可查的版本来源，'
+                                                '本次无法核对：' + '、'.join(unresolvable)})
+                fresh = ag.revalidate(assessment,
+                                      source_available=not resolvable,
+                                      current_version_of=versions, detail=detail)
+                if fresh == assessment:
+                    continue
+                answers[index] = {**answer, 'assessment': fresh}
+                affected += 1
+                touched = True
+                updated.append({'question_id': question.get('question_id'),
+                                'from': assessment.get('status'),
+                                'to': fresh.get('status')})
+            if touched:
+                from .care_tasks import safety_case_request_id
+                projections[safety_case_request_id(case.get('id'), question)] = \
+                    list(answers)
+        if touched:
+            changed_tasks.append(task)
+
+    # 写回是**一个**事务：`product.save` 自己会隐式开事务，逐个写在事务外做，
+    # 后面就再也拿不到 `transaction()`（它要求"由自己开启"）。
+    if changed_tasks or projections:
+        with product.transaction():
+            for task in changed_tasks:
+                task['revision'] = int(task.get('revision') or 0) + 1
+                task['updated_at'] = _now()
+                product.save('care_task', task)
+
+            # 把改动搬到 C 真正消费的那份投影上。`answered_parts` 是**事项上的
+            # 副本**（`care_tasks._sync_questions_to_case` 写入）：只改调查、不重
+            # 投影，前端拿到的仍然是旧状态——"改了但用户看不见"和没改一样。
+            if projections:
+                stored = store.get(case['id'])
+                changed_case = False
+                for request in stored.get('required_inputs') or []:
+                    parts = projections.get(request.get('request_id'))
+                    if parts is not None:
+                        request['answered_parts'] = parts
+                        request['still_uncertain'] = list(
+                            (parts[-1] or {}).get('still_uncertain') or [])
+                        changed_case = True
+                if changed_case:
+                    stored['updated_at'] = _now()
+                    stored['revision'] = int(stored.get('revision') or 0) + 1
+                    product.save(KIND, stored)
+
+    return {'status': 'checked' if checked else 'nothing_to_check',
+            'reason': detail, 'checked': checked, 'affected': affected,
+            'updated': updated, 'unchecked': unchecked}
 
 
 def _active_investigation(product, case_id: str) -> dict | None:
@@ -608,7 +725,7 @@ def run_follow_ups(memory, *, product, tasks=None, now: str | None = None,
             continue
         follow_up = project_follow_up(case.get('follow_up'))
         revision = int((follow_up or {}).get('revision') or 1)
-        if (not follow_up or not follow_up.get('confirmed')
+        if (not follow_up
                 or follow_up.get('schedule_state') == SCHEDULE_CANCELLED
                 or revision != int(row['schedule_revision'])):
             # 安排被改期或取消：旧触发不再执行副作用。

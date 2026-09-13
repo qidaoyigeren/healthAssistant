@@ -814,6 +814,43 @@ class SafetyCaseStore:
                               {'type': 'safety_case_require_input', 'case_id': key,
                                'request_id': request_id}, execute)
 
+    def project_answered_questions(self, key: str,
+                                   requests: Sequence[dict[str, Any]],
+                                   command_key: str | None = None) -> dict[str, Any]:
+        """把**调查自己答上的**问题投影成事项上的已答请求。
+
+        `answered_inputs` 是消费方读取答案的**唯一**入口（前端「已经查清的部分」
+        就读它），而它来自 `required_inputs` 里 `status='answered'` 的那些。
+        只登记"还开着的问题"，模型在调查里**自己核对通过**的答案（连同它的
+        `assessment`）就永远到不了界面——用户报告的答案能上屏，模型核实出来的
+        反而不能，`verified` / `stale` / `unsupported` 三个状态也就无人可见。
+
+        与 `require_input` 分开是刻意的：那条路径会记一条 `input_requested`
+        历史（"请求您补充信息"）。对一条**从没问过用户**的问题，那是一条假记录。
+
+        这里是**投影**，不是第二份真相：请求内容由调用方从调查状态构造，答案本身
+        仍以调查里的 `question['answers']` 为准。
+        """
+        def execute():
+            case = self.get(key)
+            known = {item['request_id'] for item in case['required_inputs']}
+            added = [dict(item) for item in requests if item.get('request_id') not in known]
+            if not added:
+                return case
+            case['required_inputs'].extend(added)
+            case['updated_at'] = utc_now()
+            case['revision'] += 1
+            self.derive_status(case)
+            self.p.save(KIND, case)
+            return case
+        # 幂等键**必须带调用方给的判别项**（与 `require_input` 同一种做法）：
+        # `ProductStore.command` 对"同一个 key 配不同内容"返回 409，而每跑一次调查
+        # 已答问题的集合都可能变——固定 key 会让第二轮直接撞 409。
+        return self.p.command(command_key or f'{key}:projected-answers',
+                              {'type': 'safety_case_projected_answers', 'case_id': key,
+                               'request_ids': [item.get('request_id') for item in requests]},
+                              execute)
+
     # ---- 处置：关闭 / 转人工 / 持续跟进 --------------------------------------
     def closure_evidence(self, case: dict[str, Any]) -> dict[str, Any]:
         """**关闭所需证据**的现场核对结果。只回答"能不能关"，不做任何写入。

@@ -107,11 +107,20 @@ provider 失败后当作已处理、拿旧版本的复核批准新状态、用**
 ### 长期跟进由持久任务驱动
 
 复用既有的 `outbox_tasks`（事件执行）、`dependency_tasks`（依据失效重查）、
-`care_task`（跨会话调查，含累计预算与租约）、`resume_tasks`（复核恢复）。
-**没有新增调度框架。**
+`care_task`（跨会话调查，含累计预算与租约）、`resume_tasks`（复核恢复），
+以及 `follow_up_runs`（长期跟进：到期或相关记录变化时触发一次调查）。
+跟进队列挂在**同一个** `OutboxWorker` 周期里，排在 `necessary_checks` **之后**——
+确定性检查总是先跑完，才轮到消费这一版模型调查。**没有新增调度框架。**
 
-> **部署要求**：后台 worker 未运行时，`necessary_checks`、`dependency_tasks` 与
-> `outbox_tasks` 都**不会自动推进**——只有用户主动操作时才同步执行。
+> **「已安排」与「已确认」是两件事。** 给一个复查时间**不等于**有人确认过：确认只能
+> 由确认端点产生，并且留下 `confirmed_at` / `confirmation_ref`。系统里没有任何一条路径
+> 会因为你填了时间就把一条安排记成"已确认"。
+>
+> 安排按 `schedule_state` 推进（`scheduled → due → triggered`，失败进 `blocked` 并带原因）；
+> 取消**不清空**时间与条件，只把状态改成 `cancelled`。
+
+> **部署要求**：后台 worker 未运行时，`necessary_checks`、`dependency_tasks`、
+> `outbox_tasks` 与 `follow_up_runs` 都**不会自动推进**——只有用户主动操作时才同步执行。
 > 进程内演示不构成离线持续服务能力。应用内会常驻显示检查队列的真实状态，
 > 「读不到」与「没有问题」是两件事。
 

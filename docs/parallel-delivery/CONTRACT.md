@@ -104,9 +104,9 @@ value, field, source, provenance, source_ref, quote, origin, answer_ref, at, ver
 "assessment": {
   "status": "verified",
   "reason": "引用片段与已读回的证据原文逐字一致",
-  "source_ref": "evidence:8842",
+  "source_ref": "ev-8842",
   "locator": "第 3 段第 2 行",
-  "dependency_refs": ["memory:medication:45@2"]
+  "dependency_refs": ["memory:medication:45@v2"]
 }
 ```
 
@@ -117,6 +117,17 @@ value, field, source, provenance, source_ref, quote, origin, answer_ref, at, ver
 | `source_ref` | `string \| null` | 是（可为 null） | 来源引用。与答案既有 `source_ref` 同源时取同一值 |
 | `locator` | `string \| null` | 是（可为 null） | 字段路径或片段位置；定位不到就 null，**不要编造** |
 | `dependency_refs` | `string[]` | 是（可为空数组） | 版本化依赖引用，见 §1.4 |
+
+> **集成期澄清（2026-09-13，实施后回填）**：本节示例原先写
+> `"source_ref": "evidence:8842"`，而服务端做作用域校验的
+> `investigation._reference_is_visible` 只认 `memory:` / `ev-` / `safety-case:` /
+> `material:` 与材料条目的规范形状 `<case_id>/<item_id>`——按原示例字面产出的
+> 值会被服务端自己的解析器拒绝。示例已改为实际形态 `ev-<id>`。
+> 同理，**版本化引用的真实形状是 `@v<版本号>`**（`memory:medication:45@v2`），
+> 不是 §1.4 示例里的 `@2`：`answer_grounding.parse_versioned_ref` 只认前者，
+> 所以按 §1.4 字面写下 `dependency_refs` 会解析不出任何依赖。
+> 调度侧的条件匹配（`followup_runtime._ref_matches`）按 `@` 切头比较，两种写法
+> 都能匹配——宽松只在那一条边界上。这两处是文档与实现的偏差，不是接口变更。
 
 ### 3.3 status 语义（冻结）
 
