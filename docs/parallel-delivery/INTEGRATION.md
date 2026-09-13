@@ -315,4 +315,14 @@ node scripts/safety-mainline-browser-acceptance.js \
 
 - 分支：`integration/parallel-delivery`（从 `01d208d` 起）
 - 合并顺序：A → B → C → D，均 `--no-ff` 保留各自历史
-- 集成提交：见本文件同批次的 `Integrate: …` 提交
+- 集成提交：**`3fcff86`**（`Integrate: four deliveries meet at the seams, and four of them
+  do not fit`），其下是四个 `--no-ff` 合并提交：`de5bd8c`(A) → `560ee1d`(B) →
+  `317516a`(C) → `7823822`(D)
+- **§4 的全部数字是在 `3fcff86` 这棵树上跑出来的**，中间没有在跑的编辑：
+  全量离线检查 `output/parallel/integration/at-commit/`、D 的验收
+  `output/parallel/integration/final/acceptance.json`、浏览器
+  `output/parallel/integration/final/browser/`（后两者的代码与 `3fcff86` 逐字节相同，
+  之后只动过文档与注释）
+- 原工作区 `D:\py\HealthAssistant` **全程未被触碰**：`HEAD` 仍是 `984c600`，
+  `git status --porcelain` 仍是 120 行，与 [OWNERSHIP.md §5](./OWNERSHIP.md) 里
+  制作基线时的指纹一致
