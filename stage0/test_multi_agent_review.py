@@ -82,7 +82,13 @@ class MultiAgentReviewTests(unittest.TestCase):
         # Divergences are recorded, not voted away.
         self.assertTrue(any(d['kind'] == 'support_and_opposition_coexist' for d in review['divergences']),
                         review['divergences'])
-        self.assertGreater(review['usage']['calls'], 0)
+        # Exact accounting, not "at least one call": this default path runs the
+        # deterministic workers, so the counts are fixed — 2 checker verdicts
+        # over 4 cycles and NO model call at all (the sibling test pins the
+        # exact ``model_calls`` the same way for the model path).
+        self.assertEqual(2, review['usage']['calls'])
+        self.assertEqual(4, review['usage']['cycles'])
+        self.assertNotIn('model_calls', review['usage'])
         self.assertFalse(review['usage']['usage_unknown'])
 
     def test_worker_cannot_expand_parent_scope(self):

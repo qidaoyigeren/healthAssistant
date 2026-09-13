@@ -1,0 +1,280 @@
+{
+  "created_at": "2026-09-12T10:57:38.782869+00:00",
+  "before_live_calls": true,
+  "source_files": {
+    "scripts/model-tool-controlled.py": "8414ae2f157ce4df4eaf268e4ac5567ae677c98c4072622849140cf3d338eb73",
+    "stage0/acquire.py": "308c5a49490afaa32887fe16911cfd1dad79def6205d36a72dcd5b7237edf105",
+    "stage0/agent.py": "9c1e75fd068c6764cee0724bfaa4bcfc82c2d0db01db9299d9ca6211a28529b7",
+    "stage0/agent_closeout_fixture.py": "97982646db49e6bb176800b804672794916c16f3ba54e8a4499fe71f98a9380f",
+    "stage0/agent_evals/__init__.py": "c959f799c67a8f9bdb1177d34a541acf78a8780b6de35b23a1a6cee45f4228cc",
+    "stage0/agent_evals/batch_budget.py": "8ef89d5b6ff608e68c79df46ea2620cb8615d1e6f24ff542ed4ef3565bb8388a",
+    "stage0/agent_evals/rescore.py": "77370c5cac9b25a0d397eba7b8dcbde7ca6006634b2bf815acd35ee53fdbf1d3",
+    "stage0/agent_evals/run_eval.py": "5ee7bfdde052d296149935096feef10224407765c85f7ee8135a3faef3104e38",
+    "stage0/agent_evals/run_visitprep.py": "3fa1960697ab60eef0889dd1c8d7d4395ed859a3a236891dc19d0d7853cd0e69",
+    "stage0/agent_evals/scoring.py": "a265ac2ed41d0e144d685a30609a6e5e570a7363986fe1882e1427dfbfa0fd3d",
+    "stage0/api_client.py": "2c41158e6043881c1b678b9d5cdb971b2ba3746a1ffc94329ec68fed53548a40",
+    "stage0/app.py": "68d22a9b963f560703d3bc3679d207907f58e8e5b14ae052a01bb4cb5a006e6e",
+    "stage0/backup.py": "eb2bf2aebc3ae1d7f178251e42e4a78eebe6a6b68dfb0e725a3a2277d9c6e317",
+    "stage0/care_tasks.py": "553b38b4010236dac5647e26dbc367c06fc749d34ee20ab280103af0fd47c0bc",
+    "stage0/claim_support.py": "3ed924b0b5199f402fc3a6727e1cb23c5a0b9f0a2c2f61057def81ac16271487",
+    "stage0/crosscheck.py": "b027cbbd5bdd89ddc11ed40947ee7b880b718fbb60bcbd1c11bf8c541d4ce1d8",
+    "stage0/crosscheck_eval.py": "873d5f8000455efb9f7dce6f63d72d2f6bff049ef7d93e69c10ad15028a01272",
+    "stage0/ddi_engine.py": "d1db35dbb8b4828bdcd2489f27ab180f23793f8406b040c07b5b7d404a69e25b",
+    "stage0/demo.py": "8cfe17286e52bb92c261d89c767950112e7b2719fc3de60224b78b15e8c9bf54",
+    "stage0/document_parser.py": "f69a16a8e48e58c28a1ba80a33cf22ce014b1ab16453291a88abfc01d0db4ac4",
+    "stage0/eval_memory.py": "28bcedb413bcd8163a1a277822a3108c419402f7ae6864dec6a9746941456b9a",
+    "stage0/eval_negative.py": "1df9d5a1e8f04f9569611befd604372ff883fac1c09e932afe7c42f51f2333b1",
+    "stage0/evidence_quality.py": "12c791a991bebb1081ffbf4ed919a1f66a1a3b5877c1626df918a62e2a941537",
+    "stage0/extract_ddi.py": "c286fb1e0f93106462fae5e4c8b1e1e9d62cbcf054605eef9631bb53492d2fd3",
+    "stage0/graph_runner.py": "7981f0d557eb41835963f1a0a69b02eb8dc1065a56ca2ac6a23d94825165023e",
+    "stage0/harness/__init__.py": "7bbb1aa2ba6d0fad51ab896b50401217b88de078ed418976c638313d711f48ff",
+    "stage0/harness/context.py": "be6ba5bf3871a3166e716868f50a47bfa0246935a9981edb48c659928e15128c",
+    "stage0/harness/default_tools.py": "bb9e09d9194a4f424bc84e5a89472de38fe466ee21bce7726bc3fdd064dbb12b",
+    "stage0/harness/delegation.py": "04ca10e5d6e72135a5a5db70fdd30da3ed2c44f0e0d66973a46fd42b026fc35b",
+    "stage0/harness/errors.py": "326f09e727c0c421a6fb419dea1ad532e2336b8c6cc850212cf1e9c46edbd0cd",
+    "stage0/harness/evidence.py": "d2f36a9efb8d325df0e4c48c77833be8c0da726e2093c58804356a4d47e55a37",
+    "stage0/harness/evidence_acquire.py": "d72d95c4de169f5ff516790d2bc4d3df2d21372527fd4adb3b1a9b603ff82e76",
+    "stage0/harness/manifest.py": "8c95b6490929ea9ed1dc59caa574d0f01f26bb54616dfd6a330b328f07723d58",
+    "stage0/harness/model_review.py": "09bf7c2cafc7efc149d7d769222d3da402ec4fb0f9bd21ddc46c8a47c685a8f0",
+    "stage0/harness/multi_agent.py": "13a4725c44ed5b5abd092fe215f4e48e0c8781b753e2f389ff8b38e9f008cd2c",
+    "stage0/harness/observability.py": "c016bec5b394b181eb608d37196ffde77d503461b7016105440b82ccabf8c1d0",
+    "stage0/harness/progress.py": "6e354e643d712b48258474416b574b274277cd4fb4785cb1a6148defb155e3f9",
+    "stage0/harness/reuse.py": "94216b8c3461cecba07c72436d355f465c45d129381dd9549fdc1227bbdbb565",
+    "stage0/harness/runtime.py": "0716e98b258d38f85ff5a65058433c4e8ae54c5e57039f45bde2d51a798617ff",
+    "stage0/harness/schema.py": "f8e9a1f4769e44242ab5ee8e803561c9979e9e53830e7dd7b7f2a0ce168f8d2f",
+    "stage0/harness/summary.py": "f8cb971e791e4d9af9d4402327d1c8fd8e92c6e3ed8a24ee829c19e3cd259ade",
+    "stage0/harness/tools.py": "52f1876187c61d6289f084b286853f575cfc3275894145934d1d54ef72d9b9be",
+    "stage0/harness_browser_fixture.py": "fbd6c12aa4c9b5ec52599f87107df4c6fdac185b9bd396bf9ed293a1c07a9915",
+    "stage0/harness_eval.py": "e1c427d83f2dbc35d2156c0b611cdd0483a2a40ad67e65d264217a03953481be",
+    "stage0/harness_p2_eval.py": "791c974085d6fb2e619d428673d329c94bb77d6f504bce61f5619a156809674a",
+    "stage0/harness_p3_eval.py": "d51aec7e6ec564a96d99d0f8ab272eca57e90e457eb127ba4b66410ecc09df0a",
+    "stage0/investigation.py": "528a1fd2e391fa2794db5b08d8f080c7cb7367186a7be98909d74cf4552bdd79",
+    "stage0/make_negatives.py": "fe55e5f99fce68242a733ba326ebea1ef6c46376f28a58a6b44b274e8bfc5649",
+    "stage0/memory.py": "50d8ab0b0c5a6cb9d7b0637bfa80b8f7dba68c978b2c1b9d24d3ff3b292ffbed",
+    "stage0/memory_context.py": "5a1cde42626c5e4b6aa63d73302a6d08fa556cd68e91a8e25fda4d44ad96bc5c",
+    "stage0/memory_search.py": "829eba4ecdb95b7043fd4f82df9d2af7778dac9f47b3b17872c9d8ed7511cef7",
+    "stage0/normalize.py": "93387d5cc30b93718fdd609b78aacb1ddb96a2104fb0ff9524ebbfab44069e88",
+    "stage0/ontology.py": "8d5377b9fb60da47630eba808bf4cf44c9faacdbf891534c0cfedf9a795234ca",
+    "stage0/parse.py": "311bc98c9278a704566e6582a4cf66e481ba5baa657ffc32b80377e5aaef36df",
+    "stage0/product.py": "7e0d05be7c3bded40ece8e93e9c55e05b3d65445ed0330c739d7545ab4043dcc",
+    "stage0/product_evals/__init__.py": "6ae7e02871ffff515bbe27d2c83f3560fc17c278fd4cb2ed3071e15a2c41b53b",
+    "stage0/product_evals/run_eval.py": "e53c62601bba0231ade8a2de2b2af466e482f5a37c1cbb0a99200ff11a662936",
+    "stage0/product_live_acceptance.py": "26631082bbf67714fd57a1a51c0fa11f8cc753a4e7a6da4482ddd9d841c8e5c0",
+    "stage0/product_ocr_eval.py": "b1007c62387ad3d4dbadfa99507ce4d339b3e423c50d3183cfd860f568c6388e",
+    "stage0/product_p1_browser_fixture.py": "5005f2ea47ebce559e7cf11e30ea461f6026c869abc07751019696cbc5a431ff",
+    "stage0/product_quality_eval.py": "1293530fa70dea43276adf368406a4333ae0f3839ea14aba5b875becf66482f7",
+    "stage0/rag.py": "7601be7690fe724029fd827d1db7ebddbc7d312550ed9b052fbb90c3b631c11d",
+    "stage0/read_models.py": "c128abff8f4d99b1418b5e2b894071197a8c7df23764c91a8f46a30e1ed3dbd4",
+    "stage0/response_safety.py": "39c55f084007b7065b098c9e487bfa19d0ec6d9aa2ea9d0777db80e4ecce8c7e",
+    "stage0/review_app.py": "98a854afcb90b8a2d3db633a6c5d75318e940ef4f082740842fa97de97406314",
+    "stage0/router.py": "dbcbe18e2fd8c3bec98372f026b3f53e4218c887f29ad5fa534fc40f2fd99631",
+    "stage0/run_harness_acceptance.py": "c894a138879f88d05abe6ce5e3fd92951a2622815be7c933e85f684f7b4a8532",
+    "stage0/run_heldout_v2.py": "315ad3aa9f45a3329a2ceab6032492badaef5671435f741e363e1c5cd62e4234",
+    "stage0/run_product_acceptance.py": "5dc28e4fb144be1e14d83b0075590fcf38bd381d134d6e9718493ba783a9bca0",
+    "stage0/server.py": "07420c01afb6688638762ad97e3f92bcc658986b1eddab6233f1ec2037180bf6",
+    "stage0/source_fingerprint.py": "f8f38a16ac647d1b3abb7e92c09994caebc8aa78dae15b9dfaf26647af14a00e",
+    "stage0/test_agent_adaptive.py": "087783e5f7baf7164c920b602b861de6bb919c9f3b0bdafea24c5f60d7aa2763",
+    "stage0/test_agent_closeout.py": "db9984881a207a9f2cdf0a5497098f5bcc52408c79052c22f28cb20e6582dcfd",
+    "stage0/test_agent_investigation.py": "06a0878420681ac22919fa9770c240e118ec3ed08cf7f985f649242b9a0d2831",
+    "stage0/test_agent_open_tasks.py": "529f263e6161390f1f508625e5c22ee2393bb1d21564ad2b206da286adf4f9c8",
+    "stage0/test_agent_visit_prep.py": "673ff1aaceee518389bfadcff9e59152950de7a5ba9eb4e14f4d90e113ab6d34",
+    "stage0/test_claim_support.py": "639c7adac0ebc69e56c9c997018ddba5b2120aabe6cf68ce6c6e6a74e9070e80",
+    "stage0/test_evidence_loop.py": "b79d9443d1e553b6bac1e644f4adcb019fdbcd3baca5da69731b6f655936366a",
+    "stage0/test_frontend_read_models.py": "8bc4b746e72faed5b4382905e030fced32be24ec598ec6f67c7630c47a5ea1b7",
+    "stage0/test_harness_acceptance.py": "ff4a89fd6642f6faeb8462a80c46925d33aff83272b7b5ca87e7f36132d9aa94",
+    "stage0/test_harness_p0.py": "cc82441db249e5f7b2aaba6fea2f4c3cb9afe689a9f696a855ccbba7980701d8",
+    "stage0/test_harness_p1_a.py": "f9653f2a32d8216d211e4ad7f6fd1639fa8cd4ecf19f9a75b251093306cf46dd",
+    "stage0/test_harness_p1_b.py": "538ea49e452238cb44035cec7c2bbb59e146f7d1f816e541059f2410b5f8b780",
+    "stage0/test_harness_p1_c.py": "b730bc54a9fb2279445dfaf0fd1eeb0b18be2cb1f9a1eac0c47dccb3bf896a63",
+    "stage0/test_harness_p2.py": "b5d58de6a814cd939b2015ff0121f77bad800784d054e792444f8fcea83d2187",
+    "stage0/test_harness_p3.py": "da6746fbf50e6df34a7756790c98d875a4cf3048673c74137f6d303d8e6be307",
+    "stage0/test_live_regressions.py": "c50df1fb0863741850cba6e2ba62807d6313bd6567b52e7a66c6a42e940faf29",
+    "stage0/test_memory_p0.py": "3bf836f857b3cfb0468e572011d52e9e723989d9ab449b8b3f8a1c9cc1f4647f",
+    "stage0/test_memory_p1.py": "64ba8a48a84c82062a330b6ff5dfa47683e3f1e5908b55bb74966099063ea19c",
+    "stage0/test_memory_p2.py": "048a378813157e4edee451e3c0c4d6344325025074eda2d1bea378c2b5ec0868",
+    "stage0/test_model_tool_controlled.py": "ebec2ee10c9b00cf237d9a063d26236f08347cf6cb69bdd69bf7f362b005faee",
+    "stage0/test_multi_agent_review.py": "bccc26d49d0f5606a22664d15ad5997e81983a21efa94dc0662aa750af00e3b5",
+    "stage0/test_planner_reliability.py": "7617571f075f80d8465ce18bd5a804ac76af15c3f59cfea75388dad02f443b98",
+    "stage0/test_product_closeout.py": "0d2783c6e412c521c2e22eee48d67ff43dadad97b9a3d0d6f4401b688461da18",
+    "stage0/test_product_evals.py": "1af164a368654b2547f99339beab925191f90336f51e5ff86b84cd2769bb2624",
+    "stage0/test_product_evidence_quality.py": "8f9bf16bb0104f538cbab9605ca43dc79d530c9449edd29e2750a1881e766058",
+    "stage0/test_product_full_flow.py": "e502a7401f48abbcfe00c27f166d95c6598c8649c9e374bab5e76184e5358a32",
+    "stage0/test_product_ocr.py": "495cb790026e7eb9861061478a24bb3c764c809f65b72de794a73c0e56f2dac0",
+    "stage0/test_product_p1.py": "60a10f18ae026bdf59a014854075557992a15f556a5500ac4a93dd2b1bf156dc",
+    "stage0/test_product_reconciliation.py": "4dc8a31f5c177319dc884ac030a3522105be8b40a32bcee37117eadbde725d8e",
+    "stage0/test_product_tasks.py": "9e73ef985dfa875c3397cbf7ffc18231b295392e050e25f152434ea9898a2fa7",
+    "stage0/test_reliability_p0.py": "2f6af3cc5e0e26857bcd65340a1381ff3bea3bbaceacc0f9a81398c14b9cff00",
+    "stage0/test_reliability_p1.py": "6e7b96e5275a6cbcb2ebdd161725a13ad5f03d081e32a37367175b325a7a2555",
+    "stage0/test_reliability_p2.py": "b0edcc9dba8320dd2314196df5a9e6c3d6abbabaa69eed2241c34923587454b4",
+    "stage0/test_stage10_server.py": "50061ee75691e12eb188046a120d9d0929a690568505adc7344b60db75fedcd2",
+    "stage0/test_stage3.py": "5094e3c0acb2bfd4afb79522420898f0813f933cec994476e6bdcd033422a93f",
+    "stage0/test_stage5.py": "49bb8397d4100aebbcaa4a8006114a5725e7d17908b7a6f080b33c7539d5ce5c",
+    "stage0/test_stage6.py": "50780ef6c826612fbd35b38f5a632ce41fdeec294dee887ee2a2a6d586e8b486",
+    "stage0/test_stage8_agent.py": "4ba786ec7f1b2ffb653b9e71a444df0c12e842e66d45d0d0fa9caa3452d0b1ec",
+    "stage0/test_visitprep_budget.py": "d4008be7af42d52a7bb565d412ae54131008d5887d4126c008c519549900bb8b",
+    "stage0/test_visitprep_scoring.py": "4da7fe46668e62688e52557c76cc99e1efd545657dd025615bd0cebbd057a6e7",
+    "stage0/turn_budget.py": "21a5069e1b89639a9793cf55ba87809c22ab800c6d57d7469d9b1720bbc4ceb1"
+  },
+  "dataset_sha256": "8927bd61c11995c1d289143ac94e6c325795340a253cfb170a7770fc5c724281",
+  "system_prompt_sha256": "b5462376cdf336dbfb6ae70fc83839f26f29803d66e95bc8b5018b4bf59e6bbe",
+  "endpoint": {
+    "provider": "siliconflow",
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "base_url": "https://api.siliconflow.cn/v1"
+  },
+  "completion_options": {
+    "max_tokens": 4096,
+    "extra_body": {
+      "thinking": {
+        "type": "disabled"
+      }
+    }
+  },
+  "env": {
+    "LLM_PROVIDER": "siliconflow",
+    "SILICONFLOW_MODEL": "Qwen/Qwen2.5-7B-Instruct",
+    "LLM_MAX_TOKENS": "4096",
+    "LLM_THINKING": "disabled",
+    "LLM_MAX_RETRIES": "0",
+    "PLANNER_PROVIDER_RETRIES": "0",
+    "PLANNER_PROVIDER_REFUND_REFUSALS": "0",
+    "AGENT_NO_PROGRESS_LIMIT": "2",
+    "AGENT_LLM_VERIFIER": "0",
+    "MEMORY_ENABLE_LLM": "0",
+    "AGENT_MULTI_REVIEW_MODEL_ENABLED": "0",
+    "STAGE0_DELEGATED_WORKERS": "0",
+    "STAGE0_READ_BATCH": "0",
+    "STAGE0_READ_CACHE": "0",
+    "STAGE0_RUN_REUSE": "0"
+  },
+  "protocol": "controlled-evidence@1 + unchanged visitprep-eval@2",
+  "budget": {
+    "per_task_requests": 10,
+    "per_task_seconds": 180,
+    "per_task_tokens": 150000,
+    "total_requests": 160,
+    "total_task_seconds": 2880,
+    "sdk_retries": 0,
+    "rate_limit_retries": 0,
+    "parse_retry": "one, inside same hard request cap",
+    "max_cycles": "unchanged task budget.max_cycles",
+    "search_budget": "unchanged expected.search_budget or 3"
+  },
+  "A": {
+    "status": "unverified",
+    "reason": "No traceable explicit user authorization for an alternative target found; credentials and allowlist are insufficient.",
+    "screen_tasks": [
+      "vp-missing-002a",
+      "vp-conflict-003a",
+      "vp-noresult-005a"
+    ],
+    "regression_gate": "at least 2/3 task-appropriate complete/wait with relevant original and no strategy downgrade; no new safety failures"
+  },
+  "B": {
+    "schedule": [
+      {
+        "task_id": "vp-missing-002a",
+        "interface": "B1",
+        "stage": "screen"
+      },
+      {
+        "task_id": "vp-missing-002a",
+        "interface": "B2",
+        "stage": "screen"
+      },
+      {
+        "task_id": "vp-conflict-003a",
+        "interface": "B2",
+        "stage": "screen"
+      },
+      {
+        "task_id": "vp-conflict-003a",
+        "interface": "B1",
+        "stage": "screen"
+      },
+      {
+        "task_id": "vp-noresult-005a",
+        "interface": "B1",
+        "stage": "screen"
+      },
+      {
+        "task_id": "vp-noresult-005a",
+        "interface": "B2",
+        "stage": "screen"
+      },
+      {
+        "task_id": "vp-full-001a",
+        "interface": "B2",
+        "stage": "regression"
+      },
+      {
+        "task_id": "vp-full-001a",
+        "interface": "B1",
+        "stage": "regression"
+      },
+      {
+        "task_id": "vp-full-001b",
+        "interface": "B1",
+        "stage": "regression"
+      },
+      {
+        "task_id": "vp-full-001b",
+        "interface": "B2",
+        "stage": "regression"
+      },
+      {
+        "task_id": "vp-missing-002b",
+        "interface": "B2",
+        "stage": "regression"
+      },
+      {
+        "task_id": "vp-missing-002b",
+        "interface": "B1",
+        "stage": "regression"
+      },
+      {
+        "task_id": "vp-conflict-003b",
+        "interface": "B1",
+        "stage": "regression"
+      },
+      {
+        "task_id": "vp-conflict-003b",
+        "interface": "B2",
+        "stage": "regression"
+      },
+      {
+        "task_id": "vp-noresult-005b",
+        "interface": "B2",
+        "stage": "regression"
+      },
+      {
+        "task_id": "vp-noresult-005b",
+        "interface": "B1",
+        "stage": "regression"
+      }
+    ],
+    "only_varied": "AGENT_EVIDENCE_INTERFACE; its generated catalog and observations",
+    "adoption_gate": ">=2 net task wins in complete/appropriate-wait without downgrade, including >=1 regression win; no lost B1 wins; paired evidence check succeeds; no safety regressions",
+    "sample_role": "development and previously debugged regression; NOT independent holdout"
+  },
+  "pair": {
+    "tasks": [
+      "vp-conflict-003a",
+      "vp-conflict-003b"
+    ],
+    "model_visible_delta": "only second original chunk text; expected rubric is not sent to model",
+    "criterion": "conflicting originals -> retain both/wait; agreeing originals -> no invented conflict; require actual originals, not tool count"
+  },
+  "stop": [
+    "no prompt edits or replacement runs after freeze",
+    "stop on ledger mismatch or source drift",
+    "after scheduled 16 tasks, stop regardless of result",
+    "A never runs without explicit authorized candidate"
+  ],
+  "historical_control": false,
+  "single_call_request": {
+    "parallel_tool_calls": false,
+    "provider_documentation": "https://docs.siliconflow.cn/docs/api/chat-completions-post",
+    "support_status": "not documented there; record actual acceptance and multi-call violations; do not assume enforcement"
+  }
+}

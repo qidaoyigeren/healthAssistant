@@ -1,0 +1,6 @@
+{
+  "copied_before_any_remote_calls": true,
+  "resource": "stage0/data/mapping.json",
+  "sha256": "3b08912776a98831f675aad98652459839907e6e189bfa0005b0be2c94aca45d",
+  "reason": "unchanged runtime dependency omitted from code-only snapshot; first offline setup error retained"
+}

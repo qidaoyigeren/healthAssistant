@@ -1,0 +1,103 @@
+{
+  "status": "complete",
+  "stopped_reason": null,
+  "spent": 32,
+  "batch_cap": 60,
+  "results": [
+    {
+      "task_id": "invalid-filter",
+      "arm": "A",
+      "status": "sampled",
+      "requests": 5,
+      "error": null,
+      "termination": "no_progress",
+      "relevant_originals": 0,
+      "passed": false,
+      "failures": [
+        "material_index_never_read",
+        "material_issue_not_reported"
+      ],
+      "wall_ms": 13232.21,
+      "batch_spend_after": 5,
+      "service_errors": 0
+    },
+    {
+      "task_id": "invalid-filter",
+      "arm": "B",
+      "status": "sampled",
+      "requests": 7,
+      "error": null,
+      "termination": "no_progress",
+      "relevant_originals": 0,
+      "passed": false,
+      "failures": [],
+      "wall_ms": 16849.25,
+      "batch_spend_after": 12,
+      "service_errors": 0
+    },
+    {
+      "task_id": "no-match-rewrite",
+      "arm": "A",
+      "status": "sampled",
+      "requests": 6,
+      "error": null,
+      "termination": "budget_insufficient",
+      "relevant_originals": 0,
+      "passed": false,
+      "failures": [
+        "material_index_never_read"
+      ],
+      "wall_ms": 16317.05,
+      "batch_spend_after": 18,
+      "service_errors": 0
+    },
+    {
+      "task_id": "no-match-rewrite",
+      "arm": "B",
+      "status": "sampled",
+      "requests": 5,
+      "error": null,
+      "termination": "no_progress",
+      "relevant_originals": 0,
+      "passed": false,
+      "failures": [
+        "material_index_never_read"
+      ],
+      "wall_ms": 17678.53,
+      "batch_spend_after": 23,
+      "service_errors": 0
+    },
+    {
+      "task_id": "conflict-natural",
+      "arm": "A",
+      "status": "sampled",
+      "requests": 1,
+      "error": null,
+      "termination": "budget_insufficient",
+      "relevant_originals": 0,
+      "passed": false,
+      "failures": [
+        "material_index_never_read"
+      ],
+      "wall_ms": 62661.09,
+      "batch_spend_after": 24,
+      "service_errors": 1
+    },
+    {
+      "task_id": "conflict-natural",
+      "arm": "B",
+      "status": "sampled",
+      "requests": 8,
+      "error": null,
+      "termination": "checks_completed",
+      "relevant_originals": 2,
+      "passed": false,
+      "failures": [
+        "material_index_never_read"
+      ],
+      "wall_ms": 20672.67,
+      "batch_spend_after": 32,
+      "service_errors": 0
+    }
+  ]
+}

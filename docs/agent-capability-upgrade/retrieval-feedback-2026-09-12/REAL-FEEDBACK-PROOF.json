@@ -1,0 +1,221 @@
+[
+  {
+    "task_id": "correction-invalid",
+    "phase": "after",
+    "wire_number": 4,
+    "attempt_id": "fcd8d6991b74407281e15e58be43bd4f",
+    "observations": [
+      {
+        "tool": "rag_search",
+        "purpose": "rag_search",
+        "arguments": {
+          "query": "氨氯地平",
+          "section": "适应症",
+          "drug_name": "氨氯地平"
+        },
+        "result": {
+          "contract_version": "retrieval-feedback@1",
+          "query": "氨氯地平",
+          "applied_filters": {
+            "section": "适应症",
+            "drug_name": "氨氯地平"
+          },
+          "search_executed": false,
+          "results": [],
+          "candidate_count": 0,
+          "result_kind": "candidate_chunks",
+          "truncation": {
+            "candidates_truncated": false
+          },
+          "corpus_version": "corpus:2a0ac1cfcee251e17994f2815f21878d8acef57b40018a54dad26ca4545f3f50",
+          "directory": {
+            "sections": [
+              "用法用量"
+            ],
+            "section_count": 1,
+            "offset": 0,
+            "omitted_sections": 0,
+            "next_offset": null,
+            "drug_names": [
+              "氨氯地平"
+            ],
+            "omitted_drug_names": 0
+          },
+          "scope": {
+            "accessible_chunks": 1,
+            "filtered_chunks": 0,
+            "section_optional": true,
+            "without_section": "all accessible sections, subject to other supplied filters"
+          },
+          "status": "invalid_filter",
+          "invalid_fields": [
+            "section"
+          ]
+        },
+        "ok": true,
+        "cycle": 3,
+        "error_kind": null,
+        "recoverable": null,
+        "evidence_refs": [],
+        "no_progress": false,
+        "added_information": true
+      }
+    ],
+    "no_progress_feedback": null,
+    "response_calls": [
+      {
+        "id": "01a0963ceb4b179342b10dc402805962",
+        "function": {
+          "arguments": "{\"query\": \"氨氯地平\", \"section\": \"适应症\", \"drug_name\": \"氨氯地平\", \"gap_id\": \"claim:2e11044806d0\", \"expected_observation\": \"找到氨氯地平适应症的相关证据\"}",
+          "name": "rag_search"
+        },
+        "type": "function",
+        "index": 0
+      }
+    ],
+    "autonomous_correction": false
+  },
+  {
+    "task_id": "correction-invalid",
+    "phase": "after",
+    "wire_number": 5,
+    "attempt_id": "201c69583be24edd8a1f1521098f339c",
+    "observations": [
+      {
+        "tool": "rag_search",
+        "purpose": "rag_search",
+        "arguments": {
+          "query": "氨氯地平",
+          "section": "适应症",
+          "drug_name": "氨氯地平"
+        },
+        "result": {
+          "contract_version": "retrieval-feedback@1",
+          "query": "氨氯地平",
+          "applied_filters": {
+            "section": "适应症",
+            "drug_name": "氨氯地平"
+          },
+          "search_executed": false,
+          "results": [],
+          "candidate_count": 0,
+          "result_kind": "candidate_chunks",
+          "truncation": {
+            "candidates_truncated": false
+          },
+          "corpus_version": "corpus:2a0ac1cfcee251e17994f2815f21878d8acef57b40018a54dad26ca4545f3f50",
+          "directory": {
+            "sections": [
+              "用法用量"
+            ],
+            "section_count": 1,
+            "offset": 0,
+            "omitted_sections": 0,
+            "next_offset": null,
+            "drug_names": [
+              "氨氯地平"
+            ],
+            "omitted_drug_names": 0
+          },
+          "scope": {
+            "accessible_chunks": 1,
+            "filtered_chunks": 0,
+            "section_optional": true,
+            "without_section": "all accessible sections, subject to other supplied filters"
+          },
+          "status": "invalid_filter",
+          "invalid_fields": [
+            "section"
+          ]
+        },
+        "ok": true,
+        "cycle": 3,
+        "error_kind": null,
+        "recoverable": null,
+        "evidence_refs": [],
+        "no_progress": false,
+        "added_information": true
+      },
+      {
+        "tool": "rag_search",
+        "purpose": "rag_search",
+        "arguments": {
+          "query": "氨氯地平",
+          "section": "适应症",
+          "drug_name": "氨氯地平"
+        },
+        "result": {
+          "contract_version": "retrieval-feedback@1",
+          "query": "氨氯地平",
+          "applied_filters": {
+            "section": "适应症",
+            "drug_name": "氨氯地平"
+          },
+          "search_executed": false,
+          "results": [],
+          "candidate_count": 0,
+          "result_kind": "candidate_chunks",
+          "truncation": {
+            "candidates_truncated": false
+          },
+          "corpus_version": "corpus:2a0ac1cfcee251e17994f2815f21878d8acef57b40018a54dad26ca4545f3f50",
+          "directory": {
+            "sections": [
+              "用法用量"
+            ],
+            "section_count": 1,
+            "offset": 0,
+            "omitted_sections": 0,
+            "next_offset": null,
+            "drug_names": [
+              "氨氯地平"
+            ],
+            "omitted_drug_names": 0
+          },
+          "scope": {
+            "accessible_chunks": 1,
+            "filtered_chunks": 0,
+            "section_optional": true,
+            "without_section": "all accessible sections, subject to other supplied filters"
+          },
+          "status": "invalid_filter",
+          "invalid_fields": [
+            "section"
+          ]
+        },
+        "ok": true,
+        "cycle": 4,
+        "error_kind": null,
+        "recoverable": null,
+        "evidence_refs": [],
+        "no_progress": true,
+        "added_information": true
+      }
+    ],
+    "no_progress_feedback": {
+      "note": "上一步没有带来新信息（第 1/2 次），已有结果继续有效，重复同一次读取不会提高置信度。",
+      "already_obtained": [
+        "完整权威用药快照"
+      ],
+      "still_open": [
+        {
+          "gap_id": "claim:2e11044806d0",
+          "problem": "核查氨氯地平的支持和反对证据"
+        }
+      ],
+      "still_open_note": "提案的 gap_id 必须取自上面的 still_open（或保持不变的开放缺口）。",
+      "instruction": "请自行判断：若上面列出的未解决问题确实无法再由你推进，就按契约收尾；否则提出一个与刚才不同的、能满足约束的动作。本反馈只陈述状态，不指定动作、工具或参数。"
+    },
+    "response_calls": [
+      {
+        "id": "01a0963cf97f4432b74f94420fd658a7",
+        "function": {
+          "arguments": "{\"query\": \"氨氯地平\", \"section\": \"适应症\", \"drug_name\": \"氨氯地平\", \"gap_id\": \"claim:2e11044806d0\", \"expected_observation\": \"找到氨氯地平适应症的相关证据\"}",
+          "name": "rag_search"
+        },
+        "type": "function"
+      }
+    ],
+    "autonomous_correction": false
+  }
+]

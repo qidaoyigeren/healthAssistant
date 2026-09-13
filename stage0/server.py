@@ -106,6 +106,16 @@ except ImportError:  # Support ``python stage0/server.py``.
 logger = logging.getLogger("stage0.server")
 
 
+# 由 care-task 队列执行的**证据调查**类操作。两个契约走同一套 worker 路径，所以
+# 判断按前缀做：新增一个调查契约时不会因为漏改一处而让任务永远"排队中"。
+CARE_TASK_REVIEW_OPERATIONS = ('care-task-evidence-review@', 'care-task-material-review@',
+                               'care-task-safety-case@')
+
+
+def _is_care_task_review(operation: Any) -> bool:
+    return isinstance(operation, str) and operation.startswith(CARE_TASK_REVIEW_OPERATIONS)
+
+
 def _progress_events_enabled() -> bool:
     """Harness P2 progress events default ON (additive observability; no
     business semantics).  ``STAGE0_RUN_PROGRESS=0`` disables ALL emission."""
@@ -319,8 +329,34 @@ class OutboxWorker:
         self.lease_ttl_seconds = lease_ttl_seconds
         self._runner: Any | None = None
         self._progress: ProgressEventStore | None = None
+        self._product: Any | None = None
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+
+    @property
+    def product(self) -> Any:
+        """Material/care-task/product-object store over the same database.
+
+        Necessary checks converge their findings onto safety cases, which live
+        in ``product_objects`` — same durable store, same receipt path.
+        """
+        if self._product is None:
+            from .product import ProductStore
+            self._product = ProductStore(self.store)
+        return self._product
+
+    def _necessary_check_tools(self) -> tuple[Any, Any]:
+        """使用 agent 的检测器（若可用），保证"有没有 agent"不改变检查结果。
+
+        agent 构造不出来时返回 (None, None)：``run_necessary_checks`` 会退回默认
+        检测器，检索类的检查则如实记为"没有可用的检索"，而不是推断出"没问题"。
+        """
+        try:
+            tools = self.agent.tools
+            return tools.get("ddi_check"), tools.get("rag_search")
+        except Exception:
+            logger.info("agent unavailable; necessary checks use the default detector")
+            return None, None
 
     @property
     def runner(self) -> Any:
@@ -367,6 +403,18 @@ class OutboxWorker:
             receipts.extend(self.drain_resume_tasks())
         except Exception:
             logger.warning("resume-task pass failed", exc_info=True)
+        # 必要安全检查先于模型调查：用药或患者事实一变就排队的确定性检查在这里
+        # 执行。它不需要 agent——`run_necessary_checks` 用的是检测器本身，所以
+        # provider 挂掉、agent 构造不出来的时候检查照样跑完并落盘结论。
+        try:
+            from .safety_checks import run_necessary_checks
+            detector, rag_tool = self._necessary_check_tools()
+            report = run_necessary_checks(self.store, detector=detector, rag_tool=rag_tool,
+                                          product=self.product)
+            if report["completed"]:
+                receipts.append({"task_type": "necessary_checks", **report})
+        except Exception:
+            logger.warning("necessary-check pass failed", exc_info=True)
         # Unified loop: durable rechecks ride the same worker.  A recheck
         # failure is logged, never swallowed silently (Reliability P0).
         try:
@@ -414,7 +462,7 @@ class OutboxWorker:
         # was already claimed when the cancel landed.
         if run['status'] == 'cancelled':
             raise MemoryPolicyError('run is cancelled; a late review decision cannot revive it')
-        if run['graph_version'] == 'care-task-evidence-review@1':
+        if _is_care_task_review(run['graph_version']):
             from .care_tasks import CareTasks
             from .product import ProductStore
             result = CareTasks(ProductStore(self.store), agent_factory=lambda: self.agent).apply_review_decision(record, run)
@@ -433,7 +481,7 @@ class OutboxWorker:
         return {'task_id': task['id'], 'status': 'resumed', 'decision_id': record['decision_id']}
 
     def _run_claimed(self, task: dict[str, Any]) -> dict[str, Any]:
-        if (task.get('payload') or {}).get('operation') == 'care-task-evidence-review@1':
+        if _is_care_task_review((task.get('payload') or {}).get('operation')):
             from .care_tasks import CareTasks
             from .product import ProductStore
             from .turn_budget import lease_scope
@@ -959,7 +1007,7 @@ def create_app(*, db_path: str | Path | None = None,
         run = store.workflow_run_get(run_id)
         if run is None:
             queued = store.outbox_task_for(run_id)
-            if queued and (queued.get('payload') or {}).get('operation') == 'care-task-evidence-review@1':
+            if queued and _is_care_task_review((queued.get('payload') or {}).get('operation')):
                 # Queue admission is durable before a worker creates the
                 # workflow row. Report the actual queued state without 404.
                 return JSONResponse(status_code=200, content={'run_id': run_id,

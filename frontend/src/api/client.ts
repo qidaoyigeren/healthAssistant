@@ -4,11 +4,13 @@
  */
 import { request, newIdempotencyKey } from './http';
 import type {
-  AcceptanceDto, ArtifactDto, ArtifactReportDto, CancelRunDto,
-  ChangeImpactDto, ConflictActionDto, ConflictDto, ConflictRecordDto, ConclusionDto,
-  EpisodicEventDto, EventRequest, EvidenceReadDto, FactActionResponseDto, FailedEventDto,
-  HealthDto, HistorySearchDto, MedicationRecordDto, MemoryItemDto,
-  MemoryStateDto, OverviewDto, Page, RecheckTasksDto, RunProgressDto,
+  AcceptanceDto, ArtifactDto, ArtifactReportDto, CancelRunDto, CareTaskDto,
+  CareTaskInputResultDto, ChangeImpactDto, ConflictActionDto, ConflictDto,
+  ConflictRecordDto, ConclusionDto, EpisodicEventDto, EventRequest, EvidenceReadDto,
+  FactActionResponseDto, FailedEventDto, HealthDto, HistorySearchDto, MedicationRecordDto,
+  MemoryItemDto, MemoryStateDto, OverviewDto, Page, RecheckTasksDto,
+  RunProgressDto, SafetyCaseDto, SafetyCaseListDto, SafetyClosureEvidenceDto,
+  SafetyFollowUpInputDto, SafetyMainlineDto,
   SessionDto, SessionEventDto, TurnTraceDto, WarningDto,
 } from './types';
 
@@ -203,6 +205,95 @@ export const api = {
   artifactDownloadUrl(artifactId: string): string {
     const base = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '');
     return `${base}/v1/data/artifacts/${encodeURIComponent(artifactId)}/download`;
+  },
+
+  // ---- 长期用药安全事项(主线)------------------------------------------
+
+  safetyMainline(signal?: AbortSignal) {
+    return request<SafetyMainlineDto>('/v1/safety-mainline', { signal });
+  },
+
+  safetyCases(signal?: AbortSignal) {
+    return request<SafetyCaseListDto>('/v1/safety-cases', { signal });
+  },
+
+  safetyCase(caseId: string, signal?: AbortSignal) {
+    return request<SafetyCaseDto>(`/v1/safety-cases/${encodeURIComponent(caseId)}`, { signal });
+  },
+
+  /**
+   * 记录"我看到了"。**只**写一个时间戳:不关闭事项、不清空未决项,
+   * 所以界面上不能把它说成"已处理"。
+   */
+  safetyCaseSeen(caseId: string, key: string) {
+    return request<SafetyCaseDto>(`/v1/safety-cases/${encodeURIComponent(caseId)}/seen`, {
+      method: 'POST', body: { key },
+    });
+  },
+
+  /**
+   * 关闭前先问服务端「能不能关、为什么」。只读,不写入。
+   * 界面用它决定关闭按钮是否可用——不让用户去按一个一定会被拒绝的按钮。
+   */
+  safetyCaseClosureEvidence(caseId: string, signal?: AbortSignal) {
+    return request<SafetyClosureEvidenceDto>(
+      `/v1/safety-cases/${encodeURIComponent(caseId)}/closure-evidence`, { signal });
+  },
+
+  /**
+   * 回答事项上的一条补问。空值、"明说不知道"与有内容地回答走**不同**路径,
+   * 所以 `answer_kind` 省略时由服务端按内容判定(provided / unknown / empty)。
+   */
+  safetyCaseAnswer(caseId: string, body: {
+    key: string; expected_revision: number; request_id: string; value: string;
+    answer_kind?: 'provided' | 'unknown' | 'empty';
+  }) {
+    return request<SafetyCaseDto>(`/v1/safety-cases/${encodeURIComponent(caseId)}/answer`, {
+      method: 'POST', body,
+    });
+  },
+
+  /**
+   * 按依据处置事项。关闭条件由服务端强制:依据不合法时返回 409 + 中文说明,
+   * 调用方必须**原样**显示这条说明,不能自己改写成别的结论。
+   *
+   * **不发送 `actor`**:操作者身份由服务端从认证上下文取,请求体里的身份不被读取。
+   */
+  safetyCaseDisposition(caseId: string, body: {
+    key: string; expected_revision: number; disposition: string; basis_kind: string;
+    note?: string; decision_id?: string; follow_up?: SafetyFollowUpInputDto;
+  }) {
+    return request<SafetyCaseDto>(`/v1/safety-cases/${encodeURIComponent(caseId)}/disposition`, {
+      method: 'POST', body,
+    });
+  },
+
+  /** 围绕这一件事项发起一次有界调查。返回排队中的 care_task,进度另轮询。 */
+  safetyCaseInvestigate(caseId: string, body: { key: string; budget?: number; goal?: string }) {
+    return request<CareTaskDto>(`/v1/safety-cases/${encodeURIComponent(caseId)}/investigate`, {
+      method: 'POST', body,
+    });
+  },
+
+  careTasks(signal?: AbortSignal) {
+    return request<{ items: CareTaskDto[] }>('/v1/care-tasks', { signal });
+  },
+
+  /**
+   * 补充信息。只关闭**指名回答**的那一条请求;`answers[].kind` 只能是
+   * `user_report`(用户报告)或 `material_note`——用户提供的信息不是权威记录。
+   */
+  careTaskInput(taskId: string, body: {
+    key: string; revision: number; review_request_ids: string[];
+    answers?: { request_id: string; value: string; kind?: 'user_report' | 'material_note' }[];
+  }) {
+    return request<CareTaskInputResultDto>(
+      `/v1/care-tasks/${encodeURIComponent(taskId)}/input`, { method: 'POST', body });
+  },
+
+  careTaskResume(taskId: string, body: { key: string; revision: number; action?: string }) {
+    return request<CareTaskDto>(
+      `/v1/care-tasks/${encodeURIComponent(taskId)}/resume`, { method: 'POST', body });
   },
 };
 

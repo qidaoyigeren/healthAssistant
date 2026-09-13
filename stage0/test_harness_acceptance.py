@@ -54,29 +54,6 @@ class AcceptanceGateTests(unittest.TestCase):
                 self.assertFalse(check_restore_compatibility(
                     {section: {"version": "old"}}, {section: {"version": "new"}})["compatible"])
 
-    def test_p3_missing_work_cannot_qualify_for_adoption(self):
-        from stage0.harness_p3_eval import evaluate_adoption, _full_read_coverage
-        rows = [{"scenario": scenario, "mode": mode, "planner_decision_calls": 10 if mode == "single_agent" else 2,
-                 "safety_status": "enforced", "no_medical_authority": True, "citation_validity": 1.0,
-                 "tokens_charged": 100, "delegated_tasks": 0, "required_check_completion": 0.0,
-                 "planner_payload_chars": {"mean": 100 if mode == "single_agent" else 50}}
-                for scenario in ("multi_drug_labels", "long_label_consistency", "simple_current_meds")
-                for mode in ("single_agent", "batch", "delegate")]
-        self.assertFalse(evaluate_adoption(rows)["adopt_batching"])
-        self.assertFalse(evaluate_adoption(rows)["adopt_delegation"])
-        self.assertEqual(_full_read_coverage([], [{"source_url": "test", "text": "evidence"}]), 0)
-
-    def test_p2_aggregation_is_median_and_safety_checks_every_repeat(self):
-        from stage0.harness_p2_eval import _aggregate, acceptance_passed
-        self.assertEqual(_aggregate([{"latency": n} for n in (1, 100, 2)]), {"latency": 2})
-        safe = {"safety": {"all_enforced": True, "citation_valid": True}}
-        unsafe = {"safety": {"all_enforced": False, "citation_valid": True}}
-        report = {"baseline_runs": [unsafe, safe, safe], "optimized_runs": [unsafe, safe, safe],
-                  "repeated_reads_scenario": {"comparison": {
-                      "safety_status_identical": True, "honest_incomplete_response_both": True}}}
-        self.assertFalse(acceptance_passed(report))
-
-
 class PersistedAcceptanceTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

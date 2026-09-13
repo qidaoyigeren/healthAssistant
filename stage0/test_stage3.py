@@ -94,10 +94,21 @@ class Stage3AgentTests(unittest.TestCase):
                 self.assertTrue(warning["audit_trail"]["memory_refs"])
                 acts = [item for item in response.tool_trace if item.get("phase") == "act"]
                 self.assertTrue(any(item["tool"] == "ddi_check" for item in acts))
-                self.assertLess(
-                    next(i for i, item in enumerate(acts) if item["tool"] == "ddi_check"),
-                    next(i for i, item in enumerate(acts) if item.get("purpose") == "record_ddi_warnings"),
-                )
+                # Safety ordering invariant (evidence before persistence): the
+                # deterministic DDI check must already have run whenever the
+                # warnings are persisted.  Asserted as the property itself —
+                # walking the ACT sequence — instead of comparing two index
+                # numbers, and it holds at EVERY persistence step.
+                checked = False
+                persisted = False
+                for item in acts:
+                    if item["tool"] == "ddi_check":
+                        checked = True
+                    elif item.get("purpose") == "record_ddi_warnings":
+                        self.assertTrue(
+                            checked, f"warnings persisted before the DDI check ran: {acts}")
+                        persisted = True
+                self.assertTrue(persisted, f"no act persisted the DDI warnings: {acts}")
 
             with MemoryStore(path, llm_enabled=False) as reopened:
                 second = MedicationCoordinatorAgent(reopened, ddi_tool=DDITool(fake_detect), rag_tool=EmptyRAG())

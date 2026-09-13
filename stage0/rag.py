@@ -328,8 +328,10 @@ class HybridRetriever:
         bm25_weight: float = 0.5,
         vector_weight: float = 0.5,
         rrf_k: int = 60,
+        scope_id: str | None = None,
     ) -> list[SearchResult]:
         eligible = self._eligible(section, approval_number, drug_name)
+        eligible = {i for i in eligible if self.chunks[i].get('scope_id') in (None, scope_id)}
         if mode == "bm25":
             order = self._bm25_order(query, eligible)
         elif mode == "vector":

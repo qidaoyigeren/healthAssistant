@@ -1,0 +1,624 @@
+[
+  {
+    "task_id": "vp-missing-002a",
+    "interface": "B1",
+    "safety_rejected_proposal": true,
+    "attempt_id": "ff49cae9a26344e194d066f1100c0c00",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-missing-002a",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "b7dce585fdf2494c9f22309334fcbc29",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-missing-002a",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "86e86cd9855f4dce87f09eea7a4e33a0",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-missing-002a",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "9d268c6f25ca465fbfb66b2221c4776e",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-missing-002a",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "1b759a34e0f14576ac3c119c45c6c509",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-missing-002a",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "5216341cea014bad9bcebd54d11902c7",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-missing-002a",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "28b7bca3f11d4553978554ccd144ad44",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-missing-002a",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "1ebc2451f298475eb5af263eea2df89e",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-missing-002a",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "14a6d5ebb4f34598872b3f6ab8315444",
+    "ledger_status": "unknown",
+    "trace_outcome": "provider_error",
+    "wire_error": {
+      "type": "APIConnectionError",
+      "message": "Connection error.",
+      "status_code": null
+    },
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003a",
+    "interface": "B2",
+    "safety_rejected_proposal": true,
+    "attempt_id": "62ff8fd0f88a424cb42700dd18f6375b",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003a",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "f54813e58b70498ea80f5a20abbc83ea",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003a",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "4a43e05ff9bd4c369c87b3f473569739",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003a",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "ea477517a913445cb8d7be4acfbc262c",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003a",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "1a43dc58f76b4b6388ebe29520fd6fdc",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003a",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "c08b53b90b4e42be96a965dc53337290",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003a",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "86ef379180da488c9b2406ba957c6604",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003a",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "cf3bc79b5dc2465f84197537f0197a9e",
+    "ledger_status": "unknown",
+    "trace_outcome": "provider_error",
+    "wire_error": {
+      "type": "APIConnectionError",
+      "message": "Connection error.",
+      "status_code": null
+    },
+    "matched": true
+  },
+  {
+    "task_id": "vp-noresult-005a",
+    "interface": "B1",
+    "safety_rejected_proposal": true,
+    "attempt_id": "8c252b662d8e4a8eabed39296e5709d6",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-noresult-005a",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "8a951deefc364c328c0c05cc6c976a53",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-noresult-005a",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "59df36b358064db7903bddb3dc6e2754",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-noresult-005a",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "2688e531cb2947ba8ca82006625c4b58",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-noresult-005a",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "fe72f141afaf404bbe90df8879bf56b1",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-noresult-005a",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "21b7e44245384b0eb8793ef73f0cb5dd",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-noresult-005a",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "9a7f2e29147e4bbe9c963c0e52b5d2cc",
+    "ledger_status": "unknown",
+    "trace_outcome": "provider_error",
+    "wire_error": {
+      "type": "APIConnectionError",
+      "message": "Connection error.",
+      "status_code": null
+    },
+    "matched": true
+  },
+  {
+    "task_id": "vp-full-001a",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "eb0d9064ad914304ba7828e234da9f0e",
+    "ledger_status": "unknown",
+    "trace_outcome": "provider_error",
+    "wire_error": {
+      "type": "APIConnectionError",
+      "message": "Connection error.",
+      "status_code": null
+    },
+    "matched": true
+  },
+  {
+    "task_id": "vp-full-001a",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "34201646719e40f39b34799952b7c62c",
+    "ledger_status": "unknown",
+    "trace_outcome": "provider_error",
+    "wire_error": {
+      "type": "APIConnectionError",
+      "message": "Connection error.",
+      "status_code": null
+    },
+    "matched": true
+  },
+  {
+    "task_id": "vp-full-001b",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "88163da1119e44c3bffd9d6d2261a66e",
+    "ledger_status": "unknown",
+    "trace_outcome": "provider_error",
+    "wire_error": {
+      "type": "APIConnectionError",
+      "message": "Connection error.",
+      "status_code": null
+    },
+    "matched": true
+  },
+  {
+    "task_id": "vp-full-001b",
+    "interface": "B2",
+    "safety_rejected_proposal": true,
+    "attempt_id": "5feff8294af449e794019ea1aa37660d",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-full-001b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "e982ba68feb64c4dbbe1d9d8c2dfb636",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-full-001b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "67e0f078eb0340308403b7fb19b9f3d7",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-full-001b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "f111b57426cd41c28f9939ece022f352",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-full-001b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "fc4da1c885344f308f4452891670caba",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-full-001b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "5ef1af09d015452f9238ed0f1d3d1b34",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-missing-002b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "f4f8ebb6a026444abc162251d23e11f4",
+    "ledger_status": "unknown",
+    "trace_outcome": "provider_error",
+    "wire_error": {
+      "type": "APIConnectionError",
+      "message": "Connection error.",
+      "status_code": null
+    },
+    "matched": true
+  },
+  {
+    "task_id": "vp-missing-002b",
+    "interface": "B1",
+    "safety_rejected_proposal": true,
+    "attempt_id": "6c5955e1a67d40ec85f88f5c02f26d32",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-missing-002b",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "fc43849e27674131a8f18bab02cdca62",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-missing-002b",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "deaef3923fc64bf085ec394f07c29fd5",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-missing-002b",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "f56ed0eee95b463f9ed4d7fbea0ece7b",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-missing-002b",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "9e6fd20513e84738a55ebbc799e8cded",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-missing-002b",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "939b5cff3e8f4a21ae8908ef104436f1",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003b",
+    "interface": "B1",
+    "safety_rejected_proposal": true,
+    "attempt_id": "451160f5f05d4f98b4f59e4795532479",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003b",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "86e401f4e1f740178c8e8ca6ac127f94",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003b",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "7220687f814b49c4baf9b2d0591703c5",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003b",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "bd81bb900a9f47539356c6056144c6b9",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003b",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "3e31e3239eea4a6f91cf83dc6dc67ff8",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003b",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "fab82b89fc074d728518e13b8b5c440b",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003b",
+    "interface": "B2",
+    "safety_rejected_proposal": true,
+    "attempt_id": "f0e3c402035c4ba6b0da78e3b68f3243",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "bafb4be603b4464ab23c3d08c221da30",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "0c9e6367b245414d986c445d1f6b387d",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "e95075f9053b4133b65bc5b709544e04",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-conflict-003b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "b62fdec52819498dbccffe0c57ec795d",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-noresult-005b",
+    "interface": "B2",
+    "safety_rejected_proposal": true,
+    "attempt_id": "a350d28c39bb419483a3ddf639bb5730",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-noresult-005b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "007b3cd1820f4cb49bda3712780b4efb",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-noresult-005b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "1c7b83bbc5c84b44bab17333cd35f4c1",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-noresult-005b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "1f126ab02d3e42a79571f17e5ccd55d2",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-noresult-005b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "98e3b2bd835946409823619df4d346b9",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-noresult-005b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "66a6acb5c79d44d1948049259117d5a7",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-noresult-005b",
+    "interface": "B2",
+    "safety_rejected_proposal": false,
+    "attempt_id": "02bf60b1cd7c482691912d6c65a05ffe",
+    "ledger_status": "actual",
+    "trace_outcome": "response",
+    "wire_error": null,
+    "matched": true
+  },
+  {
+    "task_id": "vp-noresult-005b",
+    "interface": "B1",
+    "safety_rejected_proposal": false,
+    "attempt_id": "0e73f29de79948e7afb1ee0726773eaf",
+    "ledger_status": "unknown",
+    "trace_outcome": "provider_error",
+    "wire_error": {
+      "type": "APIConnectionError",
+      "message": "Connection error.",
+      "status_code": null
+    },
+    "matched": true
+  }
+]

@@ -1,0 +1,1088 @@
+{
+  "batch": "live",
+  "status": "complete",
+  "stopped_reason": null,
+  "spent": 32,
+  "batch_cap": 60,
+  "sampled": 6,
+  "not_sampled": 0,
+  "runs": [
+    {
+      "task_id": "invalid-filter",
+      "arm": "A",
+      "preset_failure": true,
+      "requests": 5,
+      "error": null,
+      "termination": "no_progress",
+      "relevant_originals": 0,
+      "report_ok": false,
+      "report_failures": [
+        "material_index_never_read",
+        "material_issue_not_reported"
+      ],
+      "passed": false,
+      "autonomy": false,
+      "complete": false,
+      "wall_ms": 13232.21,
+      "planner_calls": 5,
+      "safety": "enforced",
+      "budget_exhausted": false,
+      "no_progress": true,
+      "search_calls": 3,
+      "calls": [
+        {
+          "tool": "memory_read",
+          "arguments": {
+            "query": "snapshot",
+            "gap_id": "authority",
+            "expected_observation": "完整权威药单"
+          }
+        },
+        {
+          "tool": "plan_questions",
+          "arguments": {
+            "questions": [
+              {
+                "statement": "氨氯地平的适应症是什么？",
+                "entities": [
+                  "氨氯地平"
+                ]
+              }
+            ],
+            "gap_id": "subquestions",
+            "expected_observation": "氨氯地平的适应症信息"
+          }
+        },
+        {
+          "tool": "rag_search",
+          "arguments": {
+            "query": "氨氯地平",
+            "section": "适应症",
+            "drug_name": "氨氯地平",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "氨氯地平的适应症信息"
+          }
+        },
+        {
+          "tool": "rag_search",
+          "arguments": {
+            "query": "氨氯地平",
+            "section": "适应症",
+            "drug_name": "氨氯地平",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "氨氯地平的适应症信息"
+          }
+        },
+        {
+          "tool": "rag_search",
+          "arguments": {
+            "query": "氨氯地平",
+            "section": "适应症",
+            "drug_name": "氨氯地平",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "氨氯地平的适应症信息"
+          }
+        }
+      ],
+      "feedback_seen": [
+        "invalid_filter",
+        "invalid_filter",
+        "invalid_filter"
+      ],
+      "message_shapes": [
+        {
+          "attempt": 1,
+          "messages": 2,
+          "chars": 7506,
+          "roles": [
+            "system",
+            "user"
+          ]
+        },
+        {
+          "attempt": 2,
+          "messages": 2,
+          "chars": 13240,
+          "roles": [
+            "system",
+            "user"
+          ]
+        },
+        {
+          "attempt": 3,
+          "messages": 2,
+          "chars": 16548,
+          "roles": [
+            "system",
+            "user"
+          ]
+        },
+        {
+          "attempt": 4,
+          "messages": 2,
+          "chars": 18089,
+          "roles": [
+            "system",
+            "user"
+          ]
+        },
+        {
+          "attempt": 5,
+          "messages": 2,
+          "chars": 20062,
+          "roles": [
+            "system",
+            "user"
+          ]
+        }
+      ],
+      "feedback_use": {
+        "applicable": true,
+        "failed_call": {
+          "tool": "rag_search",
+          "arguments": {
+            "query": "氨氯地平",
+            "section": "适应症",
+            "drug_name": "氨氯地平",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "氨氯地平的适应症信息"
+          }
+        },
+        "repeated_failed_action": true,
+        "repeat_count": 2,
+        "changed_action": false,
+        "changed_tools": [],
+        "obtained_original": false,
+        "verdict": "repeated the failed action"
+      }
+    },
+    {
+      "task_id": "invalid-filter",
+      "arm": "B",
+      "preset_failure": true,
+      "requests": 7,
+      "error": null,
+      "termination": "no_progress",
+      "relevant_originals": 0,
+      "report_ok": true,
+      "report_failures": [],
+      "passed": false,
+      "autonomy": false,
+      "complete": false,
+      "wall_ms": 16849.25,
+      "planner_calls": 7,
+      "safety": "enforced",
+      "budget_exhausted": false,
+      "no_progress": true,
+      "search_calls": 1,
+      "calls": [
+        {
+          "tool": "memory_read",
+          "arguments": {
+            "query": "snapshot",
+            "gap_id": "authority",
+            "expected_observation": "完整权威药单"
+          }
+        },
+        {
+          "tool": "plan_questions",
+          "arguments": {
+            "questions": [
+              {
+                "statement": "氨氯地平的适应症是什么？",
+                "entities": [
+                  "氨氯地平"
+                ]
+              }
+            ],
+            "gap_id": "subquestions",
+            "expected_observation": "明确氨氯地平的适应症"
+          }
+        },
+        {
+          "tool": "rag_search",
+          "arguments": {
+            "query": "氨氯地平 适应症",
+            "top_k": 5,
+            "section": "适应症",
+            "drug_name": "氨氯地平",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "氨氯地平的适应症相关证据"
+          }
+        },
+        {
+          "tool": "list_materials",
+          "arguments": {
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "列出与氨氯地平适应症相关的材料"
+          }
+        },
+        {
+          "tool": "read_material_item",
+          "arguments": {
+            "case_id": "case:2f82e357d99049b39b61ad072d5675f2",
+            "item_id": "e053d74e5b8a493db90d48e01222a639",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "氨氯地平的适应症相关材料原文"
+          }
+        },
+        {
+          "tool": "memory_read",
+          "arguments": {
+            "query": "snapshot",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "完整权威药单与氨氯地平的适应症相关证据"
+          }
+        },
+        {
+          "tool": "list_materials",
+          "arguments": {
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "列出与氨氯地平适应症相关的材料"
+          }
+        },
+        {
+          "tool": "read_material_item",
+          "arguments": {
+            "case_id": "case:2f82e357d99049b39b61ad072d5675f2",
+            "item_id": "e053d74e5b8a493db90d48e01222a639",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "氨氯地平的适应症相关材料原文"
+          }
+        },
+        {
+          "tool": "memory_read",
+          "arguments": {
+            "query": "snapshot",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "完整权威药单与氨氯地平的适应症相关证据"
+          }
+        }
+      ],
+      "feedback_seen": [
+        "invalid_filter",
+        "invalid_filter",
+        "invalid_filter",
+        "invalid_filter"
+      ],
+      "message_shapes": [
+        {
+          "attempt": 1,
+          "messages": 2,
+          "chars": 7466,
+          "roles": [
+            "system",
+            "user"
+          ]
+        },
+        {
+          "attempt": 2,
+          "messages": 4,
+          "chars": 11319,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool"
+          ]
+        },
+        {
+          "attempt": 3,
+          "messages": 6,
+          "chars": 13981,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool"
+          ]
+        },
+        {
+          "attempt": 4,
+          "messages": 8,
+          "chars": 16087,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool"
+          ]
+        },
+        {
+          "attempt": 5,
+          "messages": 10,
+          "chars": 18272,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool"
+          ]
+        },
+        {
+          "attempt": 6,
+          "messages": 12,
+          "chars": 22166,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool"
+          ]
+        },
+        {
+          "attempt": 7,
+          "messages": 16,
+          "chars": 24689,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "tool",
+            "tool"
+          ]
+        }
+      ],
+      "feedback_use": {
+        "applicable": true,
+        "failed_call": {
+          "tool": "rag_search",
+          "arguments": {
+            "query": "氨氯地平 适应症",
+            "top_k": 5,
+            "section": "适应症",
+            "drug_name": "氨氯地平",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "氨氯地平的适应症相关证据"
+          }
+        },
+        "repeated_failed_action": false,
+        "repeat_count": 0,
+        "changed_action": true,
+        "changed_tools": [
+          "list_materials",
+          "memory_read",
+          "read_material_item"
+        ],
+        "obtained_original": false,
+        "verdict": "changed the action but reached no relevant original"
+      }
+    },
+    {
+      "task_id": "no-match-rewrite",
+      "arm": "A",
+      "preset_failure": true,
+      "requests": 6,
+      "error": null,
+      "termination": "budget_insufficient",
+      "relevant_originals": 0,
+      "report_ok": false,
+      "report_failures": [
+        "material_index_never_read"
+      ],
+      "passed": false,
+      "autonomy": true,
+      "complete": false,
+      "wall_ms": 16317.05,
+      "planner_calls": 6,
+      "safety": "enforced",
+      "budget_exhausted": false,
+      "no_progress": false,
+      "search_calls": 3,
+      "calls": [
+        {
+          "tool": "memory_read",
+          "arguments": {
+            "query": "snapshot",
+            "gap_id": "authority",
+            "expected_observation": "完整权威药单"
+          }
+        },
+        {
+          "tool": "plan_questions",
+          "arguments": {
+            "questions": [
+              {
+                "statement": "确认氨氯地平的用药信息是否准确。",
+                "entities": [
+                  "氨氯地平"
+                ]
+              }
+            ],
+            "gap_id": "subquestions",
+            "expected_observation": "确认氨氯地平的用药信息是否准确。"
+          }
+        },
+        {
+          "tool": "plan_questions",
+          "arguments": {
+            "questions": [
+              {
+                "statement": "确认氨氯地平的用药信息是否准确。",
+                "entities": [
+                  "氨氯地平"
+                ]
+              },
+              {
+                "statement": "确认克拉霉素的用药信息是否准确。",
+                "entities": [
+                  "克拉霉素"
+                ]
+              }
+            ],
+            "gap_id": "subquestions",
+            "expected_observation": "确认氨氯地平和克拉霉素的用药信息是否准确。"
+          }
+        },
+        {
+          "tool": "rag_search",
+          "arguments": {
+            "query": "确认氨氯地平的用药信息是否准确。",
+            "top_k": 5,
+            "section": "药物相互作用",
+            "drug_name": "氨氯地平",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "找到支持或反对氨氯地平用药信息的证据片段"
+          }
+        },
+        {
+          "tool": "rag_search",
+          "arguments": {
+            "query": "确认克拉霉素的用药信息是否准确。",
+            "top_k": 5,
+            "section": "药物相互作用",
+            "drug_name": "克拉霉素",
+            "gap_id": "claim:7a54308e5f49",
+            "expected_observation": "找到支持或反对克拉霉素用药信息的证据片段"
+          }
+        },
+        {
+          "tool": "rag_search",
+          "arguments": {
+            "query": "确认氨氯地平的用药信息是否准确。",
+            "top_k": 5,
+            "section": "药物相互作用",
+            "drug_name": "氨氯地平",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "找到支持或反对氨氯地平用药信息的证据片段"
+          }
+        }
+      ],
+      "feedback_seen": [
+        "no_match",
+        "no_match",
+        "invalid_filter"
+      ],
+      "message_shapes": [
+        {
+          "attempt": 1,
+          "messages": 2,
+          "chars": 7928,
+          "roles": [
+            "system",
+            "user"
+          ]
+        },
+        {
+          "attempt": 2,
+          "messages": 2,
+          "chars": 14120,
+          "roles": [
+            "system",
+            "user"
+          ]
+        },
+        {
+          "attempt": 3,
+          "messages": 2,
+          "chars": 15861,
+          "roles": [
+            "system",
+            "user"
+          ]
+        },
+        {
+          "attempt": 4,
+          "messages": 2,
+          "chars": 18473,
+          "roles": [
+            "system",
+            "user"
+          ]
+        },
+        {
+          "attempt": 5,
+          "messages": 2,
+          "chars": 20920,
+          "roles": [
+            "system",
+            "user"
+          ]
+        },
+        {
+          "attempt": 6,
+          "messages": 2,
+          "chars": 22005,
+          "roles": [
+            "system",
+            "user"
+          ]
+        }
+      ],
+      "feedback_use": {
+        "applicable": true,
+        "failed_call": {
+          "tool": "rag_search",
+          "arguments": {
+            "query": "确认氨氯地平的用药信息是否准确。",
+            "top_k": 5,
+            "section": "药物相互作用",
+            "drug_name": "氨氯地平",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "找到支持或反对氨氯地平用药信息的证据片段"
+          }
+        },
+        "repeated_failed_action": true,
+        "repeat_count": 1,
+        "changed_action": true,
+        "changed_tools": [
+          "rag_search"
+        ],
+        "obtained_original": false,
+        "verdict": "changed the action but reached no relevant original"
+      }
+    },
+    {
+      "task_id": "no-match-rewrite",
+      "arm": "B",
+      "preset_failure": true,
+      "requests": 5,
+      "error": null,
+      "termination": "no_progress",
+      "relevant_originals": 0,
+      "report_ok": false,
+      "report_failures": [
+        "material_index_never_read"
+      ],
+      "passed": false,
+      "autonomy": false,
+      "complete": false,
+      "wall_ms": 17678.53,
+      "planner_calls": 5,
+      "safety": "enforced",
+      "budget_exhausted": false,
+      "no_progress": false,
+      "search_calls": 0,
+      "calls": [
+        {
+          "tool": "memory_read",
+          "arguments": {
+            "query": "snapshot",
+            "gap_id": "authority",
+            "expected_observation": "完整权威药单与关键事实"
+          }
+        },
+        {
+          "tool": "memory_read",
+          "arguments": {
+            "query": "current_medications",
+            "gap_id": "authority",
+            "expected_observation": "当前用药信息"
+          }
+        },
+        {
+          "tool": "memory_read",
+          "arguments": {
+            "query": "snapshot",
+            "gap_id": "authority",
+            "expected_observation": "完整权威药单与关键事实"
+          }
+        },
+        {
+          "tool": "memory_read",
+          "arguments": {
+            "query": "current_medications",
+            "gap_id": "authority",
+            "expected_observation": "当前用药信息"
+          }
+        },
+        {
+          "tool": "plan_questions",
+          "arguments": {
+            "questions": [
+              {
+                "statement": "确认氨氯地平的用药信息是否准确。",
+                "entities": [
+                  "氨氯地平"
+                ]
+              }
+            ],
+            "gap_id": "subquestions",
+            "expected_observation": "氨氯地平的用药信息是否准确"
+          }
+        },
+        {
+          "tool": "memory_read",
+          "arguments": {
+            "query": "snapshot",
+            "gap_id": "authority",
+            "expected_observation": "完整权威药单与关键事实"
+          }
+        },
+        {
+          "tool": "memory_read",
+          "arguments": {
+            "query": "current_medications",
+            "gap_id": "authority",
+            "expected_observation": "当前用药信息"
+          }
+        },
+        {
+          "tool": "read_material_item",
+          "arguments": {
+            "case_id": "user_upload",
+            "item_id": "interaction_evidence",
+            "gap_id": "authority",
+            "expected_observation": "确认氨氯地平的用药信息是否准确的检索结果"
+          }
+        }
+      ],
+      "feedback_seen": [],
+      "message_shapes": [
+        {
+          "attempt": 1,
+          "messages": 2,
+          "chars": 7888,
+          "roles": [
+            "system",
+            "user"
+          ]
+        },
+        {
+          "attempt": 2,
+          "messages": 5,
+          "chars": 12603,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "tool"
+          ]
+        },
+        {
+          "attempt": 3,
+          "messages": 8,
+          "chars": 14246,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "tool",
+            "assistant",
+            "tool",
+            "tool"
+          ]
+        },
+        {
+          "attempt": 4,
+          "messages": 10,
+          "chars": 14546,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "tool",
+            "assistant",
+            "tool",
+            "tool",
+            "assistant",
+            "tool"
+          ]
+        },
+        {
+          "attempt": 5,
+          "messages": 13,
+          "chars": 16271,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "tool",
+            "assistant",
+            "tool",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "tool"
+          ]
+        }
+      ],
+      "feedback_use": {
+        "applicable": false,
+        "reason": "no retrieval call was ever made"
+      }
+    },
+    {
+      "task_id": "conflict-natural",
+      "arm": "A",
+      "preset_failure": false,
+      "requests": 1,
+      "error": null,
+      "termination": "budget_insufficient",
+      "relevant_originals": 0,
+      "report_ok": false,
+      "report_failures": [
+        "material_index_never_read"
+      ],
+      "passed": false,
+      "autonomy": false,
+      "complete": false,
+      "wall_ms": 62661.09,
+      "planner_calls": 1,
+      "safety": "enforced",
+      "budget_exhausted": true,
+      "no_progress": false,
+      "search_calls": 0,
+      "calls": [],
+      "feedback_seen": [],
+      "message_shapes": [
+        {
+          "attempt": 1,
+          "messages": 2,
+          "chars": 7632,
+          "roles": [
+            "system",
+            "user"
+          ]
+        }
+      ],
+      "feedback_use": {
+        "applicable": false,
+        "reason": "no retrieval call was ever made"
+      }
+    },
+    {
+      "task_id": "conflict-natural",
+      "arm": "B",
+      "preset_failure": false,
+      "requests": 8,
+      "error": null,
+      "termination": "checks_completed",
+      "relevant_originals": 2,
+      "report_ok": false,
+      "report_failures": [
+        "material_index_never_read"
+      ],
+      "passed": false,
+      "autonomy": false,
+      "complete": false,
+      "wall_ms": 20672.67,
+      "planner_calls": 8,
+      "safety": "enforced",
+      "budget_exhausted": false,
+      "no_progress": false,
+      "search_calls": 2,
+      "calls": [
+        {
+          "tool": "memory_read",
+          "arguments": {
+            "query": "current_medications",
+            "gap_id": "authority",
+            "expected_observation": "确认氨氯地平和克拉霉素的用药信息"
+          }
+        },
+        {
+          "tool": "memory_read",
+          "arguments": {
+            "query": "snapshot",
+            "gap_id": "authority",
+            "expected_observation": "确认氨氯地平和克拉霉素的用药信息"
+          }
+        },
+        {
+          "tool": "plan_questions",
+          "arguments": {
+            "questions": [
+              {
+                "statement": "确认氨氯地平的用药剂量和给药时间。",
+                "entities": [
+                  "氨氯地平"
+                ]
+              },
+              {
+                "statement": "确认克拉霉素的用药剂量和给药时间。",
+                "entities": [
+                  "克拉霉素"
+                ]
+              }
+            ],
+            "gap_id": "subquestions",
+            "expected_observation": "明确氨氯地平和克拉霉素的用药信息"
+          }
+        },
+        {
+          "tool": "rag_search",
+          "arguments": {
+            "query": "氨氯地平 用药剂量 给药时间",
+            "top_k": 5,
+            "drug_name": "氨氯地平",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "找到支持和反对氨氯地平用药剂量和给药时间的证据"
+          }
+        },
+        {
+          "tool": "rag_search",
+          "arguments": {
+            "query": "克拉霉素 用药剂量 给药时间",
+            "top_k": 5,
+            "drug_name": "克拉霉素",
+            "gap_id": "claim:7a54308e5f49",
+            "expected_observation": "找到支持和反对克拉霉素用药剂量和给药时间的证据"
+          }
+        },
+        {
+          "tool": "read_evidence",
+          "arguments": {
+            "evidence_id": "ev-e30907b5d68aa977bed7",
+            "offset": 0,
+            "limit": 100,
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "确认氨氯地平的用药剂量和给药时间"
+          }
+        },
+        {
+          "tool": "read_evidence",
+          "arguments": {
+            "evidence_id": "ev-eabec063ba11a15b6c91",
+            "offset": 0,
+            "limit": 100,
+            "gap_id": "claim:7a54308e5f49",
+            "expected_observation": "确认克拉霉素的用药剂量和给药时间"
+          }
+        },
+        {
+          "tool": "memory_write",
+          "arguments": {
+            "operation": "consolidate_event",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "记录氨氯地平的用药剂量和给药时间"
+          }
+        },
+        {
+          "tool": "memory_write",
+          "arguments": {
+            "operation": "consolidate_event",
+            "gap_id": "claim:7a54308e5f49",
+            "expected_observation": "记录克拉霉素的用药剂量和给药时间"
+          }
+        },
+        {
+          "tool": "memory_write",
+          "arguments": {
+            "operation": "record_warnings",
+            "gap_id": "claim:7a54308e5f49",
+            "expected_observation": "记录克拉霉素的用药剂量和给药时间"
+          }
+        }
+      ],
+      "feedback_seen": [],
+      "message_shapes": [
+        {
+          "attempt": 1,
+          "messages": 2,
+          "chars": 7592,
+          "roles": [
+            "system",
+            "user"
+          ]
+        },
+        {
+          "attempt": 2,
+          "messages": 4,
+          "chars": 8859,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool"
+          ]
+        },
+        {
+          "attempt": 3,
+          "messages": 6,
+          "chars": 12428,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool"
+          ]
+        },
+        {
+          "attempt": 4,
+          "messages": 8,
+          "chars": 15907,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool"
+          ]
+        },
+        {
+          "attempt": 5,
+          "messages": 11,
+          "chars": 20886,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "tool"
+          ]
+        },
+        {
+          "attempt": 6,
+          "messages": 14,
+          "chars": 20051,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "tool",
+            "assistant",
+            "tool",
+            "tool"
+          ]
+        },
+        {
+          "attempt": 7,
+          "messages": 16,
+          "chars": 21257,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "tool",
+            "assistant",
+            "tool",
+            "tool",
+            "assistant",
+            "tool"
+          ]
+        },
+        {
+          "attempt": 8,
+          "messages": 18,
+          "chars": 22516,
+          "roles": [
+            "system",
+            "user",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool",
+            "tool",
+            "assistant",
+            "tool",
+            "tool",
+            "assistant",
+            "tool",
+            "assistant",
+            "tool"
+          ]
+        }
+      ],
+      "feedback_use": {
+        "applicable": true,
+        "failed_call": {
+          "tool": "rag_search",
+          "arguments": {
+            "query": "氨氯地平 用药剂量 给药时间",
+            "top_k": 5,
+            "drug_name": "氨氯地平",
+            "gap_id": "claim:2e11044806d0",
+            "expected_observation": "找到支持和反对氨氯地平用药剂量和给药时间的证据"
+          }
+        },
+        "repeated_failed_action": false,
+        "repeat_count": 0,
+        "changed_action": true,
+        "changed_tools": [
+          "memory_write",
+          "rag_search",
+          "read_evidence"
+        ],
+        "obtained_original": true,
+        "verdict": "changed the action and reached a relevant original"
+      }
+    }
+  ]
+}

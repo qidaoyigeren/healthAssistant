@@ -35,6 +35,9 @@ def _env():
 def _rag(chunks=None, warnings=None):
     """Offline exact retrieval double: never touches embeddings or the network."""
     class Fixed(RAGTool):
+        def corpus_chunks(self):
+            return list(chunks or [])
+
         def __call__(self, query, **kwargs):
             return {'query': query, 'mode': 'fixed', 'corpus_version': 'test-v1',
                     'results': list(chunks or []), 'warnings': list(warnings or [])}

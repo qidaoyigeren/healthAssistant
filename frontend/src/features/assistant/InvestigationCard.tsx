@@ -10,6 +10,14 @@ const reasons: Record<string, string> = {
   no_progress: '未获得新证据，已停止重复核查', budget_insufficient: '本轮预算不足，检查未完成',
   unrecoverable_failure: '工具或执行失败，已有结果保留', cancelled: '已取消后续核查',
 };
+const retrievalReasons: Record<string, string> = {
+  invalid_filter: '检索条件与当前材料目录不符，尚未执行搜索。',
+  empty_filter_scope: '所选材料范围没有可供核查的内容。',
+  no_match: '已检索所选材料，暂未找到匹配内容。',
+  retrieval_error: '检索服务执行失败，尚不能判断是否存在依据。',
+  invalid_query: '查询参数不完整，本次未执行搜索。',
+  found: '已找到候选依据，需结合原文继续核查。',
+};
 
 export function InvestigationCard({ bundle }: { bundle?: AnswerBundleDto | null }): React.ReactElement | null {
   const [evidenceId, setEvidenceId] = useState<string | null>(null);
@@ -28,6 +36,13 @@ export function InvestigationCard({ bundle }: { bundle?: AnswerBundleDto | null 
       {open.length ? <ul className="space-y-1">{open.map((gap) => <li key={gap.gap_id}>{gap.description}</li>)}</ul>
         : <p>本契约内没有剩余缺口。</p>}
       <p><strong>终止原因：</strong>{reasons[inv.termination_reason ?? ''] ?? '尚未完成'}</p>
+      {!!inv.retrieval_feedback?.length && <div aria-label="检索调查进展">
+        <h3 className="font-semibold">检索调查进展（最近尝试）</h3>
+        <ol className="list-inside list-decimal">{inv.retrieval_feedback.slice(-6).map((item, index) =>
+          <li key={index}>{item.status === 'found' && item.result_kind === 'original_pages'
+            ? '已取得原文，继续核对来源与适用条件。'
+            : retrievalReasons[item.status] ?? '正在核对检索反馈。'}</li>)}</ol>
+      </div>}
       {bundle?.multi_review && (
         <div aria-label="独立核查发现">
           <h3 className="font-semibold">独立核查（{bundle.multi_review.trigger === 'open_evidence_conflict' ? '证据冲突触发' : '大范围核查触发'}）</h3>

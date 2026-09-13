@@ -1,0 +1,304 @@
+{
+  "unique_suites": 41,
+  "unique_tests": 597,
+  "all_passed_after_necessary_reruns": true,
+  "suites": [
+    {
+      "name": "test_agent_adaptive",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 8,
+      "passed": true
+    },
+    {
+      "name": "test_agent_closeout",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 17,
+      "passed": true
+    },
+    {
+      "name": "test_agent_investigation",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 9,
+      "passed": true
+    },
+    {
+      "name": "test_agent_open_tasks",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 6,
+      "passed": true
+    },
+    {
+      "name": "test_agent_visit_prep",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 66,
+      "passed": true
+    },
+    {
+      "name": "test_claim_support",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 6,
+      "passed": true
+    },
+    {
+      "name": "test_evidence_loop",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 15,
+      "passed": true
+    },
+    {
+      "name": "test_frontend_read_models",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 13,
+      "passed": true
+    },
+    {
+      "name": "test_harness_acceptance",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 13,
+      "passed": true
+    },
+    {
+      "name": "test_harness_p0",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 26,
+      "passed": true
+    },
+    {
+      "name": "test_harness_p1_a",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 15,
+      "passed": true
+    },
+    {
+      "name": "test_harness_p1_b",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 16,
+      "passed": true
+    },
+    {
+      "name": "test_harness_p1_c",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 11,
+      "passed": true
+    },
+    {
+      "name": "test_harness_p2",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 16,
+      "passed": true
+    },
+    {
+      "name": "test_harness_p3",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 22,
+      "passed": true
+    },
+    {
+      "name": "test_live_regressions",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 16,
+      "passed": true
+    },
+    {
+      "name": "test_memory_p0",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 16,
+      "passed": true
+    },
+    {
+      "name": "test_memory_p1",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 14,
+      "passed": true
+    },
+    {
+      "name": "test_memory_p2",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 15,
+      "passed": true
+    },
+    {
+      "name": "test_model_tool_controlled",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 9,
+      "passed": true
+    },
+    {
+      "name": "test_multi_agent_review",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 6,
+      "passed": true
+    },
+    {
+      "name": "test_planner_reliability",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 36,
+      "passed": true
+    },
+    {
+      "name": "test_product_closeout",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 10,
+      "passed": true
+    },
+    {
+      "name": "test_product_evals",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 3,
+      "passed": true
+    },
+    {
+      "name": "test_product_evidence_quality",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 3,
+      "passed": true
+    },
+    {
+      "name": "test_product_full_flow",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 4,
+      "passed": true
+    },
+    {
+      "name": "test_product_ocr",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 4,
+      "passed": true
+    },
+    {
+      "name": "test_product_p1",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 10,
+      "passed": true
+    },
+    {
+      "name": "test_product_reconciliation",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 5,
+      "passed": true
+    },
+    {
+      "name": "test_product_tasks",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 4,
+      "passed": true
+    },
+    {
+      "name": "test_reliability_p0",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 14,
+      "passed": true
+    },
+    {
+      "name": "test_reliability_p1",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 9,
+      "passed": true
+    },
+    {
+      "name": "test_reliability_p2",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 10,
+      "passed": true
+    },
+    {
+      "name": "test_stage10_server",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 11,
+      "passed": true
+    },
+    {
+      "name": "test_stage3",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 3,
+      "passed": true
+    },
+    {
+      "name": "test_stage5",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 18,
+      "passed": true
+    },
+    {
+      "name": "test_stage6",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 26,
+      "passed": true
+    },
+    {
+      "name": "test_stage8_agent",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 14,
+      "passed": true,
+      "resolution_log": "final-focused.log; final-code-regression.log",
+      "initial_failure_preserved": "regression/test_stage8_agent.log"
+    },
+    {
+      "name": "test_visitprep_budget",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 10,
+      "passed": true
+    },
+    {
+      "name": "test_visitprep_scoring",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 54,
+      "passed": true
+    },
+    {
+      "name": "test_retrieval_feedback",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "tests": 14,
+      "passed": true,
+      "final_log": "final-code-regression.log"
+    }
+  ],
+  "final_targeted_tests": 118,
+  "final_targeted_log": "final-code-regression.log",
+  "frontend_typecheck": "passed",
+  "frontend_build": "passed; existing bundle size warning",
+  "diff_check": "passed",
+  "product_api_flows": 4,
+  "browser": "isolated scripted assistant: invalid filter visible -> candidates -> original/hash view; favicon 404 and existing router warnings only"
+}

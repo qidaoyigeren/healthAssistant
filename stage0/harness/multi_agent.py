@@ -1,7 +1,7 @@
 """A4 multi-agent evidence review — a DEFAULT-ON, closeable experiment.
 
-Builds on the Harness P3 delegation contract.  A coordinator (the parent
-agent) may dispatch two fixed read-only worker roles per claim:
+A coordinator (the parent agent) may dispatch two fixed read-only worker
+roles per claim:
 
 * ``evidence_researcher`` — proposes retrieval actions (rag_search /
   read_evidence only) within a bounded budget and stops by its own decision;
@@ -9,10 +9,11 @@ agent) may dispatch two fixed read-only worker roles per claim:
   researcher's argument), receives the claim, patient fact versions and
   evidence refs, and re-verifies entity/negation/condition/date coverage.
 
-Hard boundaries (unchanged from P3, re-tested here):
+Hard boundaries (re-tested here):
 
 * workers are read-only: no memory_write, no review submission, no domain
-  effects; ``delegate_task`` never appears in a worker toolset (no recursion);
+  effects; no worker holds a tool that could dispatch another worker, so
+  recursion is structurally impossible;
 * scope cannot expand: every returned evidence ref is re-validated by the
   PARENT against its own observed scope + content hash before use;
 * divergent verdicts are recorded as divergences — never resolved by voting

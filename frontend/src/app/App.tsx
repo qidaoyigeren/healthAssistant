@@ -5,6 +5,8 @@ import { Layout } from './Layout';
 import { ErrorBoundary, RouteErrorBoundary } from './ErrorBoundary';
 import { PreferencesProvider } from '../hooks/usePreferences';
 import { OverviewPage } from '../features/overview/OverviewPage';
+import { SafetyPage } from '../features/safety/SafetyPage';
+import { SafetyCaseDetailPage } from '../features/safety/SafetyCaseDetailPage';
 import { ProfilePage } from '../features/profile/ProfilePage';
 import { MedicationsPage } from '../features/medications/MedicationsPage';
 import { AlertsPage } from '../features/alerts/AlertsPage';
@@ -38,7 +40,12 @@ export function App(): React.ReactElement {
             <Layout>
               <RouteErrorBoundary>
                 <Routes>
-                  <Route path="/" element={<OverviewPage />} />
+                  {/* 产品主线:长期用药安全事项。`/` 与 `/safety` 是同一页。 */}
+                  <Route path="/" element={<SafetyPage />} />
+                  <Route path="/safety" element={<SafetyPage />} />
+                  <Route path="/safety/:caseId" element={<SafetyCaseDetailPage />} />
+                  {/* 旧总览保留可访问(计数与最近变化),但不再占首页。 */}
+                  <Route path="/overview" element={<OverviewPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/medications" element={<MedicationsPage />} />
                   <Route path="/alerts" element={<AlertsPage />} />

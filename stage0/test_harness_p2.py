@@ -80,9 +80,19 @@ class NoProgressTests(unittest.TestCase):
             # 1 fresh read + 2 repeats (feedback at 1, stop at the limit of 2)
             # instead of running to the max_cycles budget.
             self.assertEqual(len(acts), 3)
+            # Exactly ONE structured feedback entry.  The old filter matched the
+            # STOP entry too ("连续重复读取…" contains "重复读取"), so "at least
+            # one" could not tell mid-run feedback from the terminal stop.
             feedback = [e for e in response.tool_trace if e.get("phase") == "no_progress"
-                        and "重复读取" in str(e.get("note", ""))]
-            self.assertGreaterEqual(len(feedback), 1)  # structured, evidence-naming
+                        and str(e.get("note", "")).startswith("重复读取")]
+            self.assertEqual(len(feedback), 1, feedback)
+            # It is a complete record rather than a bare string, and it names
+            # what was repeated and how far the streak is — while still stating
+            # that the evidence already in hand stands.
+            self.assertEqual({"phase", "cycle", "note", "evidence_refs"}, set(feedback[0]))
+            self.assertIn("memory_read", feedback[0]["note"])
+            self.assertIn("第 1/2 次重复", feedback[0]["note"])
+            self.assertIn("已有证据继续有效", feedback[0]["note"])
             stop = [e for e in response.tool_trace
                     if e.get("unfinished_items")]
             self.assertTrue(stop)

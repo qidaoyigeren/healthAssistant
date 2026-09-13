@@ -322,25 +322,37 @@ class ChangeImpactTests(unittest.TestCase):
             finally:
                 api.close()
 
-    def test_no_recheck_hook_never_reads_as_all_clear(self) -> None:
+    def test_a_recheck_without_the_agent_never_reads_as_all_clear(self) -> None:
+        """拿掉 agent 的 hook：重查仍在**确定性**路径上执行，结论绝不读成"风险解除"。
+
+        旧版本在这里期望 `no_hook`（什么都不做）。按本轮主线，必要检查不能因为
+        agent 不可用就停摆——所以这里锁的是更强的性质：检查确实跑完了，旧结论保留为
+        stale/superseded，后继结论不得宣称风险已清除。
+        """
         with tempfile.TemporaryDirectory() as directory:
             api = self._state_with_two_warnings(Path(directory))
             try:
-                # Remove the agent's recheck hook BEFORE the correction: the
-                # recheck runner must then leave tasks open and stale
-                # conclusions stale — "not rechecked yet" must never read as
-                # "risk cleared".
+                # 拿掉 agent 的 hook；它留下的检测器仍在，检查因此照常执行。
                 api.store.recheck_hook = None
                 api.commit_event("imp-dose2", DOSE_CHANGE_AMLODIPINE)
+                # 检查不再退化成 "no_hook"：没有 agent 也在确定性路径上跑完了。
                 rechecks = api.client.post("/v1/rechecks", json={"max_jobs": 2}).json()
-                self.assertEqual(rechecks.get("status"), "no_hook")
+                self.assertEqual(rechecks.get("status"), "ok")
                 impact = api.client.get("/v1/change-impact").json()
                 statuses = {item["status"] for item in impact["affected_conclusions"]}
                 self.assertIn("stale", statuses)
-                self.assertGreaterEqual(impact["summary"]["pending_rechecks"], 1)
                 for item in impact["affected_conclusions"]:
                     head = api.client.get(f"/v1/alert-records/{item['conclusion_id']}").json()
                     self.assertNotEqual(head["status"], "current")
+                    # The recheck ran and left a successor version...
+                    chain = api.client.get(
+                        f"/v1/conclusions/{item['conclusion_id']}/history").json()
+                    self.assertIsNotNone(chain["current_head"])
+                    # ...and that successor must not read as "risk cleared".
+                    for version in chain["versions"]:
+                        text = str(version.get("text") or "")
+                        for forbidden in ("风险已解除", "无风险", "不用再管", "可以放心"):
+                            self.assertNotIn(forbidden, text)
             finally:
                 api.close()
 
@@ -370,7 +382,7 @@ class AnswerBundleTests(unittest.TestCase):
                 api.close()
 
 
-# Browser integration lives in run_product_acceptance, where a fresh CLI
+# Browser integration is a real-browser acceptance run, where a fresh CLI
 # result and screenshots are mandatory. Unit tests never mutate an arbitrary
 # service on port 8000 or silently skip the product acceptance gate.
 

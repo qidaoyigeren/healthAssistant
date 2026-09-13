@@ -1,0 +1,85 @@
+[
+  {
+    "task_id": "correction-invalid",
+    "phase": "before",
+    "status": "scored",
+    "requests": 4,
+    "service_faults": 0,
+    "report_quality": {
+      "ok": false,
+      "failures": [
+        "material_index_never_read",
+        "material_issue_not_reported"
+      ],
+      "questions_asked": []
+    },
+    "terminal_reason": "no_progress",
+    "task_success": false,
+    "relevant_originals": 0,
+    "tool_attempts": null,
+    "executed_searches": null,
+    "note": null
+  },
+  {
+    "task_id": "correction-invalid",
+    "phase": "after",
+    "status": "scored",
+    "requests": 5,
+    "service_faults": 0,
+    "report_quality": {
+      "ok": false,
+      "failures": [
+        "material_index_never_read",
+        "material_issue_not_reported"
+      ],
+      "questions_asked": []
+    },
+    "terminal_reason": "no_progress",
+    "task_success": false,
+    "relevant_originals": 0,
+    "tool_attempts": 3,
+    "executed_searches": 0,
+    "note": null
+  },
+  {
+    "task_id": "correction-scope",
+    "phase": "before",
+    "status": "result_export_failed",
+    "requests": 4,
+    "service_faults": 0,
+    "report_quality": null,
+    "terminal_reason": null,
+    "task_success": false,
+    "relevant_originals": null,
+    "tool_attempts": null,
+    "executed_searches": null,
+    "note": "raw wire/ledger retained; runner result lost during export; offline replay separately reproduces final safety refusal"
+  },
+  {
+    "task_id": "correction-scope",
+    "phase": "after",
+    "status": "not_sampled_after_frozen_stop",
+    "task_success": false,
+    "report_quality": null,
+    "service_faults": null,
+    "requests": 0
+  },
+  {
+    "task_id": "correction-rewrite",
+    "phase": "before",
+    "status": "not_sampled_after_frozen_stop",
+    "task_success": false,
+    "report_quality": null,
+    "service_faults": null,
+    "requests": 0
+  },
+  {
+    "task_id": "correction-rewrite",
+    "phase": "after",
+    "status": "not_sampled_after_frozen_stop",
+    "task_success": false,
+    "report_quality": null,
+    "service_faults": null,
+    "requests": 0
+  }
+]

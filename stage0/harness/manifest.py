@@ -175,26 +175,16 @@ def build_manifest(*, run_id: str, agent, graph_version: str,
                            if review_enabled is None else review_enabled),
         "read_cache": os.getenv("STAGE0_READ_CACHE", ""),
         "run_reuse": os.getenv("STAGE0_RUN_REUSE", ""),
-        "no_progress_limit": os.getenv("AGENT_NO_PROGRESS_LIMIT", "0"),
+        "evidence_interface": os.getenv("AGENT_EVIDENCE_INTERFACE", "B1"),
+        "parallel_tool_calls": False,
+        # The EFFECTIVE value, not the raw env: the detector now has a
+        # non-zero default, and a manifest that reported "0" while the loop
+        # actually ran at 2 would describe a different system than the one
+        # that produced the artifacts.
+        "no_progress_limit": (
+            (os.getenv("AGENT_NO_PROGRESS_LIMIT") or "").strip()
+            or str(agent_module.MedicationCoordinatorAgent.NO_PROGRESS_LIMIT_DEFAULT)),
     }
-
-    # Harness P3: the delegation/batching experiment configuration is part of
-    # the immutable manifest — worker roles, their fixed toolsets and limits,
-    # and the honest worker kind (deterministic pipeline, no model).
-    try:
-        from . import delegation as _delegation
-        policy["delegation"] = {
-            "enabled": _delegation.delegation_enabled(),
-            "batch_read": os.getenv("STAGE0_READ_BATCH", ""),
-            "worker_kind": _delegation.delegation_limits()["worker_kind"],
-            "worker_model": _delegation.delegation_limits()["worker_model"],
-            "roles": {name: {"tools": sorted(role["tools"]), "label": role["label"]}
-                      for name, role in _delegation.WORKER_ROLES.items()},
-            "limits": {k: v for k, v in _delegation.delegation_limits().items()
-                       if k not in {"worker_kind", "worker_model"}},
-        }
-    except Exception:
-        policy["delegation"] = "unknown"
 
     from .. import ddi_engine
     rag_dir = Path(os.getenv("DDI_ENGINE_RAG_INDEX_DIR") or agent_module.rag.INDEX_DIR)
@@ -212,8 +202,6 @@ def build_manifest(*, run_id: str, agent, graph_version: str,
         "AGENT_GRAPH_RUNNER": os.getenv("AGENT_GRAPH_RUNNER", ""),
         "STAGE0_REVIEW_ENABLED": os.getenv("STAGE0_REVIEW_ENABLED", ""),
         "STAGE0_OTEL_EXPORT": os.getenv("STAGE0_OTEL_EXPORT", ""),
-        "STAGE0_DELEGATED_WORKERS": os.getenv("STAGE0_DELEGATED_WORKERS", ""),
-        "STAGE0_READ_BATCH": os.getenv("STAGE0_READ_BATCH", ""),
     }
 
     dependencies = {name: _package_version(name) for name in

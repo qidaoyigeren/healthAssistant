@@ -272,7 +272,7 @@ def capture_from_rag_result(store: EvidenceStore, result: dict[str, Any], *,
             corpus_version=item.get("corpus_version") or corpus_version,
             retrieval_params={"query": query, "drug_name": item.get("drug_name"),
                               "section": item.get("section"), "mode": result.get("mode")},
-            patient_revision=patient_revision, access_class=GENERAL_LABEL,
+            patient_revision=patient_revision, access_class=PATIENT_SPECIFIC if item.get('scope_id') is not None else GENERAL_LABEL,
             scope_id=scope_id)
         excerpt = select_excerpt(str(item["text"]), query)
         view.append({"evidence_id": record.evidence_id, "excerpt": excerpt["excerpt"],

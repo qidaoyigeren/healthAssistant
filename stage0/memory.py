@@ -625,6 +625,55 @@ def _ensure_p2_schema(connection: sqlite3.Connection) -> bool:
     return altered
 
 
+SAFETY_CHECK_SCHEMA_VERSION = "5-safety"
+
+#: 必要安全检查队列。用药或患者事实一变化就要**由程序**跑一次检查，而不是等模型
+#: 决定调用 ddi_check。这里只登记"该检查什么"；检查的确定性逻辑在
+#: ``stage0/safety_checks.py``。
+#:
+#: 去重键包含 ``subject_key``（用药集合哈希 / 事实键）：同一触发在**同一世界状态**下
+#: 重复发生不重复检查；世界变了哈希就变，于是新提示不会被去重吞掉。
+SAFETY_TABLES = """
+CREATE TABLE IF NOT EXISTS necessary_checks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope_id TEXT NOT NULL DEFAULT 'local-demo',
+    trigger_kind TEXT NOT NULL CHECK(trigger_kind IN ('medication_set','condition_facts')),
+    trigger_ref TEXT NOT NULL,
+    subject_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('open','running','done','failed','cancelled')),
+    attempts INTEGER NOT NULL DEFAULT 0,
+    lease_token TEXT,
+    lease_expires_at TEXT,
+    reason TEXT NOT NULL,
+    result_json TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(trigger_kind, trigger_ref, subject_key)
+);
+CREATE INDEX IF NOT EXISTS idx_necessary_checks_status ON necessary_checks(status, id);
+"""
+
+
+def _ensure_safety_schema(connection: sqlite3.Connection) -> bool:
+    """必要检查队列 + 结论的结构化结果。Additive only — no user data is touched.
+
+    ``conclusion_outcome`` 是**结构化**结果，值域 ``risk_present`` /
+    ``trigger_eliminated`` / ``unknown``。加列而不是回填：历史行留 NULL，
+    读出来就是 ``unknown``——**绝不**迁移成 ``risk_absent``。
+    """
+    existing = {
+        row[0] for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    connection.executescript(SAFETY_TABLES)
+    altered = False
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(conclusions)")}
+    if "conclusion_outcome" not in columns:
+        connection.execute("ALTER TABLE conclusions ADD COLUMN conclusion_outcome TEXT")
+        altered = True
+    return "necessary_checks" not in existing or altered
+
+
 def _ensure_r0_schema(connection: sqlite3.Connection) -> bool:
     """Reliability P0 migration.  Additive only: existing rows keep their
     identity; new columns are nullable so no historical data is rewritten."""
@@ -1010,6 +1059,11 @@ class MemoryStore:
         # "source_refs"} | None, registered by the agent; when absent, recheck
         # tasks stay open and are never silently treated as "risk cleared".
         self.recheck_hook: Any = None
+        # 确定性重查路径使用的检测器与检索工具。agent 构造时会把自己的实例写进来，
+        # 这样即使 hook 被移除（agent 不可用），检查用的仍是同一个检测器——
+        # 换实现就等于换结果，那是不能接受的。
+        self.recheck_detector: Any = None
+        self.recheck_rag_tool: Any = None
         self.connection = sqlite3.connect(self.db_path, timeout=30, check_same_thread=False)
         self.connection.row_factory = sqlite3.Row
         self.connection.execute("PRAGMA journal_mode=WAL")
@@ -1025,6 +1079,7 @@ class MemoryStore:
         migrated = _ensure_p2_schema(self.connection) or migrated
         migrated = _ensure_r0_schema(self.connection) or migrated
         migrated = _ensure_p2harness_schema(self.connection) or migrated
+        migrated = _ensure_safety_schema(self.connection) or migrated
         if migrated:
             self.connection.execute(
                 "INSERT OR REPLACE INTO schema_meta(key,value) VALUES('schema_version',?)",
@@ -1157,7 +1212,13 @@ class MemoryStore:
             self._audit("deduplicate", "semantic", item["id"], {"ref": item["ref"], "value": fact.value}, source)
             return {"outcome": "deduplicated", "item": item, "conflict": None}
 
-        version = (current["version"] + 1) if current else 1
+        # 版本号取**所有**历史行（含 superseded/retracted/disputed）的最大值 + 1，
+        # 不是"当前行 + 1"。撤回或取代之后没有 active 行，用后者会算出 v1 并撞上
+        # 已有的 v1——结果是**一条被撤回的事实再也无法重新上报**，跨会话复核
+        # 走到这里就断了。这与 medications 的版本规则一致。
+        version = int(self.connection.execute(
+            "SELECT COALESCE(MAX(version),0)+1 FROM semantic_memory "
+            "WHERE namespace=? AND fact_key=?", (fact.namespace, fact.key)).fetchone()[0])
         policy = fact.conflict_policy
         policy_forced = False
         if policy == "auto":
@@ -1202,6 +1263,12 @@ class MemoryStore:
             audit_details["policy_forced_to_conflict"] = {"requested": fact.conflict_policy, "reason": "safety_critical_namespace"}
         self._audit("insert" if current is None else policy, "semantic", item["id"], audit_details, source)
         self._after_fact_change_tx(fact.namespace, fact.key)
+        if fact.namespace in SAFETY_CRITICAL_NAMESPACES:
+            # 患者背景事实变化 → 说明书注意事项的适用性可能变了，这是确定性检查，
+            # 不是"请模型再看看"。
+            self._enqueue_necessary_check_tx(
+                'condition_facts', f'{fact.namespace}:{fact.key}', str(item['version']),
+                f'patient fact {fact.namespace}:{fact.key} changed')
         return {"outcome": "inserted" if current is None else policy, "item": item, "conflict": conflict}
 
     # ---- P1: scope revisions, dependency invalidation, recheck tasks ----
@@ -1513,6 +1580,29 @@ class MemoryStore:
             affected.append(conclusion_id)
         return affected
 
+    def _enqueue_necessary_check_tx(self, trigger_kind: str, trigger_ref: str,
+                                    subject_key: str, reason: str) -> None:
+        """登记一次必要安全检查，**在调用方的事务里**。
+
+        这是"必要检查不依赖模型"的落点：检查本身由 ``safety_checks`` 用确定性检测器
+        执行，这里只保证"记录改了"和"要重新检查"是同一次提交。检查失败或 worker
+        没跑，都不影响事实已经安全落盘这一件事。
+        """
+        now = utc_now()
+        self.connection.execute(
+            """INSERT INTO necessary_checks(scope_id,trigger_kind,trigger_ref,subject_key,
+                 status,attempts,lease_token,lease_expires_at,reason,result_json,created_at,updated_at)
+               VALUES('local-demo',?,?,?,'open',0,NULL,NULL,?,NULL,?,?)
+               ON CONFLICT(trigger_kind,trigger_ref,subject_key) DO NOTHING""",
+            (trigger_kind, trigger_ref, subject_key, reason, now, now))
+        # 失败过的检查必须能被同样的触发重新排上，否则一次 provider 抖动会让某个
+        # 药物组合永远不再被检查。
+        self.connection.execute(
+            "UPDATE necessary_checks SET status='open', attempts=0, lease_token=NULL, "
+            "lease_expires_at=NULL, updated_at=? WHERE trigger_kind=? AND trigger_ref=? "
+            "AND subject_key=? AND status='failed'",
+            (now, trigger_kind, trigger_ref, subject_key))
+
     def _invalidate_medication_dependents_tx(self, changed_name: str | None = None) -> None:
         """Scope-dependency rule: a medication-list change invalidates every
         current conclusion that consumed an older revision of the full list —
@@ -1731,6 +1821,19 @@ class MemoryStore:
             self._audit("remove", "medication", medication["id"], {"ref": medication["ref"], "name": name}, source)
 
         self._invalidate_medication_dependents_tx(changed_name=name)
+        # 必要安全检查：药单一变，就按**当前**药单重新检查一次相互作用。这一步不
+        # 取决于模型是否选中 ddi_check，也不取决于旧结论是否存在——第一次出现的
+        # 药物组合正是在这里第一次被查到。
+        #
+        # subject_key 里带上**药单版本**，而不是只有集合哈希：从 {甲,乙} 走到 {甲}
+        # 再回到 {甲,乙}，集合哈希与第一次相同，只用哈希会把这一轮检查当作重复而
+        # 丢掉——中间那次变化产生的任何结论都不会被重新核对。去重必须按"这个版本
+        # 的这个世界"，不能按"长得一样的这个世界"。
+        revision = self.scope_revision('medications')
+        self._enqueue_necessary_check_tx(
+            'medication_set', _drug_dep_key(name),
+            f'{self._medication_set_hash_tx()}@{revision}',
+            f'medication list changed via {action} {name!r} (revision {revision})')
 
         event_type = {"add": "medication_add", "remove": "medication_remove", "dose_change": "medication_dose_change"}[action]
         payload = {
@@ -2093,12 +2196,13 @@ class MemoryStore:
         memory_refs: Sequence[str],
         source_refs: Sequence[dict[str, Any]],
         predecessor_id: int | None = None,
+        conclusion_outcome: str | None = None,
     ) -> dict[str, Any]:
         with self._lock, self.connection:
             return self._record_conclusion_tx(
                 session_id=session_id, turn_id=turn_id, kind=kind, text=text,
                 memory_refs=memory_refs, source_refs=source_refs,
-                predecessor_id=predecessor_id,
+                predecessor_id=predecessor_id, conclusion_outcome=conclusion_outcome,
             )
 
     def _record_conclusion_tx(
@@ -2111,6 +2215,7 @@ class MemoryStore:
         memory_refs: Sequence[str],
         source_refs: Sequence[dict[str, Any]],
         predecessor_id: int | None = None,
+        conclusion_outcome: str | None = None,
     ) -> dict[str, Any]:
         """Record a conclusion inside the caller's transaction.
 
@@ -2129,9 +2234,9 @@ class MemoryStore:
             "semantic": self.scope_revision("semantic"),
         }
         cursor = self.connection.execute(
-            """INSERT INTO conclusions(session_id,turn_id,kind,text,memory_refs_json,source_refs_json,created_at,status,input_revision,predecessor_id)
-               VALUES(?,?,?,?,?,?,?,?,?,?)""",
-            (session_id, turn_id, kind, text, _json(list(dict.fromkeys(memory_refs))), _json(list(source_refs)), now, "current", _json(input_revision), predecessor_id),
+            """INSERT INTO conclusions(session_id,turn_id,kind,text,memory_refs_json,source_refs_json,created_at,status,input_revision,predecessor_id,conclusion_outcome)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+            (session_id, turn_id, kind, text, _json(list(dict.fromkeys(memory_refs))), _json(list(source_refs)), now, "current", _json(input_revision), predecessor_id, conclusion_outcome),
         )
         item = {
             "id": cursor.lastrowid,
@@ -2143,12 +2248,75 @@ class MemoryStore:
             "status": "current",
             "input_revision": input_revision,
             "predecessor_id": predecessor_id,
+            "conclusion_outcome": conclusion_outcome,
         }
         self._audit("conclude", "conclusion", item["id"], item, "agent", actor="agent")
         self._write_conclusion_dependencies_tx(
             item["id"], kind, text, memory_refs, predecessor_id=predecessor_id,
         )
         return item
+
+    # ---- 结论的结构化结果：触发条件是否已被消除 ----------------------------
+    def evaluate_trigger(self, conclusion_id: int) -> dict[str, Any]:
+        """本事项的**触发条件**在当前权威记录下是否已经不成立。
+
+        这是确定性判断，来源是结论自己的依赖行（``conclusion_dependencies``）
+        与当前权威状态，**不是**对结论文本做关键词匹配：
+
+        * ``medication_pair``：触发条件是"两条药同时在用"。任一条不再是 active
+          用药 → 条件客观消失（例如停药）。
+        * ``medication``：触发条件是"这条药在用"。不在用 → 消失。
+        * ``semantic_fact``：触发条件包含"那条事实仍按原值成立"。事实被撤回或
+          改成了别的值 → 消失；仍然成立 → 未消失。
+        * ``medication_set`` / ``conclusion``：只是"当时扫过整份列表"，不足以
+          单独证明条件消失——保持 ``unknown``，**不**当作已消除。
+
+        刻意只回答"本事项的触发条件"，不回答"整体用药是否安全"。
+        """
+        rows = self.connection.execute(
+            "SELECT dep_kind, dep_key FROM conclusion_dependencies WHERE conclusion_id=?",
+            (conclusion_id,)).fetchall()
+        if not rows:
+            return {'state': 'unknown', 'reasons': [],
+                    'note': '这条结论没有依赖记录，无法判断触发条件是否仍然成立'}
+        active = {_drug_dep_key(item["display_name"]) for item in self.current_medications()}
+        facts = {f"{item['namespace']}:{item['fact_key']}": item
+                 for item in self.current_semantic()}
+        reasons: list[str] = []
+        conclusive = False
+        for row in rows:
+            kind, key = row["dep_kind"], row["dep_key"]
+            if kind == "medication_pair":
+                members = [part for part in str(key).split("|") if part]
+                missing = [member for member in members if member not in active]
+                if missing:
+                    conclusive = True
+                    reasons.append(f"药物对的一方已不在当前用药中：{'、'.join(missing)}")
+            elif kind == "medication":
+                if str(key) not in active:
+                    conclusive = True
+                    reasons.append(f"相关用药已不在当前用药中：{key}")
+            elif kind == "semantic_fact":
+                item = facts.get(str(key))
+                if item is None:
+                    conclusive = True
+                    reasons.append(f"相关事实已不再有效：{key}")
+        if conclusive:
+            return {'state': 'trigger_eliminated', 'reasons': reasons, 'note': None}
+        return {'state': 'risk_present' if self._has_live_pair(rows, active) else 'unknown',
+                'reasons': [], 'note': '触发条件在当前记录下仍然成立或无法排除'}
+
+    @staticmethod
+    def _has_live_pair(rows, active: set[str]) -> bool:
+        """依赖行里有没有一条"仍然成立的药物对"——有就说明风险还在。"""
+        for row in rows:
+            if row["dep_kind"] == "medication_pair":
+                members = [part for part in str(row["dep_key"]).split("|") if part]
+                if members and all(member in active for member in members):
+                    return True
+            if row["dep_kind"] == "medication" and str(row["dep_key"]) in active:
+                return True
+        return False
 
     def current_conclusions(self, status: str = "current") -> list[dict[str, Any]]:
         rows = self.connection.execute(
@@ -3619,8 +3787,16 @@ class MemoryStore:
             open_count = self.connection.execute(
                 "SELECT COUNT(*) FROM dependency_tasks WHERE status='open'"
             ).fetchone()[0]
-        if self.recheck_hook is None:
-            return {"status": "no_hook", "pending": open_count, "completed": []}
+        # 没有 agent 安装 hook 时，走**确定性**重查：同一套租约、去重、后继结论与
+        # 审计，只是不需要 planner 或 provider。这样 provider 挂掉、agent 构造不出来
+        # 的时候，必要检查仍然执行——而不是停在这里什么都检查不了。
+        # 语义不变：检出就更新结论，检不出就记录保守的"未检出"结论，绝不表述成风险解除。
+        hook = self.recheck_hook
+        if hook is None:
+            from .safety_checks import deterministic_recheck
+            detector, rag_tool = self.recheck_detector, self.recheck_rag_tool
+            hook = lambda store, conclusion: deterministic_recheck(  # noqa: E731
+                store, conclusion, detector=detector, rag_tool=rag_tool)
         completed = []
         for task in tasks:
             token = uuid.uuid4().hex
@@ -3659,7 +3835,7 @@ class MemoryStore:
             conclusion["memory_refs"] = _from_json(conclusion_row["memory_refs_json"], [])
             conclusion["source_refs"] = _from_json(conclusion_row["source_refs_json"], [])
             try:
-                outcome = self.recheck_hook(self, conclusion)
+                outcome = hook(self, conclusion)
             except Exception as exc:  # recheck failure must not fake success
                 with self._lock, self.connection:
                     attempts = task["attempts"] + 1

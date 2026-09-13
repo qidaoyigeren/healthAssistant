@@ -238,6 +238,7 @@ class BudgetSession:
         self.sync()
         self.memory.reserve_llm_attempt(attempt_id, self.run_id, kind,
             min(tokens_left, estimate + cap), allowed, self.data)
+        self.last_attempt_id = attempt_id
         started = time.perf_counter()
         allowed = min(allowed, self.data['wall_clock_seconds'] - self.base_seconds
                       - (started - self.started) - margin)

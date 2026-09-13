@@ -66,10 +66,16 @@ PERMISSION_ROLES: dict[str, frozenset] = {
     # write capability.
     "plan:questions": frozenset({"caregiver", "ops", "reviewer"}),
     "materials:read": frozenset({"caregiver", "ops", "reviewer"}),
-    # Harness P3 (both default-OFF experiments): read-only batch fan-out and
-    # read-only worker delegation.  Neither grants any write capability.
-    "batch:read": frozenset({"caregiver", "ops"}),
-    "delegate:run": frozenset({"caregiver", "ops"}),
+    # material-review@2: reading an authorised material entry, and submitting a
+    # CANDIDATE question/finding/assertion into the review state.  Submitting
+    # writes to the task's own working state, never to patient memory or the
+    # authoritative medication list, so it carries the same roles as a
+    # clarification rather than the memory-write roles.
+    # 把一条已取得的来源落成某条问题的答案。它不改权威记录、不关闭事项，
+    # 只更新调查状态里那条问题——所以权限等同于"提交候选"，而不是写入。
+    "answer:submit": frozenset({"caregiver", "ops", "reviewer"}),
+    "review:read": frozenset({"caregiver", "ops", "reviewer"}),
+    "review:submit": frozenset({"caregiver", "ops"}),
 }
 
 
@@ -343,39 +349,10 @@ class ToolExecutor:
         result.metrics["active_seconds"] = round(time.perf_counter() - started, 6)
         self.hooks.emit("after_tool", ctx=ctx, tool=tool, meta={
             "ok": True, "replayed": result.receipt_replayed, "cycle": cycle,
+            "retrieval_status": value.get('status') if isinstance(value, dict) and tool in {'rag_search', 'acquire_evidence', 'rag_catalog'} else None,
             "args_hash": _args_hash(arguments), "evidence_refs": result.evidence_refs})
         self._audit(ctx, result)
         return result
-
-    def execute_read_batch(self, ctx: RunContext, calls: Any, *,
-                           state: Any = None, max_items: int = 8) -> list[ToolResult]:
-        """Harness P3 control condition: ordinary read-only tool BATCHING on
-        the shared execution layer.  Every item is dispatched through the SAME
-        ``execute`` path (identity/scope/permission/schema/evidence checks per
-        item — no second validation rule).  Only ``kind='read'`` +
-        ``idempotency='pure'`` specs are eligible: a batch containing anything
-        else is refused WHOLE, before any dispatch, so no partial side effects
-        can occur.  Code-called primitive — deliberately NOT a model-callable
-        tool; the planner proposes single tools (or the P3 ``batch_read``
-        wrapper when its flag is on)."""
-        if not isinstance(calls, list) or not (1 <= len(calls) <= max_items):
-            raise ToolExecutionError(
-                ToolErrorKind.INVALID_ARGUMENTS,
-                f"batch must be a list of 1..{max_items} calls", recoverable=True)
-        for item in calls:
-            if not isinstance(item, dict) or not isinstance(item.get("arguments"), dict):
-                raise ToolExecutionError(ToolErrorKind.INVALID_ARGUMENTS,
-                                         "batch items must be {tool, arguments}", recoverable=True)
-            spec = self.specs.get(str(item.get("tool")))
-            if spec is None:
-                raise ToolExecutionError(ToolErrorKind.UNKNOWN_TOOL,
-                                         f"batch tool is not registered: {item.get('tool')}")
-            if spec.kind != "read" or spec.idempotency != "pure":
-                raise ToolExecutionError(
-                    ToolErrorKind.POLICY_VIOLATION,
-                    f"batch is limited to pure reads; {spec.name} is {spec.kind}/{spec.idempotency}")
-        return [self.execute(ctx, str(item["tool"]), item["arguments"], state=state)
-                for item in calls]
 
     def _current_revision(self, state: Any) -> int | None:
         if self.memory is None:

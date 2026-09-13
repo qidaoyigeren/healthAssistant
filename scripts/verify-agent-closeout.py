@@ -14,6 +14,8 @@ import sys
 from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[1]
+#: 主线产品验收套件。它由下面带 `--report` 的显式调用执行，所以不进 glob 循环。
+MAINLINE_SUITE = 'test_safety_mainline_e2e'
 
 
 def fingerprint():
@@ -62,7 +64,19 @@ def main():
 
     if not args.only_live:
         for file in sorted((ROOT / 'stage0').glob('test_*.py')):
+            if file.stem == MAINLINE_SUITE:
+                continue  # 由下面带 --report 的那一次权威执行覆盖
             result['suites'].append(run(file.stem, [sys.executable, '-m', 'unittest', f'stage0.{file.stem}', '-q']))
+        # 主线产品验收：按**类别**报告（必要检查 / 事项 / 调查 / 等待与处置 /
+        # 模型与程序的分工 / 请求与故障可追溯），而不是合并成一个通过率。
+        mainline_report = out / 'safety-mainline.json'
+        row = run('safety-mainline-acceptance',
+                  [sys.executable, '-m', 'stage0.test_safety_mainline_e2e',
+                   '--report', str(mainline_report)], timeout=600)
+        result['mainline'] = row
+        if mainline_report.exists():
+            result['mainline']['categories'] = json.loads(
+                mainline_report.read_text(encoding='utf-8')).get('categories', {})
         for policy, path, negative in [('baseline', 'replay', False), ('gap', 'replay', False),
                                        ('gap', 'tools', False), ('gap', 'replay', True)]:
             name = f'{policy}-{path}' + ('-negative' if negative else '')
@@ -79,7 +93,8 @@ def main():
         result['live'].append(run(name, cmd))
     result['source_unchanged'] = version == fingerprint()
     result['status'] = 'pass' if result['source_unchanged'] and all(
-        r['passed'] for k in ('suites', 'evals', 'live') for r in result[k]) else 'fail'
+        r['passed'] for k in ('suites', 'evals', 'live') for r in result[k]
+    ) and (args.only_live or result.get('mainline', {}).get('passed')) else 'fail'
     result['tests_executed'] = sum(r['tests'] or 0 for r in result['suites'])
     result['completed_at'] = datetime.now(timezone.utc).isoformat()
     report_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')

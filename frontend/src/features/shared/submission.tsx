@@ -13,6 +13,7 @@ import type { ChangeImpactDto, OperationOutcomeDto, RunProgressEventDto } from '
 import { Badge, Card, ConfirmDialog, LiveAnnouncement, TimeText } from '../../components/ui';
 import { ConflictCard, SourceRefList, WarningCard } from '../../components/evidence';
 import { SafeMarkdown } from '../../components/safeMarkdown';
+import { retrievalProgress } from './retrievalProgress';
 
 /** Harness P2:产品级进度词汇(服务端只推粗粒度状态,无未审核医学内容)。 */
 const PROGRESS_LABELS: Record<string, string> = {
@@ -32,6 +33,8 @@ function latestProgress(task: SubmissionTask): RunProgressEventDto | null {
 }
 
 function progressLabel(event: RunProgressEventDto): string {
+  const retrieval = retrievalProgress[String(event.detail?.retrieval_status ?? '')];
+  if (retrieval) return retrieval;
   return PROGRESS_LABELS[event.kind] ?? `阶段:${event.kind}`;
 }
 

@@ -1,211 +1,203 @@
-# 用药协管员：可审计的家庭用药记忆
+# 用药协管员：长期用药安全跟进
 
-**记住父母健康史、主动预警用药冲突、全程可审计的“用药协管员”。**
+**记住父母的用药与相关背景，在变化发生时执行必要安全检查，并围绕产生的安全事项持续跟进到有依据的处置。**
 
-## What it is
+## 产品主线
 
-This repository is a single-caregiver, single-patient engineering demonstration. It turns Chinese medicine-label evidence and caregiver events into a durable SQLite record: patient facts, current medication state, change events, warnings, citations, and unresolved conflicts. The default path is deterministic and offline-first, so the UI and scripted demo can be replayed without an LLM or network access.
-
-## What it is not
-
-It is **not a medical device, diagnostic system, prescriber, or clinical decision-support service**. It does not diagnose, prescribe, or tell a person to start, stop, or change a medicine. Severe, uncertain, uncited, and conflicting results are explicitly escalated to a doctor or pharmacist. The metrics below are software-engineering measurements, not clinical validation or evidence of patient-outcome safety.
-
-## Architecture
-
-### Product upgrade P0–P6: material reconciliation and durable care tasks
-
-The React frontend supports **open an alert → read and highlight its original evidence → inspect recorded facts → correct a medication record → inspect that operation's impact**. Evidence reads enforce scope and verify the stored content hash; unknown source versions remain unknown. New operations persist their `run_id` on mutation audit entries, so impact comes from the actual operation's invalidations. Historical operations without attribution explicitly report that their impact cannot be reconstructed.
-
-The React app now also imports CSV or printed Chinese discharge tables, shows original document regions beside candidate fields, records each confirmed difference with an atomic receipt, queues risk checks, resumes durable care tasks, and downloads immutable visit summaries. Versioned evidence caches, conservative citation-support checks and explicit source replacement preserve evidence history.
-
-See [P0–P6 delivery and reproducible acceptance](docs/product-upgrade/final-acceptance/README.md). The [earlier P0–P1 closeout](docs/product-upgrade/closeout/README.md) is retained as historical evidence. Engineering/synthetic regression, actual local OCR, real-model quality and independent domain review are reported separately. New pages: `/materials` and `/tasks`. Optional OCR dependencies: `requirements-product-ocr.txt`.
-
-The subsequent [live-provider acceptance report](docs/product-upgrade/live-acceptance/README.md) records real model, retrieval, KEGG and browser calls. The material workflow passed; strict live-model acceptance remains failed because of provider timeouts and response fallback. The report includes fixes, regression results and retained failure evidence.
-
-```mermaid
-flowchart LR
-    A["MNBVC 中文药品说明书"] --> B["parse<br/>结构化章节与引用"]
-    B --> C["Hybrid RAG<br/>BM25 + BGE"]
-    C --> D["DDI engine"]
-    K["KEGG fast path<br/>结构化相互作用"] --> D
-    C --> F["RAG / LLM fallback<br/>精确中文摘录门槛"]
-    F --> D
-    D --> M["Three-layer memory<br/>SQLite: semantic / episodic / working"]
-    M --> AG["Agent loop<br/>Typed queries: deterministic · Open questions: planner"]
-    AG --> S["Safety boundary<br/>拒绝诊断/处方 · 强制升级"]
-    S --> UI["React + legacy Streamlit UI<br/>单照护者 / 单患者"]
-    UI -->|care event| AG
-    E["Evaluation loop<br/>regression replay + held-out baseline"] -. "回归保护与缺口反馈" .-> D
-    E -. "记忆/代理行为检查" .-> AG
+```
+用药或背景变化
+ → ① 接受并持久化有依据的事件
+ → ② 程序执行必要安全检查            （代码，不依赖模型是否选中工具）
+ → ③ 建立或更新持久化安全事项 SafetyCase
+ → ④ Agent 调查与补问
+ → ⑤ 用户或专业人员提供补充
+ → ⑥ 恢复同一事项并重新核对
+ → ⑦ 更新有依据的处置状态
+ → ⑧ 后续变化时重新打开受影响事项
 ```
 
-## Pipeline walkthrough
+Agent 的角色是**持续跟进用药安全事项的调查协调者**。它不决定是否跳过必要检查、
+不修改权威药单、不自行诊断或调整用药，也不凭自己的判断静默关闭风险。
 
-1. **Data → parse.** `stage0/` keeps the MNBVC-derived label corpus and the existing parser. Relevant Chinese sections are chunked with source metadata.
-2. **Parse → hybrid RAG.** `rag.py` combines local BM25 and BGE/FAISS retrieval. A degraded exact-token path is available when the embedding runtime is unavailable.
-3. **RAG → DDI engine.** `ddi_engine.detect()` normalizes Chinese brand/generic names, expands mapped compounds and enumerates ingredient pairs. KEGG is the fast corroboration path; grounded RAG/LLM extraction is a bounded fallback. A warning is not accepted as cited evidence unless its quote is an exact substring of a retrieved Chinese chunk.
-4. **DDI → memory.** `MemoryStore` writes patient facts, medication versions, warning episodes, conclusions, and audit rows. A conflict links both sides without silently choosing one.
-5. **Memory → agent.** `MedicationCoordinatorAgent.handle(CareEvent)` runs one LLM decision per plan → act → observe → reflect cycle when `--llm-planner` is enabled. The model sees the event, patient snapshot, tool schemas, observations and trace, chooses its tool and free arguments, and decides when to answer. `ResponseComposer` writes the final text from actual warnings, conflicts and memory references. The default remains offline and deterministic. In LLM mode the deterministic planner runs only after provider/parse failure. Schema or safety rejection is recorded and sent back to the LLM on the next cycle, without selecting a replacement action.
-6. **Agent → UI.** `stage0/app.py` calls that real agent and real `MemoryStore`; it does not duplicate detection or memory logic. The UI exposes the current ledger, citations, audit references, and a cross-session query.
+### 一件事是怎么被推进的
 
-## Why exact recall instead of embeddings for memory?
+Agent 从**一件具体事项**开工，拿到的是事项上下文（为什么有这件事、相关记录、当前结论
+及它们的**触发条件状态**、未决问题与已收到的回答、上次做到哪、这次新增了什么），
+不是一份患者档案复述。每一步决策留下五个结构化字段：针对哪个未决问题、依据哪些已有
+结论或证据、做什么动作、预期解决什么、什么结果会改变下一步。
 
-Embeddings are useful for finding label evidence, but they are the wrong source of truth for safety-critical patient facts. The memory layer therefore uses exact SQLite keys and immutable versions for age, allergies, renal/hepatic function, chronic disease, preferences, and medication records. Exact `(namespace, key)` recall gives deterministic “what is currently recorded?” answers, stable references such as `memory:semantic:3@v1`, and a clear audit trail. Time decay only changes episodic retrieval ranking; it never deletes the underlying event. When two safety-critical facts disagree, `conflicts` stores both sides as open instead of allowing a similarity score to erase history.
+补充回答分三类处理：**有内容地回答**关闭该问题；**明说不知道**结束这一轮追问、
+但**不消除不确定性**（转去找替代证据，并且继续阻止关闭）；**空值**什么都不关。
+回答记录当时看到的记录版本——事实一变，那条回答即失效、问题重新打开并写明原因。
 
-## Memory deepening (Stage 7)
+材料解析、字段比较、原文读取和报告生成都是**支持能力**，服务于这条主线，
+不再是独立扩张的产品中心。
 
-Belief revision is indexed and selective rather than a hand-written one-hop scan:
+## What it is / is not
 
-- **Conclusion dependency index.** Every conclusion records what it consumed — cited facts by `(namespace, key)`, medications by normalized ingredient, DDI pairs parsed from its own text, and for whole-list scan warnings a hash of the medication set it was checked against. The `conclusion_dependencies` table replaces the pre-Stage-7 full-table scans; migration backfills it deterministically, and a NULL set-hash means "always re-verify" (the conservative pre-Stage-7 behaviour).
-- **Selective invalidation.** Adding an unrelated drug no longer stales patient-condition findings — they depend only on their focus drug and cited facts. Whole-list pair warnings keep the set-scoped rule (a full-list scan produced them), and stopping or dose-changing a member still stales everything citing it. The ablation `MemoryStore(ablations={'selective_invalidation'})` restores the full-invalidation baseline: on scenario S28 the over-invalidation rate drops from 1.0 to 0 while invalidation coverage stays 1.0.
-- **Recheck hardening.** Task claims carry an expiring lease (crashed workers are recovered; three failed claims mark the task failed instead of looping forever), one detector run serves a whole batch (memoized by the current medication-set hash — three stale conclusions, one detection), and patient-condition conclusions get a deterministic label-vs-facts recheck instead of only the conservative template.
-- **As-of reconstruction.** `query_state(known_at=...)` now folds the conflict action trail (resolve/reopen/undo), so a conflict resolved today still appears open in earlier known-at views and disappears from current ones; `retrieve_episodic(as_of=...)` is a knowledge cutoff over `recorded_at`.
-- **Promotion state machine.** `verification_status` moves `recorded_as_reported → verified` only by rule — two consistent reports from distinct events, or an explicit caregiver confirmation — while an open conflict blocks promotion and marks the key disputed. Event replays never count toward promotion.
-- **Backup and export.** `python -m stage0.backup --backup | --export | --restore <file> --to <path> | --verify <file>`: WAL-safe online backups with checksum sidecars, a JSON interchange export, and restores that refuse to overwrite existing targets.
+It is a single-caregiver, single-patient engineering demonstration over a durable SQLite
+record. The default path is deterministic and offline-first.
 
-Scenario coverage grew from 22 to 28 (`python -m stage0.eval_memory --ablate`), with all four mechanisms — policy, bitemporal, dependency, and the new selective_invalidation — load-bearing under ablation. Implementation details and the four design corrections found during implementation are in `docs/production-upgrade-2026-09-05/stage7_implementation_report.md`.
+It is **not a medical device, diagnostic system, prescriber, or clinical decision-support
+service**. It does not diagnose, prescribe, or tell anyone to start, stop or change a
+medicine. Severe, uncertain, uncited and conflicting results are escalated to a doctor or
+pharmacist. **No real clinician service is connected** — the professional-review queue is a
+clearly-marked local simulation and never auto-approves. All metrics here are
+software-engineering measurements, not clinical validation.
 
-## Agent-loop hardening (Stage 8)
+## 架构
 
-The LLM-decided loop is bounded, breakable and verifiable:
+分工（职责划分，不是同名目录）：
 
-- **Per-turn budget** (`AGENT_TURN_BUDGET_SECONDS`, default 120s wall-clock; `AGENT_TURN_TOKEN_BUDGET`, a conservative chars/1.5 estimate backstop; max_cycles). The first exhausted budget degrades the turn to a deterministic completion with an explicit “结果可能不完整” notice — appended *before* the final safety check, so the checked text is exactly the delivered text. Live planner calls measured 18–60s in the Stage 6 run, which is why the wall-clock budget — not a shorter per-call timeout — is the limiter.
-- **Bounded planner payloads.** Only the current cycle plus the two before it keep full observations; earlier ones carry a tool/purpose/ok summary with a result digest, RAG chunk text is truncated, and `recent_trace` no longer embeds a duplicate of every observation. Compression applies only to the serialized planner view — hydration and the response path keep reading the originals. Measured on synthetic RAG-sized stacks: 12 cycles of observations cost 77k → 9k payload characters (`docs/production-upgrade-2026-09-05/payload_budget.json`).
-- **Consecutive-rejection circuit breaker.** Two consecutive safety rejections trip the breaker and the rest of the turn finishes on the deterministic planner — no more burning up to 16 LLM calls (18–60s each) on a model that keeps proposing unsafe actions. A single rejection still feeds back to the LLM as before.
-- **Veto-only response verifier** (`--llm-verifier`, explicit opt-in). When the rule checker flags a semantic class (the false-positive-prone Stage 6 classes), an LLM verifier may adjudicate it benign — or reject with line-numbered, verbatim-quoted findings that the code re-verifies. It can never rewrite or add text; hard gates (fabricated refs/URIs, missing escalation) are never adjudicable; any verifier failure falls back to the full rule checker, so degradation is never weaker.
-- **Persistent turn traces.** Every plan/act/observe/reflect/respond entry lands in a `turn_traces` table (process record), deliberately separate from `audit_log` (data-mutation record), so “why did it answer that way?” is answerable across sessions.
+| 职责 | 落在哪 |
+|---|---|
+| 用药与事实服务 | `memory.py`（`medications` 版本链、`semantic_memory`、`episodic_memory`） |
+| 安全检查与结论 | `ddi_engine.py`（确定性检测）、`safety_checks.py`（必要检查队列与执行）、`conclusions` + `conclusion_dependencies` |
+| 安全事项与生命周期 | `safety_cases.py` |
+| 调查运行器与领域能力 | `agent.py`（`run_open_review`）、`investigation.py`、`review/` |
+| 证据、处置与变化说明 | `harness/evidence.py`、`conclusions.source_refs`、`read_models.change_impact` |
+| 材料输入适配 | `product.py`、`document_parser.py`、`review/coverage.py` |
+| 产品界面与通知 | `frontend/`（`/` 与 `/safety` 是主线页）、应用内待办（无外部通知） |
 
-## RAG corpus fix (Stage 9, C1)
+### 必要安全检查不依赖模型
 
-The held-out recall gap was concentrated in theophylline-class pairs because 茶碱 was absent from the chronic-drug priority list — their labels could only enter the 1,200-label corpus via the random hash sample. The term list now includes 茶碱/氨茶碱/多索茶碱, and a v2 corpus (`rag_corpus_v2.jsonl`, selection seed `stage1-rag-v2`) was rebuilt alongside the untouched v1: **90 theophylline labels** now in corpus, index at 4,051 chunks. The held-out DDI re-run for the recall delta is pending (needs live KEGG + provider); no number is claimed until it runs. Retrieval-layer work (rerank, query expansion, second-pass citation) is deferred by the one-month cut.
+用药新增/停用/剂量变更，或安全相关的患者事实变化时，`MemoryStore` 在**同一个事务里**
+登记一次必要检查（`necessary_checks`）；worker 用确定性检测器执行它，产出结论与依赖行，
+再把结论收敛成安全事项。这条路径上**没有 planner、没有 provider**：agent 构造不出来或
+供应商不可用时，检查照样跑完、事项照样建立。
 
-## Service layer, two-layer idempotency, outbox (Stage 10)
+去重键包含用药集合哈希，所以"同一个世界状态不重复检查"，而"世界变了"一定会再查一次——
+事件去重不会吞掉新的安全提示。检查失败保持可见（重试后标记 failed），**绝不**读成"检查通过"。
 
-`stage0/server.py` exposes the system as a single-writer FastAPI service (the Streamlit default direct path is unchanged; the UI becomes an API client only when `STAGE0_API_URL` is set):
+### 安全事项：引用，不是第二个真相源
 
-- **Async-first events.** `POST /v1/events` with an `Idempotency-Key` header atomically claims the key and enqueues an outbox task in one transaction, then returns `202` with a polling URL; a single in-process worker executes agent turns (also draining durable rechecks).
-- **Two idempotency layers.** Request-level: same key + same payload replays the same acceptance (concurrent same-key submissions get the identical 202 — no 409 storm); same key + different payload → 422. Domain-level: the event key derives from the idempotency key, so replays dedup in the projection itself.
-- **At-least-once, effectively-once.** Worker claims carry expiring leases; crashed claims are recovered; three failed claims mark the task failed (409 on that key, a new key retries). Tests assert crash recovery produces exactly one projection.
-- Read endpoints (`/v1/memory/state|timeline|conflicts`, `/v1/alerts`), conflict actions, `/v1/rechecks`, `/v1/health`, and a four-category error model (validation/safety/provider/internal) with `trace_id`.
+`SafetyCase` 只保存**引用**（`linked_conclusion_refs` / `evidence_refs` / `relevant_fact_refs`）
+与过程（`open_questions` / `required_inputs` / `linked_run_ids` / `history` / `resolution_basis`），
+不复制任何患者事实、用药值或风险等级。
 
-Honest boundary: one writer process (`--workers >1` unsupported by design); see the design document section D7 for the documented Postgres migration triggers.
+生命周期状态与运行状态分开：`open` / `investigating` / `awaiting_user` /
+`awaiting_professional` / `resolved` / `needs_recheck` / `execution_failed`。
+**一次运行失败只把事项推进到 `execution_failed`，绝不关闭它。**
 
-**Reliability P0 (2026-09)** hardened this layer: server-generated `event_id`/`run_id` identity (the agent turn id is a uuid, no longer a truncation of the idempotency key — long-key prefix collisions cannot merge two events), lease-fenced worker writes with heartbeat renewal, one-transaction publication of task result + idempotency-key state, durable `operation_receipts` protecting consolidation/warning writes against replay, classified failures (`retryable`/`permanent`/`safety`/`effect_unknown`) with backoff+jitter and an explicit `POST /v1/events/{key}/retry` recovery endpoint, a committed-replay POST that now returns the same full body as the status endpoint, `SubmitKeyStore` so UI timeout retries reuse the same event, and a `Principal` layer (`STAGE0_AUTH_MODE=local-demo` default with an explicit warning; `deployment` refuses to start without `STAGE0_AUTH_TOKEN`). Design and audit trail: [docs/reliability-design/](docs/reliability-design/), implementation report: [docs/reliability-implementation/p0_implementation_report.md](docs/reliability-implementation/p0_implementation_report.md).
+身份 `dedup_key = hash(scope, case_type, subject_keys, episode_anchor)`，其中
+`episode_anchor` 沿用药版本链回溯到最近一次停用边界：剂量变更（`superseded`）仍是同一次
+用药 → **更新既有事项**；停药后重新启用 → 新分期 → 新事项。所以同一风险每天复检不会
+变成每天一张新卡片，而不同用药阶段不会因药名相同被错误合并。
 
-**Reliability P1 (2026-09, opt-in)** adds a LangGraph StateGraph runner behind `AGENT_GRAPH_RUNNER=1` (legacy stays the default path): the turn is split into `load_context → plan → execute → compose → publish` nodes with a persistent SQLite checkpointer, so a crashed turn resumes from the last completed step; the "domain commit succeeded but checkpoint missing" window is closed by the P0 operation receipts (a replayed `execute` node returns the stored result instead of duplicating the effect); accumulated budget is persisted to `workflow_runs` and never resets on restart; the checkpointer state carries JSON-safe fields only; and in-flight runs keep the runner version that created them (`workflow_runs.graph_version`), so flag changes never silently re-route a paused run. Shadow comparison runs on isolated databases only. See [docs/reliability-implementation/p1_implementation_report.md](docs/reliability-implementation/p1_implementation_report.md).
+### 处置依据由代码强制
 
-**Reliability P2 (2026-09, opt-in behind `STAGE0_REVIEW_ENABLED=1` + the graph runner)** closes the human-review loop: severe warnings or unresolved conflicts open an idempotent review case, publish a safe waiting response and park the run on a LangGraph `interrupt()` — the worker lease is released immediately, so no thread/lock/transaction ever waits for a human. Reviewers (a clearly-marked **simulated** local workbench, `streamlit run stage0/review_app.py`) claim cases with CAS revision, submit one of five structured decisions (Idempotency-Key protected; no graph goto/SQL/state patch is expressible), and the worker resumes the run via `Command(resume=...)`. The resume node re-validates everything and re-checks fact freshness: if medications or facts changed while waiting, the decision is refused as `review_stale`, the case is cancelled and a fresh round opens — an old approval never authorizes a new state. Overdue cases are an operational state only; timeout never auto-approves. No real clinician service is connected: UI, exports, and the reviewer page all say so explicitly. See [docs/reliability-implementation/p2_implementation_report.md](docs/reliability-implementation/p2_implementation_report.md).
+**"检查做过了"不是关闭理由。** 一条 `current` 的风险结论只证明"检查跑了、风险还在"。
+关闭必须现场证明**本事项的触发条件已经消除**——由依赖索引 × 当前权威记录确定性判定
+（例如药物对的一方已停药），而不是对结论文本做关键词匹配。`closure_evidence` 同时要求：
+结论版本适用于当前状态、关联结论里没有一条"触发条件仍成立"、没有阻塞性未决问题。
 
-## Agent capability upgrade A0–A5 (2026-09)
+三种动作语义分开：
 
-**Latest reliability acceptance (2026-09-11):** 394 test executions across 34 modules passed, frontend build and real progress UI verified. The previously missing live k=3 cohort was executed: **2/3 task outcomes, 0/3 autonomous planner successes, 8/20 provider responses**. Nested argument schema and queued progress fixes were completed afterward with offline validation; no extra online samples replaced the failures. Product rate-limit retries now default to 0; the frozen experiment explicitly uses 1. See [current implementation and acceptance](docs/agent-capability-upgrade/planner-closeout-2026-09-11/implementation-report.md). Stable open-ended model experience remains unaccepted.
+- `resolved_with_basis`——**关闭**，需上述证明，或一条**适用且允许完成**的
+  `professional_review_applied` 决定；
+- `escalated_to_professional`——交给专业人员（用户转述医生意见走这条，**不**关闭）；
+- `accepted_monitoring`——风险仍在但已有安排，**持续跟进**，不是"等待专业人员"，
+  也不是风险消失。没有可信时间/条件时记为**待确认的安排**，模型不能自己编一个复查周期。
 
-The agent's decision layer was upgraded in auditable stages, each with its own report, frozen artifacts and honest availability labels ([docs/agent-capability-upgrade/](docs/agent-capability-upgrade/)):
+明确拒绝：用户点"已读"就关闭（`mark_seen` 只写时间戳）、模型判断作为依据、
+provider 失败后当作已处理、拿旧版本的复核批准新状态、用**别的**事项的复核决定关闭本事项、
+把本地模拟工作台的复核包装成专业医疗确认。操作者身份与角色取自**认证上下文**，
+不读请求体自报的 `actor`。
 
-- **A0 — baseline and evaluation protocol.** A 13-family author-synthetic development set (`stage0/agent_evals/`), an outcome rubric (necessary-question recall with denominators, invalid questions, false completion, duplicate effects, calls/latency/tokens), a frozen pre-A1 source archive for reproducible baselines, and a negative control that must fail. Baseline truth: **0/13** tasks delivered a bounded evidence-coverage report — the legacy planner clarifies intent instead ([A0 report](docs/agent-capability-upgrade/A0/implementation-report.md)).
-- **A1 — gap-driven planning.** `stage0/investigation.py` (`investigation@1`):待证 claim → gap → action → verification loop with hard lexical source/entity/date/condition/negation rules, bounded stop reasons, and an answer bundle that separates `execution_status` / `goal_status` / `answer_status`. On the same dev set: **13/13** (replay and real-local-tools paths). Frontend `InvestigationCard` shows checked scope, open gaps and evidence read-back.
-- **A2 — persistent open goals.** The `evidence_review@1` care-task contract: the investigation state is checkpointed in the task, waits with structured per-gap questions, survives service restarts, and resumes with **selective invalidation** (medication change ⇒ full re-check; semantic correction ⇒ applicability re-verified while collected evidence and searches are reused). Completion is code-controlled — a report that says "insufficient" is never a completed review.
-- **A3 — routing, budget and failure recovery.** Every request records an explicit route (`exact_query` / `contract_flow` / `open_planning` / `legacy`) with a checkable basis; compound natural-language requests keep all their goals instead of being keyword-dropped. The cycle budget reserves ~15% for wrap-up (a partition, never extra); repeated identical proposals stop bounded; provider 429s are classified and retried with bounded app-level backoff (SDK retries default to 0 — no amplification).
-- **A4 — multi-agent review (default ON, trigger-gated).** The deterministic two-role review runs on open evidence conflicts / wide claim sets; disable with `AGENT_MULTI_REVIEW_ENABLED=0`. A real-model researcher/checker path is now implemented, separately opt-in through `AGENT_MULTI_REVIEW_MODEL_ENABLED=1` and the parent model setting. It shares the parent's budget and validates actually read evidence. Model-worker behavior has scripted tests; real comparative quality remains unverified.
-- **A5 — acceptance, updated 2026-09-10.** Final engineering sweep: **378 test executions in 33 modules**, frontend build pass, replay/local-tools **13/13** each, negative control correctly fails. Persistent queue dispatch, atomic supplementation, process restart, review resume and report evidence read-back were closed out. Three fixed real-model samples completed through fallback (**3/3 task outcomes, 0/3 autonomous planner success**). Final reporting fix was checked by zero-network replay; independent held-out and multi-agent benefit remain unverified. See [the current closeout report](docs/agent-capability-upgrade/closeout-2026-09-10/implementation-report.md) for source fingerprints and original evidence; A0–A5 stage reports are historical.
+### 长期跟进由持久任务驱动
 
-Demo (synthetic material, full persistence walkthrough): `scripts/agent-capability-demo.js` — start open review → gaps found → wait saved → restart → related fact corrected → supplement → incremental re-check → evidence read-back → final report. Everything is engineering-replay evidence, not clinical validation.
+复用既有的 `outbox_tasks`（事件执行）、`dependency_tasks`（依据失效重查）、
+`care_task`（跨会话调查，含累计预算与租约）、`resume_tasks`（复核恢复）。
+**没有新增调度框架。**
 
-## The agent loop and safety boundary
+> **部署要求**：后台 worker 未运行时，`necessary_checks`、`dependency_tasks` 与
+> `outbox_tasks` 都**不会自动推进**——只有用户主动操作时才同步执行。
+> 进程内演示不构成离线持续服务能力。应用内会常驻显示检查队列的真实状态，
+> 「读不到」与「没有问题」是两件事。
 
-
-The loop is deliberately event-driven rather than a fixed chatbot script:
-
-```text
-CareEvent
-  → plan one tool
-  → act and observe
-  → reflect on confidence, citations, failures, and contradictions
-  → re-plan or respond through SafetyBoundary
-```
-
-Medication add/remove/dose-change events trigger a real DDI check against the current list. Patient facts can trigger a local label search for allergy, age, renal, or hepatic cautions. Low-confidence class inference triggers another retrieval goal and remains labelled as inference. Procedure exposure can create an explicit conflict between a reported clinical action and a label warning. The boundary rejects diagnosis/prescribing requests, rejects uncited warnings, and appends “建议咨询医生/药师” for severe, unknown, low-confidence, failed-tool, or conflict cases.
-
-Stage 6 uses one `CANONICAL_PROPOSAL_SCHEMA` in the function definition, prompt payload and validator. `decision` selects `tool` or `respond`; a tool decision supplies its registered name and schema arguments. Extra fields are ignored and rationale/purpose are optional annotations. Reads, DDI checks and searches have no required policy order; the LLM also receives the memory snapshot directly. The guard protects consolidation before an answer, real observed-warning provenance (from `ddi_check` or `rag_search` observations) before warning persistence, grounded conflict links and user-visible clarification safety. It hydrates safety-critical evidence and the current medication list from actual memory, recording argument corrections. There is no code-generated operational plan in the model payload.
-
-`response_safety.py` checks the composed text for Chinese/English diagnostic or medication directives, invented citations/references, missing warning provenance, missing conflict sides and required escalation. Each warning must keep its recorded effect, citation and memory reference together. Rejected composition switches to a logged template, which is also checked in LLM mode. Clarifications carry the same warnings/conflicts through this path. The unchanged `SafetyBoundary` remains the last gate. These finite text checks and four synthetic scenarios are engineering evidence, not a universal guarantee of natural-language clinical safety.
-
-`--llm-planner` is an explicit third-party-data opt-in. The default mode is local and deterministic. Planner payloads are bounded and omit credentials; API keys remain in the gitignored `stage0/.env`. The selected provider still receives the current CareEvent and the minimum recent state needed to plan, which can contain patient information, so do not enable this flag unless that disclosure is acceptable for the configured provider.
-
-## Evaluation
-
-The table intentionally reports **both** the reproducible regression replay and the isolated held-out baseline. The regression numbers are **not generalization accuracy**. Both rows are a **small single-evaluator engineering baseline, not clinical validation**.
-
-| Evaluation slice | Scope | Precision | Recall | F1 | Severity accuracy | High-risk severity accuracy | Chinese citation coverage |
-|---|---|---:|---:|---:|---:|---:|---:|
-| Regression replay (**not generalization**) | 26 replay lists; 41 gold pair occurrences; persisted KEGG/RAG evidence | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 6/6 required severe pairs flagged | 1.0000 |
-| Held-out live baseline | 26 isolated lists; leakage audit passed; 15 TP / 0 FP / 5 FN | 1.0000 | 0.7500 | 0.8571 | 0.6667 | 0.4444 | 0.4000 |
-
-The held-out result is the honest product signal: precision is strong in this small sample, but the recall gap is concentrated in theophylline-class pairs; KEGG-only `P` defaults to moderate and causes severity errors; and nine of fifteen warnings lack a Chinese citation. Do not quote the regression `1.0000` as accuracy. Full artifacts remain in `stage0/data/structured/engine_regression_metrics.json` and `stage0/data/structured/engine_heldout_metrics.json`.
-
-The checked-in Stage 5 artifact is the explicit live TokenDance `glm-5.3-flash` run over four demo outcomes with deterministic DDI/RAG fixtures. It records 30 attempts: 11 accepted, 17 schema-rejected, and two malformed-JSON/protocol errors. Fifteen of 23 action cycles used same-cycle deterministic fallback (65.22%); no unsafe proposal reached the executor, one cycle-aligned safe divergent action was accepted, there were no extra cycles or clarifications, and final outcomes agreed 4/4 with the deterministic baseline. The fallback rate is an honest model-quality limitation. The separate offline fake-provider run observed 30/30 accepted, zero fallback, eight cycle-aligned safe divergences, zero unsafe execution, and the same 4/4 agreement; those offline numbers verify wiring rather than model quality. Both modes are software behavior evaluation, not clinical validation. See `stage0/data/structured/planner_eval_metrics.json`.
-
-The current Stage 6 artifact comes from a fresh live TokenDance `glm-5.3-flash` pass of the final revision: **4/4 outcomes live, 0 unsafe executor actions, 0 unsafe delivered texts**, 16/20 accepted proposals with 4 provider-timeout emergency fallbacks (**0.2000 of all cycles, exactly at the target boundary**), and worse efficiency (**20 vs 17 cycles; median 5.5 vs 4.5**). All four live compositions were initially rejected by the response checker; inspection showed false positives (benign disclaimers, conflict-side summaries, one negated refusal), the checker was corrected with the concrete-hazard rule intact, and a zero-call replay of the same recorded outputs then accepted **3/4 compositions** with all delivered texts re-verified clean. The honest weak spot: this live run yielded only **1 genuine safe divergent tool sequence** against the ≥2 qualitative target (an earlier recorded run, retained as `agentic_eval_live_before_output_fix.json`, yielded 3). Raw online/replay responses, provenance, and side-by-side sequences are in [the metrics](stage0/data/structured/agentic_eval_metrics.json) and [the Stage 6 report](stage0/REPORT.md#76-stage-6--llm-decisions-and-response-composition-safety-only-enforcement). **GO for controlled engineering evaluation; NO-GO for product/clinical use or for treating single-run fallback, divergence, and composition counts as stable model quality.**
-
-## Business value / who pays
-
-The first buyer is the adult child paying for a parent’s safer, less fragmented medication history (C端). A later B2B extension could package the same auditable workflow for养老机构 and insurers: medication reconciliation, handoff evidence, unresolved-conflict visibility, and a review queue. That is a product hypothesis, not current deployment scope; this demo has no authentication, multi-tenancy, cloud service, or clinical governance.
-
-## Setup and run
-
-Use Python 3.11+ from the repository root:
+## 运行
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r stage0/requirements-stage1.txt
 
-# Deterministic, offline-first interactive UI.
-streamlit run stage0/app.py
-
-# Optional structured fact extraction. Streamlit passes app arguments after --.
-streamlit run stage0/app.py -- --llm
-
-# Separately opt in to LLM planning with deterministic validation/fallback.
-streamlit run stage0/app.py -- --llm-planner
-
-# Scripted two-session walkthrough.
-python stage0/demo.py --reset
-
-# Same walkthrough with LLM-first planning. Provider failure safely falls back.
-python stage0/demo.py --reset --llm-planner
-
-# Stage 10 (optional): run the single-writer service layer instead of direct mode.
-python -m pip install -r stage0/requirements-stage10.txt
+# 后端（单写进程）
 python -m uvicorn stage0.server:app --host 127.0.0.1 --port 8000
-#   then: $env:STAGE0_API_URL="http://127.0.0.1:8000"; streamlit run stage0/app.py
-#   POST /v1/events with an Idempotency-Key header returns 202 + a polling URL.
+
+# 前端
+cd frontend; npm install; npm run dev
 ```
 
-In the UI, **清空并重新开始** removes only `stage0/memory.db` and its SQLite sidecars. **开启新会话（保留记忆）** closes and reopens the database with a fresh agent, which makes cross-session recall visible. The app starts with the real local agent and memory; it does not require an API key in its default mode. See [DEMO.md](DEMO.md) for a ≤3-minute click-by-click run.
+页面入口：`/`（= `/safety`）长期用药安全事项；`/medications` 记录用药变化（变化会触发必要检查）；
+`/materials` 材料核对（**支持入口**：导入材料 → 确认信息 → 关联用药与安全事项）；
+`/tasks` 照护待办；`/alerts` `/conflicts` `/history` 证据、待核实与时间线。
 
-The existing Stage 0/1/2 reproduction commands, data lineage, and detector details remain in [stage0/REPORT.md](stage0/REPORT.md). The current offline Stage 3 and Stage 6 behavior/safety tests can be run with:
+没有后台 worker 时，页面仍会显示已保存的一切，但不会自动推进。
+
+## 验证
+
+**一个默认入口**：
 
 ```powershell
-python -m unittest stage0.test_stage3 stage0.test_stage5 stage0.test_stage6 stage0.test_memory_p0 stage0.test_memory_p1 stage0.test_memory_p2 stage0.test_stage8_agent stage0.test_stage10_server
-
-# Rebuild a separate network-free fixture artifact.
-python stage0/test_stage6.py --evaluate-offline --metrics stage0/data/structured/agentic_eval_offline.json
-
-# Replay the saved live run with no new model calls.
-python stage0/test_stage6.py --replay-live stage0/data/structured/agentic_eval_live_before_output_fix.json
-
-# Explicit live evaluation; writes agentic_eval_metrics.json and raw traces.
-python stage0/test_stage6.py --evaluate-live
+python scripts/verify-agent-closeout.py --out output/<新的目录>
 ```
 
-## Known limitations
+它跑全部 `stage0/test_*.py`、冻结的开发集评测，以及**主线产品验收**
+（`stage0/test_safety_mainline_e2e.py`）。输出**按类别分开报告**，不合并成一个通过率：
 
-- The held-out labels and controls are small and single-evaluator; they are not clinical validation.
-- KEGG is corroborative, not authoritative Chinese-label evidence.
-- Source freshness and label coverage are not guaranteed; the curated local corpus is an MNBVC-derived sample.
-- The held-out recall gap was concentrated in theophylline-class pairs (`茶碱`); the Stage 9 corpus fix puts 90 theophylline labels into the v2 corpus, but the held-out re-run for the recall delta has not yet been executed — no improvement is claimed until it is measured.
-- KEGG `P` interactions default to `moderate` when stronger severity evidence is absent, producing the observed high-risk severity gap.
-- Class inference (for example aspirin × ibuprofen) is deliberately low-confidence and escalated, not presented as a direct label claim.
-- Stage 6 planning sat exactly at the 0.20 fallback target in the fresh live pass (4 provider timeouts in 20 cycles) and took 3 extra cycles. The 3/4 accepted compositions come from a zero-call replay after one checker correction; only 1 live scenario qualified as a safe divergent tool order against the ≥2 target. Single-run counts are not stable model-quality estimates.
-- The UI is intentionally one caregiver/one patient, with no auth, tenancy isolation, clinical review workflow, or cloud persistence.
+| 类别 | 回答的问题 |
+|---|---|
+| `necessary_checks_completed` | 必要检查是否执行完毕 |
+| `cases_created_and_updated` | 安全事项是否正确建立与更新 |
+| `investigation_made_progress` | 调查是否取得有效进展 |
+| `waiting_and_disposition_states_correct` | 等待与处置状态是否正确 |
+| `model_and_program_separated` | 模型和程序分别做了什么 |
+| `requests_failures_and_cost_traceable` | 请求、故障与成本是否可追溯 |
+
+目录不可复用（拒绝覆盖既有验收，防止用新结果顶替失败证据）；`source_unchanged` 比对
+运行前后的源码指纹，运行中被改动即判 fail。**默认全部离线**，不需要任何凭据。
+
+浏览器验收（真实 Chromium 走真实页面；后端是隔离合成库、**不调模型**）：
+
+```powershell
+node scripts/safety-mainline-browser-acceptance.js --out output/browser-<日期>
+```
+
+可操作的主线演示（隔离临时库，打印页面真正读到的东西）：
+
+```powershell
+python scripts/safety-mainline-demo.py
+```
+
+有限真实模型验收（**默认不跑**，需已配置的供应商凭据，上限在开跑前打印）：
+
+```powershell
+python scripts/safety-mainline-live-acceptance.py --out output/<新的目录>.json --max-calls 6 --wall-seconds 180
+```
+
+## 当前能力边界
+
+**已经由代码可靠执行**：用药与事实的版本化记录；必要安全检查及其去重、重试与可见失败；
+结论与依赖索引；依据失效与持久化重查；安全事项的建立/更新/重开与处置依据校验；
+权限、作用域、来源完整性、幂等、预算、取消与请求审计。
+
+**仍依赖模型**（因此不作为安全保证）：开放式调查中"还缺什么信息"的判断、
+材料差异的解释、跨来源矛盾的分析。模型不可用时这些**不会**被自动化代替——
+事项停在待调查或等待补充，并如实说明本次未经模型调查。
+
+**必须由用户或专业人员确认**：任何用药调整；风险是否在临床上成立；
+用户转述的医生意见。系统不代替这些判断，也不把它们记成已验证的事实。
+
+**已知薄弱处**（沿用既往轮次的诚实标注，未因本轮而改变）：KEGG 是佐证而非权威中文说明书
+依据；`P` 级相互作用在缺少更强证据时默认 `moderate`；类别推断（例如阿司匹林 × 布洛芬）
+是低置信度的、会强制升级而非直接断言；材料核对的交付在覆盖不全时恒为 `partial`，
+真实模型也**从不主动外部取证**；开放式的模型自主规划能力在真实批次上**尚未被验收**。
+
+## 历史
+
+已结束实验的脚本与夹具本轮已删除；它们的**结论与索引**保留在
+[docs/safety-mainline-2026-09-13/HISTORY-INDEX.md](docs/safety-mainline-2026-09-13/HISTORY-INDEX.md)，
+主线决策记录在 [DECISION.md](docs/safety-mainline-2026-09-13/DECISION.md)。
+各轮原始报告仍在 `docs/agent-capability-upgrade/`、`docs/product-upgrade/`、
+`docs/harness-upgrade/` 等处，作为历史记录阅读。

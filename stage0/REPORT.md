@@ -1,5 +1,11 @@
 # Stage 1 / 1b / 2 — Data-layer hardening and runtime DDI detection
 
+> **历史文档（截至 2026-08-27）。** 本文记录当时的数据层与检测器工作，其数字与结论
+> 仍然有效，但**命令不再全部可执行**：`make_negatives.py`、`eval_negative.py` 等一次性
+> 实验入口已在 2026-09-13 的长期用药安全主线重构中删除（它们的一次性结论见
+> [docs/safety-mainline-2026-09-13/HISTORY-INDEX.md](../docs/safety-mainline-2026-09-13/HISTORY-INDEX.md)）。
+> 当前的产品定位与验证入口见 [README.md](../README.md)。
+
 Date: 2026-08-27  
 Decision: **GO for further controlled detector/data validation; NO-GO for an agent, product, or clinical use.**
 

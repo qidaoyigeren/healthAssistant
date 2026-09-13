@@ -20,6 +20,14 @@ export const qk = {
   sessionEvents: (sessionId: string) => ['sessionEvents', sessionId] as const,
   turnTrace: (sessionId: string, turnId: string) => ['turnTrace', sessionId, turnId] as const,
   artifacts: ['dataArtifacts'] as const,
+  // 长期用药安全事项主线:主页面、事项列表、单事项、调查进度。
+  safetyMainline: ['safetyMainline'] as const,
+  safetyCases: ['safetyCases'] as const,
+  safetyCase: (caseId: string) => ['safetyCases', caseId] as const,
+  safetyClosureEvidence: (caseId: string) =>
+    ['safetyCases', caseId, 'closureEvidence'] as const,
+  careTasks: ['care-tasks'] as const,
+  runProgress: (runId: string, active: boolean) => ['runProgress', runId, active] as const,
 };
 
 /** 一次业务事件提交成功后需要刷新的查询族。 */
@@ -34,4 +42,8 @@ export const INVALIDATE_AFTER_COMMIT = [
   qk.recheckTasks,
   qk.sessions,
   qk.eventTypes,
+  // 药单一变,安全事项与它的调查任务都可能跟着变。
+  qk.safetyMainline,
+  qk.safetyCases,
+  qk.careTasks,
 ] as const;

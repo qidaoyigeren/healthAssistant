@@ -1,0 +1,797 @@
+{
+  "created_at": "2026-09-12T11:04:53.827795+00:00",
+  "baseline_audit": {
+    "tasks": 8,
+    "search_proposals_accepted": 2,
+    "original_read_proposals": 0,
+    "complete": 0,
+    "ledger_requests": 46,
+    "trace_attempts": 38,
+    "rejected_proposals": 8,
+    "limitation": "historical reduced planner trace has no complete tool observations; do not invent retrieved original text or per-request IDs"
+  },
+  "source_unchanged_since_freeze": true,
+  "wire_configuration_valid": true,
+  "A_status": {
+    "status": "unverified",
+    "reason": "No traceable explicit user authorization for an alternative target found; credentials and allowlist are insufficient.",
+    "screen_tasks": [
+      "vp-missing-002a",
+      "vp-conflict-003a",
+      "vp-noresult-005a"
+    ],
+    "regression_gate": "at least 2/3 task-appropriate complete/wait with relevant original and no strategy downgrade; no new safety failures"
+  },
+  "B_aggregates": {
+    "B1": {
+      "tasks": 8,
+      "provider_requests": 30,
+      "prompt_tokens_reported": 134494,
+      "completion_tokens_reported": 2080,
+      "wall_ms": 92934.18000000001,
+      "unknown_usage_requests": 4,
+      "multiple_call_responses": 4,
+      "identical_result_signature_repeats": 6,
+      "safety_rejected_requests": 4,
+      "executed_searches": 1,
+      "complete_without_degradation": 0,
+      "appropriate_wait_without_degradation": 0,
+      "original_backed_report": 0,
+      "material_original_reads": 0,
+      "relevant_original_tasks": 0,
+      "legacy_partial_report_quality_pass": 2,
+      "terminal_counts": {
+        "budget_insufficient": 6,
+        "no_progress": 2
+      },
+      "money_cost": null,
+      "billed_cost_not_available": true
+    },
+    "B2": {
+      "tasks": 8,
+      "provider_requests": 29,
+      "prompt_tokens_reported": 131620,
+      "completion_tokens_reported": 2278,
+      "wall_ms": 83232.57,
+      "unknown_usage_requests": 4,
+      "multiple_call_responses": 7,
+      "identical_result_signature_repeats": 9,
+      "safety_rejected_requests": 4,
+      "executed_searches": 1,
+      "complete_without_degradation": 0,
+      "appropriate_wait_without_degradation": 0,
+      "original_backed_report": 0,
+      "material_original_reads": 0,
+      "relevant_original_tasks": 0,
+      "legacy_partial_report_quality_pass": 3,
+      "terminal_counts": {
+        "budget_insufficient": 4,
+        "no_progress": 4
+      },
+      "money_cost": null,
+      "billed_cost_not_available": true
+    }
+  },
+  "total_requests": 59,
+  "ledger_all_matched": true,
+  "responses": 51,
+  "connection_errors": 8,
+  "pair": {
+    "input_changed_keys": [
+      "task_id",
+      "materials",
+      "expected"
+    ],
+    "only_evidence_text_changes_model_visible_input": true,
+    "offline_contract": "pass",
+    "product_API": "pass",
+    "live_model_evidence_sensitivity": "unverified: no original obtained; one conflicting-side B1 transport failure"
+  },
+  "scoring_caveat": "legacy report_quality checks partial report structure/content, not proof of original-backed conclusions; unchanged scores retained",
+  "repetition_caveat": "raw controlled_metrics.repeated_without_new_information is pre-update/stale and excluded; use exported durable signature counts, not all-zero trace flags",
+  "decision": "3: retain B1/current model and bounded material reconciliation/partial reports; leave B2 opt-in and autonomous investigation default off; A unverified; no claim that B2 cannot help under a healthy service",
+  "next_hypothesis": "unconstrained section string lets model invent nonexistent corpus filters, causing empty evidence even after it chooses acquisition",
+  "stop_condition_for_future_authorized_test": "one three-task gate after transport health verified; identical current model and 10 calls/180 seconds per task; no original-backed task improvement in >=2/3 -> stop, no full regression or prompt loops",
+  "regression": {
+    "started_at": "2026-09-12T10:58:06.401783+00:00",
+    "source_fingerprint": "8a02f94421aba4953f3a1119884a525dffad756f7a7fb45eeace54a43f2097f8",
+    "suites": [
+      {
+        "name": "test_agent_adaptive",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_agent_adaptive",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 8
+      },
+      {
+        "name": "test_agent_closeout",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_agent_closeout",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 17
+      },
+      {
+        "name": "test_agent_investigation",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_agent_investigation",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 9
+      },
+      {
+        "name": "test_agent_open_tasks",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_agent_open_tasks",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 6
+      },
+      {
+        "name": "test_agent_visit_prep",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_agent_visit_prep",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 66
+      },
+      {
+        "name": "test_claim_support",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_claim_support",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 6
+      },
+      {
+        "name": "test_evidence_loop",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_evidence_loop",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 15
+      },
+      {
+        "name": "test_frontend_read_models",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_frontend_read_models",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 13
+      },
+      {
+        "name": "test_harness_acceptance",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_harness_acceptance",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 13
+      },
+      {
+        "name": "test_harness_p0",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_harness_p0",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 26
+      },
+      {
+        "name": "test_harness_p1_a",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_harness_p1_a",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 15
+      },
+      {
+        "name": "test_harness_p1_b",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_harness_p1_b",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 16
+      },
+      {
+        "name": "test_harness_p1_c",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_harness_p1_c",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 11
+      },
+      {
+        "name": "test_harness_p2",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_harness_p2",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 16
+      },
+      {
+        "name": "test_harness_p3",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_harness_p3",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 22
+      },
+      {
+        "name": "test_live_regressions",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_live_regressions",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 16
+      },
+      {
+        "name": "test_memory_p0",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_memory_p0",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 16
+      },
+      {
+        "name": "test_memory_p1",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_memory_p1",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 14
+      },
+      {
+        "name": "test_memory_p2",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_memory_p2",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 15
+      },
+      {
+        "name": "test_model_tool_controlled",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_model_tool_controlled",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 9
+      },
+      {
+        "name": "test_multi_agent_review",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_multi_agent_review",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 6
+      },
+      {
+        "name": "test_planner_reliability",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_planner_reliability",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 36
+      },
+      {
+        "name": "test_product_closeout",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_product_closeout",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 10
+      },
+      {
+        "name": "test_product_evals",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_product_evals",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 3
+      },
+      {
+        "name": "test_product_evidence_quality",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_product_evidence_quality",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 3
+      },
+      {
+        "name": "test_product_full_flow",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_product_full_flow",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 4
+      },
+      {
+        "name": "test_product_ocr",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_product_ocr",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 4
+      },
+      {
+        "name": "test_product_p1",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_product_p1",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 10
+      },
+      {
+        "name": "test_product_reconciliation",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_product_reconciliation",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 5
+      },
+      {
+        "name": "test_product_tasks",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_product_tasks",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 4
+      },
+      {
+        "name": "test_reliability_p0",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_reliability_p0",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 14
+      },
+      {
+        "name": "test_reliability_p1",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_reliability_p1",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 9
+      },
+      {
+        "name": "test_reliability_p2",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_reliability_p2",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 10
+      },
+      {
+        "name": "test_stage10_server",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_stage10_server",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 11
+      },
+      {
+        "name": "test_stage3",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_stage3",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 3
+      },
+      {
+        "name": "test_stage5",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_stage5",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 18
+      },
+      {
+        "name": "test_stage6",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_stage6",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 26
+      },
+      {
+        "name": "test_stage8_agent",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_stage8_agent",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 14
+      },
+      {
+        "name": "test_visitprep_budget",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_visitprep_budget",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 10
+      },
+      {
+        "name": "test_visitprep_scoring",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "unittest",
+          "stage0.test_visitprep_scoring",
+          "-q"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": 54
+      }
+    ],
+    "evals": [
+      {
+        "name": "baseline-replay",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "stage0.agent_evals.run_eval",
+          "--policy",
+          "baseline",
+          "--path",
+          "replay",
+          "--out",
+          "D:\\py\\HealthAssistant\\output\\model-tool-controlled-2026-09-12\\regression\\baseline-replay.json"
+        ],
+        "exit_code": 1,
+        "expected_exit": 1,
+        "passed": true,
+        "tests": null
+      },
+      {
+        "name": "gap-replay",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "stage0.agent_evals.run_eval",
+          "--policy",
+          "gap",
+          "--path",
+          "replay",
+          "--out",
+          "D:\\py\\HealthAssistant\\output\\model-tool-controlled-2026-09-12\\regression\\gap-replay.json"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": null
+      },
+      {
+        "name": "gap-tools",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "stage0.agent_evals.run_eval",
+          "--policy",
+          "gap",
+          "--path",
+          "tools",
+          "--out",
+          "D:\\py\\HealthAssistant\\output\\model-tool-controlled-2026-09-12\\regression\\gap-tools.json"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "passed": true,
+        "tests": null
+      },
+      {
+        "name": "gap-replay-negative",
+        "command": [
+          "D:\\py\\HealthAssistant\\.venv\\Scripts\\python.exe",
+          "-m",
+          "stage0.agent_evals.run_eval",
+          "--policy",
+          "gap",
+          "--path",
+          "replay",
+          "--out",
+          "D:\\py\\HealthAssistant\\output\\model-tool-controlled-2026-09-12\\regression\\gap-replay-negative.json",
+          "--negative-control"
+        ],
+        "exit_code": 1,
+        "expected_exit": 1,
+        "passed": true,
+        "tests": null
+      }
+    ],
+    "live": [],
+    "independent_held_out": "unavailable",
+    "source_unchanged": true,
+    "status": "pass",
+    "tests_executed": 583,
+    "completed_at": "2026-09-12T11:00:41.356693+00:00"
+  },
+  "product_acceptance": {
+    "kind": "scripted API contract acceptance, no remote model",
+    "results": [
+      {
+        "interface": "B1",
+        "task_id": "vp-conflict-003a",
+        "checks": {
+          "material_upload": true,
+          "expected_terminal": true,
+          "originals_read": true,
+          "citation_api_hash_verified": true,
+          "five_section_report": true,
+          "no_patient_write": true,
+          "cancel_retains_report": true
+        }
+      },
+      {
+        "interface": "B1",
+        "task_id": "vp-conflict-003b",
+        "checks": {
+          "material_upload": true,
+          "expected_terminal": true,
+          "originals_read": true,
+          "citation_api_hash_verified": true,
+          "five_section_report": true,
+          "no_patient_write": true
+        }
+      },
+      {
+        "interface": "B2",
+        "task_id": "vp-conflict-003a",
+        "checks": {
+          "material_upload": true,
+          "expected_terminal": true,
+          "originals_read": true,
+          "citation_api_hash_verified": true,
+          "five_section_report": true,
+          "no_patient_write": true,
+          "cancel_retains_report": true
+        }
+      },
+      {
+        "interface": "B2",
+        "task_id": "vp-conflict-003b",
+        "checks": {
+          "material_upload": true,
+          "expected_terminal": true,
+          "originals_read": true,
+          "citation_api_hash_verified": true,
+          "five_section_report": true,
+          "no_patient_write": true
+        }
+      }
+    ]
+  }
+}

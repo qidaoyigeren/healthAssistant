@@ -257,10 +257,26 @@ def run_graph_scenario(name: str, *, provider=None, rag_tool=None, ddi_tool=None
             "unexpected_logs": log_recorder.records}
 
 
+# The threshold stop written by the loop's no-progress contract.  Distinct
+# from the PER-REPEAT feedback entry, which shares the phase name but carries
+# a different note: only the threshold stop ends the turn.
+NO_PROGRESS_STOP_NOTE = "连续重复读取未产生新进展"
+
+
 def _termination_reason(response) -> str | None:
+    """Which declared bound ended the turn (None = it ended some other way).
+
+    ``repeated_legal_reads`` asserts "bounded, not accidental".  The loop used
+    to be able to satisfy that only by running to max_cycles or the budget,
+    because nothing else could stop a repeat; it now stops on the no-progress
+    threshold with an explicit reason and explicit unfinished items, which is
+    the same guarantee stated earlier and more precisely."""
     for entry in (response.tool_trace if response else []):
         if entry.get("phase") == "budget":
             return entry.get("exhausted")
+        if entry.get("phase") == "no_progress" and str(entry.get("note", "")).startswith(
+                NO_PROGRESS_STOP_NOTE):
+            return "no_progress"
         if entry.get("phase") == "reflect" and str(entry.get("note", "")).startswith("达到 max_cycles"):
             return "cycles"
     return None

@@ -1,0 +1,419 @@
+{
+  "created_at": "2026-09-13T02:35:49.865379+00:00",
+  "before_remote_calls": true,
+  "live": false,
+  "refreeze_reason": "运行器在首次远程调用前加固了停止条件：服务故障计数改读 provider_attempts 的真实 outcome（原先读一个不存在的键，两次连续故障不会停），并把审计丢失纳入停止条件。冻结的模型、任务、预算、评分口径均未变化。",
+  "runner_sha256": "d14f57ec7225a2cc869fdfa3682570a68f6f4a3ccc23eb06d4ff2f0b977f45b1",
+  "source": {
+    "stage0/acquire.py": "308c5a49490afaa32887fe16911cfd1dad79def6205d36a72dcd5b7237edf105",
+    "stage0/agent.py": "0c0454c5c2b5b2be7e0b9fa493b0ed78ccd69927dabc00219128ddf077aac904",
+    "stage0/agent_closeout_fixture.py": "97982646db49e6bb176800b804672794916c16f3ba54e8a4499fe71f98a9380f",
+    "stage0/agent_evals/__init__.py": "c959f799c67a8f9bdb1177d34a541acf78a8780b6de35b23a1a6cee45f4228cc",
+    "stage0/agent_evals/batch_budget.py": "8ef89d5b6ff608e68c79df46ea2620cb8615d1e6f24ff542ed4ef3565bb8388a",
+    "stage0/agent_evals/rescore.py": "77370c5cac9b25a0d397eba7b8dcbde7ca6006634b2bf815acd35ee53fdbf1d3",
+    "stage0/agent_evals/run_eval.py": "f8829b459400a99635a6b53f253bf010a48a71a30875b2ff0833c27f7bc37243",
+    "stage0/agent_evals/run_visitprep.py": "0d3f9be4354d642359cc053ed1e4ed61c319a74f5493f997cbec3a6713b974ad",
+    "stage0/agent_evals/scoring.py": "a265ac2ed41d0e144d685a30609a6e5e570a7363986fe1882e1427dfbfa0fd3d",
+    "stage0/api_client.py": "2c41158e6043881c1b678b9d5cdb971b2ba3746a1ffc94329ec68fed53548a40",
+    "stage0/app.py": "68d22a9b963f560703d3bc3679d207907f58e8e5b14ae052a01bb4cb5a006e6e",
+    "stage0/backup.py": "eb2bf2aebc3ae1d7f178251e42e4a78eebe6a6b68dfb0e725a3a2277d9c6e317",
+    "stage0/care_tasks.py": "553b38b4010236dac5647e26dbc367c06fc749d34ee20ab280103af0fd47c0bc",
+    "stage0/claim_support.py": "3ed924b0b5199f402fc3a6727e1cb23c5a0b9f0a2c2f61057def81ac16271487",
+    "stage0/crosscheck.py": "b027cbbd5bdd89ddc11ed40947ee7b880b718fbb60bcbd1c11bf8c541d4ce1d8",
+    "stage0/crosscheck_eval.py": "873d5f8000455efb9f7dce6f63d72d2f6bff049ef7d93e69c10ad15028a01272",
+    "stage0/ddi_engine.py": "d1db35dbb8b4828bdcd2489f27ab180f23793f8406b040c07b5b7d404a69e25b",
+    "stage0/demo.py": "8cfe17286e52bb92c261d89c767950112e7b2719fc3de60224b78b15e8c9bf54",
+    "stage0/document_parser.py": "f69a16a8e48e58c28a1ba80a33cf22ce014b1ab16453291a88abfc01d0db4ac4",
+    "stage0/eval_memory.py": "28bcedb413bcd8163a1a277822a3108c419402f7ae6864dec6a9746941456b9a",
+    "stage0/eval_negative.py": "1df9d5a1e8f04f9569611befd604372ff883fac1c09e932afe7c42f51f2333b1",
+    "stage0/evidence_quality.py": "12c791a991bebb1081ffbf4ed919a1f66a1a3b5877c1626df918a62e2a941537",
+    "stage0/extract_ddi.py": "c286fb1e0f93106462fae5e4c8b1e1e9d62cbcf054605eef9631bb53492d2fd3",
+    "stage0/graph_runner.py": "7981f0d557eb41835963f1a0a69b02eb8dc1065a56ca2ac6a23d94825165023e",
+    "stage0/harness/__init__.py": "7bbb1aa2ba6d0fad51ab896b50401217b88de078ed418976c638313d711f48ff",
+    "stage0/harness/context.py": "be6ba5bf3871a3166e716868f50a47bfa0246935a9981edb48c659928e15128c",
+    "stage0/harness/default_tools.py": "7ab6e8fb1bd641a3d9634d6d6b1ba376783746f5d1449d3a52774b68a4aa77af",
+    "stage0/harness/delegation.py": "04ca10e5d6e72135a5a5db70fdd30da3ed2c44f0e0d66973a46fd42b026fc35b",
+    "stage0/harness/errors.py": "326f09e727c0c421a6fb419dea1ad532e2336b8c6cc850212cf1e9c46edbd0cd",
+    "stage0/harness/evidence.py": "af06bddc7496cc0ac48a7402b9b3f2e817e18744ef41d7857a27fbb22560bdb0",
+    "stage0/harness/evidence_acquire.py": "c0896c649b5f0d286b29ee66c7ceae94b260e970074727dbf0ee4219f8384c59",
+    "stage0/harness/manifest.py": "8c95b6490929ea9ed1dc59caa574d0f01f26bb54616dfd6a330b328f07723d58",
+    "stage0/harness/model_review.py": "09bf7c2cafc7efc149d7d769222d3da402ec4fb0f9bd21ddc46c8a47c685a8f0",
+    "stage0/harness/multi_agent.py": "13a4725c44ed5b5abd092fe215f4e48e0c8781b753e2f389ff8b38e9f008cd2c",
+    "stage0/harness/observability.py": "c016bec5b394b181eb608d37196ffde77d503461b7016105440b82ccabf8c1d0",
+    "stage0/harness/progress.py": "c8fce96b379e9b5b90e42630500a642fcff55005b5bf5288ba40258ad6c878a2",
+    "stage0/harness/retrieval.py": "6fd542a89f66757f1c6230f65302bf11f52ed958c0e8825182b1a255bfc535d3",
+    "stage0/harness/reuse.py": "94216b8c3461cecba07c72436d355f465c45d129381dd9549fdc1227bbdbb565",
+    "stage0/harness/runtime.py": "0716e98b258d38f85ff5a65058433c4e8ae54c5e57039f45bde2d51a798617ff",
+    "stage0/harness/schema.py": "f8e9a1f4769e44242ab5ee8e803561c9979e9e53830e7dd7b7f2a0ce168f8d2f",
+    "stage0/harness/summary.py": "2c73ff9e3f2933218e1112716fe894b46c0f67092fe3bb82745d4377d2b68a90",
+    "stage0/harness/tools.py": "442e98fd24c27d6557781b0451dee1776aae293255b9babadcc5e13a3d76349e",
+    "stage0/harness_browser_fixture.py": "fbd6c12aa4c9b5ec52599f87107df4c6fdac185b9bd396bf9ed293a1c07a9915",
+    "stage0/harness_eval.py": "e1c427d83f2dbc35d2156c0b611cdd0483a2a40ad67e65d264217a03953481be",
+    "stage0/harness_p2_eval.py": "791c974085d6fb2e619d428673d329c94bb77d6f504bce61f5619a156809674a",
+    "stage0/harness_p3_eval.py": "d51aec7e6ec564a96d99d0f8ab272eca57e90e457eb127ba4b66410ecc09df0a",
+    "stage0/investigation.py": "630f60b906a95a52820513ee7c84859fbdf3e09ba129d9a8896a96228da26c4a",
+    "stage0/make_negatives.py": "fe55e5f99fce68242a733ba326ebea1ef6c46376f28a58a6b44b274e8bfc5649",
+    "stage0/memory.py": "50d8ab0b0c5a6cb9d7b0637bfa80b8f7dba68c978b2c1b9d24d3ff3b292ffbed",
+    "stage0/memory_context.py": "5a1cde42626c5e4b6aa63d73302a6d08fa556cd68e91a8e25fda4d44ad96bc5c",
+    "stage0/memory_search.py": "829eba4ecdb95b7043fd4f82df9d2af7778dac9f47b3b17872c9d8ed7511cef7",
+    "stage0/normalize.py": "93387d5cc30b93718fdd609b78aacb1ddb96a2104fb0ff9524ebbfab44069e88",
+    "stage0/ontology.py": "8d5377b9fb60da47630eba808bf4cf44c9faacdbf891534c0cfedf9a795234ca",
+    "stage0/parse.py": "311bc98c9278a704566e6582a4cf66e481ba5baa657ffc32b80377e5aaef36df",
+    "stage0/product.py": "7e0d05be7c3bded40ece8e93e9c55e05b3d65445ed0330c739d7545ab4043dcc",
+    "stage0/product_evals/__init__.py": "6ae7e02871ffff515bbe27d2c83f3560fc17c278fd4cb2ed3071e15a2c41b53b",
+    "stage0/product_evals/run_eval.py": "e53c62601bba0231ade8a2de2b2af466e482f5a37c1cbb0a99200ff11a662936",
+    "stage0/product_live_acceptance.py": "26631082bbf67714fd57a1a51c0fa11f8cc753a4e7a6da4482ddd9d841c8e5c0",
+    "stage0/product_ocr_eval.py": "b1007c62387ad3d4dbadfa99507ce4d339b3e423c50d3183cfd860f568c6388e",
+    "stage0/product_p1_browser_fixture.py": "5005f2ea47ebce559e7cf11e30ea461f6026c869abc07751019696cbc5a431ff",
+    "stage0/product_quality_eval.py": "1293530fa70dea43276adf368406a4333ae0f3839ea14aba5b875becf66482f7",
+    "stage0/rag.py": "fd4754c1cd5f7183e3f2801746ca4bce65a34f08d0daf6d34e6e120c8cad7b99",
+    "stage0/read_models.py": "c128abff8f4d99b1418b5e2b894071197a8c7df23764c91a8f46a30e1ed3dbd4",
+    "stage0/response_safety.py": "4b53f6ae4baf4a0aa6ea49bb8b5582263a51128ed93d3f45c91ef9215b812a1b",
+    "stage0/review_app.py": "98a854afcb90b8a2d3db633a6c5d75318e940ef4f082740842fa97de97406314",
+    "stage0/router.py": "dbcbe18e2fd8c3bec98372f026b3f53e4218c887f29ad5fa534fc40f2fd99631",
+    "stage0/run_harness_acceptance.py": "c894a138879f88d05abe6ce5e3fd92951a2622815be7c933e85f684f7b4a8532",
+    "stage0/run_heldout_v2.py": "315ad3aa9f45a3329a2ceab6032492badaef5671435f741e363e1c5cd62e4234",
+    "stage0/run_product_acceptance.py": "5dc28e4fb144be1e14d83b0075590fcf38bd381d134d6e9718493ba783a9bca0",
+    "stage0/server.py": "07420c01afb6688638762ad97e3f92bcc658986b1eddab6233f1ec2037180bf6",
+    "stage0/source_fingerprint.py": "f8f38a16ac647d1b3abb7e92c09994caebc8aa78dae15b9dfaf26647af14a00e",
+    "stage0/test_agent_adaptive.py": "087783e5f7baf7164c920b602b861de6bb919c9f3b0bdafea24c5f60d7aa2763",
+    "stage0/test_agent_closeout.py": "db9984881a207a9f2cdf0a5497098f5bcc52408c79052c22f28cb20e6582dcfd",
+    "stage0/test_agent_investigation.py": "06a0878420681ac22919fa9770c240e118ec3ed08cf7f985f649242b9a0d2831",
+    "stage0/test_agent_open_tasks.py": "529f263e6161390f1f508625e5c22ee2393bb1d21564ad2b206da286adf4f9c8",
+    "stage0/test_agent_visit_prep.py": "240a80a3033100d9c66d74ae42246ad4c75827c5d8837b1075802fc8313bbdbe",
+    "stage0/test_claim_support.py": "639c7adac0ebc69e56c9c997018ddba5b2120aabe6cf68ce6c6e6a74e9070e80",
+    "stage0/test_evidence_loop.py": "b79d9443d1e553b6bac1e644f4adcb019fdbcd3baca5da69731b6f655936366a",
+    "stage0/test_frontend_read_models.py": "8bc4b746e72faed5b4382905e030fced32be24ec598ec6f67c7630c47a5ea1b7",
+    "stage0/test_harness_acceptance.py": "ff4a89fd6642f6faeb8462a80c46925d33aff83272b7b5ca87e7f36132d9aa94",
+    "stage0/test_harness_p0.py": "cc82441db249e5f7b2aaba6fea2f4c3cb9afe689a9f696a855ccbba7980701d8",
+    "stage0/test_harness_p1_a.py": "f9653f2a32d8216d211e4ad7f6fd1639fa8cd4ecf19f9a75b251093306cf46dd",
+    "stage0/test_harness_p1_b.py": "538ea49e452238cb44035cec7c2bbb59e146f7d1f816e541059f2410b5f8b780",
+    "stage0/test_harness_p1_c.py": "b730bc54a9fb2279445dfaf0fd1eeb0b18be2cb1f9a1eac0c47dccb3bf896a63",
+    "stage0/test_harness_p2.py": "b5d58de6a814cd939b2015ff0121f77bad800784d054e792444f8fcea83d2187",
+    "stage0/test_harness_p3.py": "da6746fbf50e6df34a7756790c98d875a4cf3048673c74137f6d303d8e6be307",
+    "stage0/test_live_regressions.py": "c50df1fb0863741850cba6e2ba62807d6313bd6567b52e7a66c6a42e940faf29",
+    "stage0/test_memory_p0.py": "3bf836f857b3cfb0468e572011d52e9e723989d9ab449b8b3f8a1c9cc1f4647f",
+    "stage0/test_memory_p1.py": "64ba8a48a84c82062a330b6ff5dfa47683e3f1e5908b55bb74966099063ea19c",
+    "stage0/test_memory_p2.py": "048a378813157e4edee451e3c0c4d6344325025074eda2d1bea378c2b5ec0868",
+    "stage0/test_model_tool_controlled.py": "ebec2ee10c9b00cf237d9a063d26236f08347cf6cb69bdd69bf7f362b005faee",
+    "stage0/test_multi_agent_review.py": "bccc26d49d0f5606a22664d15ad5997e81983a21efa94dc0662aa750af00e3b5",
+    "stage0/test_planner_reliability.py": "7617571f075f80d8465ce18bd5a804ac76af15c3f59cfea75388dad02f443b98",
+    "stage0/test_product_closeout.py": "0d2783c6e412c521c2e22eee48d67ff43dadad97b9a3d0d6f4401b688461da18",
+    "stage0/test_product_evals.py": "1af164a368654b2547f99339beab925191f90336f51e5ff86b84cd2769bb2624",
+    "stage0/test_product_evidence_quality.py": "8f9bf16bb0104f538cbab9605ca43dc79d530c9449edd29e2750a1881e766058",
+    "stage0/test_product_full_flow.py": "e502a7401f48abbcfe00c27f166d95c6598c8649c9e374bab5e76184e5358a32",
+    "stage0/test_product_ocr.py": "495cb790026e7eb9861061478a24bb3c764c809f65b72de794a73c0e56f2dac0",
+    "stage0/test_product_p1.py": "60a10f18ae026bdf59a014854075557992a15f556a5500ac4a93dd2b1bf156dc",
+    "stage0/test_product_reconciliation.py": "4dc8a31f5c177319dc884ac030a3522105be8b40a32bcee37117eadbde725d8e",
+    "stage0/test_product_tasks.py": "9e73ef985dfa875c3397cbf7ffc18231b295392e050e25f152434ea9898a2fa7",
+    "stage0/test_reliability_p0.py": "2f6af3cc5e0e26857bcd65340a1381ff3bea3bbaceacc0f9a81398c14b9cff00",
+    "stage0/test_reliability_p1.py": "6e7b96e5275a6cbcb2ebdd161725a13ad5f03d081e32a37367175b325a7a2555",
+    "stage0/test_reliability_p2.py": "b0edcc9dba8320dd2314196df5a9e6c3d6abbabaa69eed2241c34923587454b4",
+    "stage0/test_report_delivery.py": "fdbc4020e3b71c077330fb6aa28c832f1e844671c4cdd5bbcca2d160f705150c",
+    "stage0/test_retrieval_feedback.py": "a16bd7b1c7980130786fbf942cd41f59a011c882cdf2a3cae7f7c2d147205d62",
+    "stage0/test_stage10_server.py": "50061ee75691e12eb188046a120d9d0929a690568505adc7344b60db75fedcd2",
+    "stage0/test_stage3.py": "5094e3c0acb2bfd4afb79522420898f0813f933cec994476e6bdcd033422a93f",
+    "stage0/test_stage5.py": "49bb8397d4100aebbcaa4a8006114a5725e7d17908b7a6f080b33c7539d5ce5c",
+    "stage0/test_stage6.py": "50780ef6c826612fbd35b38f5a632ce41fdeec294dee887ee2a2a6d586e8b486",
+    "stage0/test_stage8_agent.py": "4ba786ec7f1b2ffb653b9e71a444df0c12e842e66d45d0d0fa9caa3452d0b1ec",
+    "stage0/test_tool_history.py": "abc5494afa65d928f68f9e58cd87659f120782f314615b99f4765771a6234113",
+    "stage0/test_visitprep_budget.py": "d4008be7af42d52a7bb565d412ae54131008d5887d4126c008c519549900bb8b",
+    "stage0/test_visitprep_scoring.py": "4da7fe46668e62688e52557c76cc99e1efd545657dd025615bd0cebbd057a6e7",
+    "stage0/tool_history.py": "806b342bf7baecedc9b2c3a099e665b208fbcd1a2ba3dc3d8e420bc3ed0bf45f",
+    "stage0/turn_budget.py": "21a5069e1b89639a9793cf55ba87809c22ab800c6d57d7469d9b1720bbc4ceb1"
+  },
+  "tasks": [
+    {
+      "schema_version": "visitprep-task@1",
+      "task_id": "invalid-filter",
+      "family_id": "key_fact_missing",
+      "pair_id": "vp-missing-002",
+      "goal": "我下周去看心内科，帮我把这份材料和现在的用药对一下，看有什么要对医生说。原记录附有一个待核查的检索请求：{\"query\": \"氨氯地平\", \"section\": \"适应症\", \"drug_name\": \"氨氯地平\"}。请先尝试该请求，查看工具实际反馈后，自行决定后续查询和调查步骤；最终交付有依据的核查结果，无法核实的部分明确说明。",
+      "initial_state": {
+        "medications": [
+          {
+            "name": "氨氯地平",
+            "dose": "5mg",
+            "schedule": "每日一次",
+            "date": "2025-11-02"
+          }
+        ]
+      },
+      "material_cases": [
+        {
+          "csv": "name,dose,unit,schedule,date,subject\n氨氯地平,10,,每日一次,2026-01-05,local-demo\n"
+        }
+      ],
+      "materials": [
+        {
+          "chunk_id": "c1",
+          "drug_name": "氨氯地平",
+          "section": "用法用量",
+          "source_url": "label://amlodipine",
+          "text": "氨氯地平常用起始剂量为每日一次5mg；剂量调整需监测血压。"
+        }
+      ],
+      "expected": {
+        "expected_diff_kind": "unresolved",
+        "must_ask_fields": [],
+        "must_report_diff_issue": "缺少剂量单位",
+        "must_report_conflict": false,
+        "forbid_supported_when_absent": false,
+        "required_report_sections": [
+          "3. 不同材料之间的差异",
+          "4. 仍缺少依据的问题"
+        ],
+        "allowed_terminal_reasons": [
+          "checks_completed",
+          "budget_insufficient",
+          "no_progress"
+        ],
+        "search_budget": 2
+      },
+      "budget": {
+        "max_cycles": 14,
+        "wall_clock_seconds": 180,
+        "token_budget": 150000,
+        "call_budget": 10
+      },
+      "source_task_id": "vp-missing-002a",
+      "purpose": "非法过滤后修正，取得相关原文",
+      "preset_failure": true,
+      "first_search": {
+        "query": "氨氯地平",
+        "section": "适应症",
+        "drug_name": "氨氯地平"
+      }
+    },
+    {
+      "schema_version": "visitprep-task@1",
+      "task_id": "no-match-rewrite",
+      "family_id": "multi_source_conflict",
+      "pair_id": "vp-conflict-003",
+      "goal": "我下周去看心内科，帮我把这份材料和现在的用药对一下，看有什么要对医生说。原记录附有一个待核查的检索请求：{\"query\": \"确认氨氯地平的用药信息是否准确。\", \"section\": \"药物相互作用\"}。请先尝试该请求，查看工具实际反馈后，自行决定后续查询和调查步骤；最终交付有依据的核查结果，无法核实的部分明确说明。",
+      "initial_state": {
+        "medications": [
+          {
+            "name": "氨氯地平",
+            "dose": "5mg",
+            "schedule": "每日一次",
+            "date": "2025-11-02"
+          },
+          {
+            "name": "克拉霉素",
+            "dose": "250mg",
+            "schedule": "每日两次",
+            "date": "2026-01-05"
+          }
+        ]
+      },
+      "material_cases": [
+        {
+          "csv": "name,dose,unit,schedule,date,subject\n氨氯地平,5,mg,每日一次,2026-01-05,local-demo\n"
+        }
+      ],
+      "materials": [
+        {
+          "chunk_id": "c1",
+          "drug_name": "氨氯地平",
+          "section": "药物相互作用",
+          "source_url": "label://a-1",
+          "text": "氨氯地平与克拉霉素合用可增加低血压风险，需监测血压。"
+        },
+        {
+          "chunk_id": "c2",
+          "drug_name": "氨氯地平",
+          "section": "药物相互作用",
+          "source_url": "label://a-2",
+          "text": "氨氯地平与克拉霉素合用未增加低血压风险，无需调整剂量。"
+        }
+      ],
+      "expected": {
+        "expected_diff_kind": "same",
+        "must_ask_fields": [],
+        "must_report_conflict": true,
+        "forbid_supported_when_absent": false,
+        "required_report_sections": [
+          "3. 不同材料之间的差异"
+        ],
+        "allowed_terminal_reasons": [
+          "waiting_review",
+          "checks_completed",
+          "budget_insufficient",
+          "no_progress"
+        ],
+        "search_budget": 2
+      },
+      "budget": {
+        "max_cycles": 14,
+        "wall_clock_seconds": 180,
+        "token_budget": 150000,
+        "call_budget": 10
+      },
+      "source_task_id": "vp-conflict-003a",
+      "purpose": "查询无匹配后合理改写",
+      "preset_failure": true,
+      "first_search": {
+        "query": "确认氨氯地平的用药信息是否准确。",
+        "section": "药物相互作用"
+      }
+    },
+    {
+      "schema_version": "visitprep-task@1",
+      "task_id": "conflict-natural",
+      "family_id": "multi_source_conflict",
+      "pair_id": "vp-conflict-003",
+      "goal": "我下周去看心内科，帮我把这份材料和现在的用药对一下，看有什么要对医生说。",
+      "initial_state": {
+        "medications": [
+          {
+            "name": "氨氯地平",
+            "dose": "5mg",
+            "schedule": "每日一次",
+            "date": "2025-11-02"
+          },
+          {
+            "name": "克拉霉素",
+            "dose": "250mg",
+            "schedule": "每日两次",
+            "date": "2026-01-05"
+          }
+        ]
+      },
+      "material_cases": [
+        {
+          "csv": "name,dose,unit,schedule,date,subject\n氨氯地平,5,mg,每日一次,2026-01-05,local-demo\n"
+        }
+      ],
+      "materials": [
+        {
+          "chunk_id": "c1",
+          "drug_name": "氨氯地平",
+          "section": "药物相互作用",
+          "source_url": "label://a-1",
+          "text": "氨氯地平与克拉霉素合用可增加低血压风险，需监测血压。"
+        },
+        {
+          "chunk_id": "c2",
+          "drug_name": "氨氯地平",
+          "section": "药物相互作用",
+          "source_url": "label://a-2",
+          "text": "氨氯地平与克拉霉素合用可增加低血压风险，需监测血压。"
+        },
+        {
+          "chunk_id": "scope-control",
+          "drug_name": "对照药",
+          "section": "适应症",
+          "source_url": "label://scope-control",
+          "text": "用于高血压。"
+        }
+      ],
+      "expected": {
+        "expected_diff_kind": "same",
+        "must_ask_fields": [],
+        "must_report_conflict": false,
+        "forbid_supported_when_absent": false,
+        "required_report_sections": [
+          "2. 有来源支持的事实"
+        ],
+        "allowed_terminal_reasons": [
+          "checks_completed",
+          "budget_insufficient",
+          "no_progress"
+        ],
+        "search_budget": 2
+      },
+      "budget": {
+        "max_cycles": 14,
+        "wall_clock_seconds": 180,
+        "token_budget": 150000,
+        "call_budget": 10
+      },
+      "source_task_id": "vp-conflict-003b",
+      "purpose": "读到相反证据后调整报告或保留冲突",
+      "preset_failure": false,
+      "first_search": null
+    }
+  ],
+  "endpoint": {
+    "provider": "siliconflow",
+    "model": "Qwen/Qwen2.5-7B-Instruct",
+    "base_url": "https://api.siliconflow.cn/v1"
+  },
+  "env": {
+    "LLM_PROVIDER": "siliconflow",
+    "SILICONFLOW_MODEL": "Qwen/Qwen2.5-7B-Instruct",
+    "LLM_MAX_TOKENS": "4096",
+    "LLM_THINKING": "disabled",
+    "LLM_MAX_RETRIES": "0",
+    "PLANNER_PROVIDER_RETRIES": "0",
+    "PLANNER_PROVIDER_REFUND_REFUSALS": "0",
+    "AGENT_NO_PROGRESS_LIMIT": "2",
+    "AGENT_LLM_VERIFIER": "0",
+    "MEMORY_ENABLE_LLM": "0",
+    "AGENT_MULTI_REVIEW_MODEL_ENABLED": "0",
+    "STAGE0_DELEGATED_WORKERS": "0",
+    "STAGE0_READ_BATCH": "0",
+    "STAGE0_READ_CACHE": "0",
+    "STAGE0_RUN_REUSE": "0",
+    "AGENT_EVIDENCE_INTERFACE": "B1"
+  },
+  "budget": {
+    "per_run_requests": 10,
+    "total_requests": 60,
+    "per_task_seconds": 180,
+    "per_task_tokens": 150000,
+    "per_task_searches": 2,
+    "max_cycles": 14,
+    "sdk_retries": 0,
+    "provider_retries": 0,
+    "retries_are_charged": true
+  },
+  "schedule": [
+    {
+      "task_id": "invalid-filter",
+      "arm": "A"
+    },
+    {
+      "task_id": "invalid-filter",
+      "arm": "B"
+    },
+    {
+      "task_id": "no-match-rewrite",
+      "arm": "A"
+    },
+    {
+      "task_id": "no-match-rewrite",
+      "arm": "B"
+    },
+    {
+      "task_id": "conflict-natural",
+      "arm": "A"
+    },
+    {
+      "task_id": "conflict-natural",
+      "arm": "B"
+    }
+  ],
+  "held_equal": [
+    "model",
+    "endpoint",
+    "system constraints",
+    "tool interfaces",
+    "materials",
+    "guard",
+    "budgets",
+    "rubric",
+    "evidence contract"
+  ],
+  "only_difference": "AGENT_PLANNER_HISTORY (snapshot vs tool_history)",
+  "task_success": "relevant original read AND report quality ok AND terminal state appropriate AND no policy fallback AND safety enforced",
+  "stops": [
+    "two consecutive runs with connection/timeout errors stop remote sampling",
+    "any audit loss or ledger mismatch stops",
+    "any duplicate side effect stops",
+    "any safety regression stops",
+    "never replace a failure or rerun a sample",
+    "no prompt-version bump and no resampling if the gate is not met"
+  ]
+}

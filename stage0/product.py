@@ -490,6 +490,10 @@ def register_product_routes(app, store, principal, authorize_scope, require_role
 
     from .care_tasks import register_task_routes
     register_task_routes(app, product, access, invoke, agent_factory=getattr(app.state, 'agent_factory', None))
+    # 安全事项是产品主线：主页面读它，Agent 的调查挂在它上面。处置的操作者身份
+    # 从认证上下文取，所以这里把 principal 传下去。
+    from .safety_cases import register_safety_routes
+    register_safety_routes(app, product, access, invoke, principal, require_role)
     from .document_parser import register_document_routes
     register_document_routes(app, product, access, invoke)
     from .evidence_quality import register_quality_routes

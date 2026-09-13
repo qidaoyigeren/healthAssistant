@@ -6,41 +6,22 @@ import { productApi } from '../../api/product';
 import { SafeMarkdown } from '../../components/safeMarkdown';
 import { EvidenceDrawer } from '../../components/evidence';
 import { inputClass, buttonClass } from '../materials/MaterialsPage';
+import { RunProgressLine } from '../shared/runProgress';
+import { MaterialReviewTaskCard, type MaterialReviewTask } from './MaterialReviewCard';
 
 interface CareTask { id: string; goal_type: string; revision: number; status: string; case_id: string | null; waiting_reason: string | null; due_at: string | null; budget: { spent: number; limit: number }; result_refs: string[]; goal?: string; missing_inputs?: Array<{ gap_id: string; field?: string; question: string }>; subgoals?: Array<{ subgoal_id: string; kind: string; statement: string; status: string }>; partial_report_refs?: string[]; active_run_id?: string | null; degraded_label?: string | null; retry_available?: boolean; runs?: Array<{ run_id: string; status?: string; workflow_run_id?: string }> }
 interface InvestigationReport { id: string; markdown: string; partial: boolean; goal: string; investigation?: { evidence_refs: string[] } }
 interface Summary { id: string; created_at: string; stale: boolean; markdown: string }
-interface RunProgressEvent { event_id: string; seq: number; kind: string; tool?: string | null; detail?: Record<string, unknown>; created_at: string }
-interface RunProgress { run_id: string; events: RunProgressEvent[]; latest_seq: number; snapshot: boolean; run_status?: string }
-const names: Record<string, string> = { reconcile_material: '材料核对', visit_summary: '准备就诊摘要', current_medications: '查看当前药单', evidence_review: '开放证据核查', ready: '可以继续', running: '正在处理', waiting_input: '等待补充', waiting_review: '等待专业审核', completed: '已完成', cancelled: '已取消', failed: '处理未完成' };
+const names: Record<string, string> = { reconcile_material: '材料核对', visit_summary: '准备就诊摘要', current_medications: '查看当前药单', evidence_review: '开放证据核查', material_review: '材料核对与就诊准备', safety_case: '用药安全事项调查', ready: '可以继续', running: '正在处理', waiting_input: '等待补充', waiting_review: '等待专业审核', completed: '已完成', cancelled: '已取消', failed: '处理未完成' };
 const subgoalStatus: Record<string, string> = { completed: '已完成', blocked: '未完成', recorded: '已记录待确认' };
 const fetchTasks = () => request<{ items: CareTask[] }>('/v1/care-tasks');
-// Labels mirror the backend progress vocabulary (harness/progress.py) — the
-// lines render real execution events from GET /v1/runs/{id}/progress, never a
-// synthetic progress bar.
-const progressLabels: Record<string, string> = { accepted: '已受理，正在准备核查…', organizing: '整理记录…', retrieving: '检索依据…', checking_risks: '核对风险…', waiting_input: '本轮已暂停，等待补充记录', recheck_required: '记录已变化，需要继续核查', waiting_review: '等待本地模拟审核', completed: '核查完成', failed: '处理失败', cancel_requested: '正在取消…', cancelled: '已取消' };
-
-function RunProgressLine({ runId, active }: { runId?: string | null; active: boolean }): React.ReactElement | null {
-  const progress = useQuery({
-    queryKey: ['run-progress', runId, active],
-    queryFn: () => request<RunProgress>(`/v1/runs/${encodeURIComponent(runId ?? '')}/progress`),
-    enabled: !!runId,
-    refetchInterval: active ? 2000 : false,
-  });
-  const latest = progress.data?.events.at(-1);
-  const runStatus = progress.data?.run_status;
-  if (!latest && !runStatus) return null;
-  const label = latest ? (progressLabels[latest.kind] ?? latest.kind) : runStatus === 'queued' ? '已受理，等待后台核查…' : '';
-  const degradedNote = runStatus === 'degraded' ? '（本轮存在降级或未完成步骤，请查看报告说明）' : '';
-  return <p className="text-sm text-ink-secondary" role="status">{label}{degradedNote}</p>;
-}
 
 const semanticLabels: Record<string, string> = { renal_function: '肾功能', hepatic_function: '肝功能', allergy: '过敏', age: '年龄', pregnancy: '孕产情况', chronic_condition: '既往疾病' };
 
 function EvidenceReviewTask({ task, busy, onRun, resume }: {
   task: CareTask; busy: boolean;
   onRun: (fn: () => Promise<unknown>) => Promise<void>;
-  resume: (task: CareTask, action?: string) => Promise<CareTask>;
+  resume: (task: { id: string; revision: number }, action?: string) => Promise<unknown>;
 }): React.ReactElement {
   const questions = task.missing_inputs ?? [];
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -110,21 +91,51 @@ export function CareTasksPage(): React.ReactElement {
   const [caseId, setCaseId] = useState('');
   const [due, setDue] = useState('');
   const [openGoal, setOpenGoal] = useState('');
+  // 本次要求来自**明确的选择**,不是从一句话里猜出来的:只支持三种明确要求,
+  // 各自有不同的满足条件。没勾的不会被当成义务。
+  const [wantDifferences, setWantDifferences] = useState(true);
+  const [wantField, setWantField] = useState(false);
+  const [confirmField, setConfirmField] = useState('strength');
+  const [wantSource, setWantSource] = useState(false);
+  const [sourceQuestion, setSourceQuestion] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function run(fn: () => Promise<unknown>) { setBusy(true); setError(''); try { await fn(); await client.invalidateQueries(); } catch(e) { setError(e instanceof Error ? e.message : '处理失败'); } finally { setBusy(false); } }
+  function requestedNow(): Array<Record<string, unknown>> {
+    const items: Array<Record<string, unknown>> = [];
+    if (wantDifferences) items.push({ kind: 'list_differences' });
+    if (wantField) items.push({ kind: 'confirm_field', field: confirmField });
+    if (wantSource && sourceQuestion.trim().length >= 4) {
+      items.push({ kind: 'answer_from_source', question: sourceQuestion.trim() });
+    }
+    return items;
+  }
   async function create(goal: string, openGoal?: string) {
-    const task = await request<CareTask>('/v1/care-tasks', { method: 'POST', body: { key: newIdempotencyKey(), goal_type: goal, case_id: caseId || null, due_at: due ? new Date(due).toISOString() : null, goal: openGoal } });
+    const task = await request<CareTask>('/v1/care-tasks', { method: 'POST', body: { key: newIdempotencyKey(), goal_type: goal, case_id: caseId || null, due_at: due ? new Date(due).toISOString() : null, goal: openGoal, requested: goal === 'material_review' ? requestedNow() : undefined } });
     await resume(task);
   }
-  const resume = (task: CareTask, action = 'continue') => request<CareTask>(`/v1/care-tasks/${task.id}/resume`, { method: 'POST', body: { key: newIdempotencyKey(), revision: task.revision, action } });
+  const resume = (task: { id: string; revision: number }, action = 'continue') => request<CareTask>(`/v1/care-tasks/${task.id}/resume`, { method: 'POST', body: { key: newIdempotencyKey(), revision: task.revision, action } });
   return <div className="space-y-5"><header><h2 className="font-serif text-2xl">照护待办与就诊准备</h2><p className="mt-2 text-sm text-ink-secondary">离开后可在这里继续。到期仅显示应用内待办，不会在关闭应用后发送通知。</p></header>
     {(error || tasks.error || summaries.error) && <p role="alert" className="bg-red-50 p-3 text-red-800">{error || '读取失败，请刷新重试'}</p>}
     <section className="space-y-3 rounded-card border border-border bg-surface p-4"><h3 className="font-medium">留下一个材料核对待办</h3><label className="block text-sm">选择材料<select className={inputClass} value={caseId} onChange={e => setCaseId(e.target.value)}><option value="">请选择</option>{cases.data?.items.map(c => <option value={c.case_id} key={c.case_id}>{c.created_at} · {c.items.length} 项</option>)}</select></label><label className="block text-sm">计划处理时间（可选）<input className={inputClass} type="datetime-local" value={due} onChange={e => setDue(e.target.value)} /></label><button disabled={busy || !caseId} className={buttonClass} onClick={() => void run(() => create('reconcile_material'))}>保存待办</button></section>
+    <section className="space-y-3 rounded-card border border-border bg-surface p-4"><h3 className="font-medium">核对一份材料,准备就诊</h3><p className="text-sm text-ink-secondary">选一份已上传的材料,系统整理它与当前记录的一致项、差异和缺项,必要时向您补充确认,然后给出带来源的报告。补充信息或换一版材料后,只会重新核对受影响的部分。</p><label className="block text-sm">选择材料<select className={inputClass} value={caseId} onChange={e => setCaseId(e.target.value)}><option value="">请选择</option>{cases.data?.items.map(c => <option value={c.case_id} key={c.case_id}>{c.created_at} · {c.items.length} 项</option>)}</select></label><label className="block text-sm">本次核对目标<textarea className={inputClass} rows={2} value={openGoal} onChange={e => setOpenGoal(e.target.value)} placeholder="例如:核对这份材料与当前药单是否一致,整理就诊时要确认的问题" /></label><fieldset className="space-y-2 rounded-lg border border-border px-3 py-2"><legend className="text-sm">本次要完成什么(可多选,决定这次怎样才算做完)</legend>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={wantDifferences} onChange={e => setWantDifferences(e.target.checked)} />列出这份材料与当前记录的差异及缺项</label>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={wantField} onChange={e => setWantField(e.target.checked)} />确认指定字段是否一致
+        <select className={inputClass} value={confirmField} disabled={!wantField} onChange={e => setConfirmField(e.target.value)} aria-label="要确认的字段">{(['dose', 'unit', 'schedule', 'date', 'route', 'form', 'strength', 'name'] as const).map(f => <option key={f} value={f}>{{dose:'剂量',unit:'单位',schedule:'服用频次',date:'日期',route:'给药途径',form:'剂型',strength:'规格',name:'药名'}[f]}</option>)}</select>
+      </label>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={wantSource} onChange={e => setWantSource(e.target.checked)} />依据资料回答一个问题</label>
+      {wantSource && <input className={inputClass} value={sourceQuestion} onChange={e => setSourceQuestion(e.target.value)} placeholder="例如:这份材料里的用法与说明书是否一致?" aria-label="要依据资料回答的问题" />}
+      <p className="text-xs text-ink-muted">没有勾选的要求不会被系统当成义务;核对过程中发现的其它问题会作为**可选建议**列出,不阻塞本次任务。</p>
+    </fieldset>
+    <button disabled={busy || !caseId || openGoal.trim().length < 4 || (wantSource && sourceQuestion.trim().length < 4)} className={buttonClass} onClick={() => void run(() => create('material_review', openGoal.trim()).then(() => setOpenGoal('')))}>开始核对</button></section>
     <section className="space-y-3 rounded-card border border-border bg-surface p-4"><h3 className="font-medium">发起一个开放证据核查</h3><p className="text-sm text-ink-secondary">围绕已有患者记录与材料核查证据、整理待确认问题；核查会分步进行，缺少记录时等待补充，已保存的进度可以随时回来继续。</p><label className="block text-sm">核查目标<textarea className={inputClass} rows={2} value={openGoal} onChange={e => setOpenGoal(e.target.value)} placeholder="例如:核查当前用药相互作用证据与适用条件" /></label><button disabled={busy || openGoal.trim().length < 4} className={buttonClass} onClick={() => void run(() => create('evidence_review', openGoal.trim()).then(() => setOpenGoal('')))}>开始核查</button></section>
     <section className="space-y-3" aria-label="照护待办列表">{tasks.data?.items.map(t => t.goal_type === 'evidence_review'
       ? <EvidenceReviewTask key={t.id} task={t} busy={busy} onRun={run} resume={resume} />
-      : <article key={t.id} className="rounded-card border border-border bg-surface p-4"><div className="flex justify-between gap-2"><h3 className="font-medium">{names[t.goal_type]}</h3><span className="text-sm text-primary-strong">{names[t.status]}</span></div><p className="mt-2 text-sm">{t.waiting_reason}</p>{t.due_at && <p className="mt-2 text-xs text-ink-muted">计划：{new Date(t.due_at).toLocaleString()}{new Date(t.due_at).getTime() < Date.now() && t.status !== 'completed' ? ' · 已到计划时间' : ''}</p>}<div className="mt-3 flex gap-3">{t.case_id && <Link className={buttonClass} to={`/materials?case=${encodeURIComponent(t.case_id)}`}>打开材料补充信息</Link>}{!['completed', 'cancelled', 'failed'].includes(t.status) && <><button disabled={busy} className={buttonClass} onClick={() => void run(() => resume(t))}>继续处理</button><button disabled={busy} className={buttonClass} onClick={() => void run(() => resume(t, 'cancel'))}>取消后续处理</button></>}</div></article>)}</section>
+      : t.goal_type === 'material_review'
+      ? <MaterialReviewTaskCard key={t.id} task={t as unknown as MaterialReviewTask} busy={busy} onRun={run} resume={resume} />
+      : <article key={t.id} className="rounded-card border border-border bg-surface p-4"><div className="flex justify-between gap-2"><h3 className="font-medium">{names[t.goal_type]}</h3><span className="text-sm text-primary-strong">{names[t.status]}</span></div><p className="mt-2 text-sm">{t.waiting_reason}</p>{t.due_at && <p className="mt-2 text-xs text-ink-muted">计划：{new Date(t.due_at).toLocaleString()}{new Date(t.due_at).getTime() < Date.now() && t.status !== 'completed' ? ' · 已到计划时间' : ''}</p>}<div className="mt-3 flex gap-3">{t.case_id && (t.goal_type === 'safety_case'
+        ? <Link className={buttonClass} to={`/safety/${encodeURIComponent(t.case_id)}`}>回到这件事项</Link>
+        : <Link className={buttonClass} to={`/materials?case=${encodeURIComponent(t.case_id)}`}>打开材料补充信息</Link>)}{!['completed', 'cancelled', 'failed'].includes(t.status) && <><button disabled={busy} className={buttonClass} onClick={() => void run(() => resume(t))}>继续处理</button><button disabled={busy} className={buttonClass} onClick={() => void run(() => resume(t, 'cancel'))}>取消后续处理</button></>}</div></article>)}</section>
     <section className="space-y-3 rounded-card border border-border bg-surface p-4"><h3 className="font-medium">就诊准备摘要</h3><p className="text-sm text-ink-secondary">保存当前报告药单、近期变化、未决问题与来源。每次生成独立版本。</p><button disabled={busy} className={`${buttonClass} bg-primary-soft`} onClick={() => void run(() => create('visit_summary'))}>生成就诊摘要</button>{summaries.data?.items.map(s => <details className="border-t border-border pt-3" key={s.id}><summary className="cursor-pointer text-sm">{s.created_at} · {s.stale ? '记录已变化，建议重新生成' : '与当前记录一致'}</summary><div className="my-3 min-w-0 [overflow-wrap:anywhere]"><SafeMarkdown text={s.markdown} /></div><div className="flex gap-4"><a className="text-sm text-primary-strong underline" href={`${import.meta.env.VITE_API_BASE ?? ''}/v1/visit-summaries/${s.id}/download?format=html`}>下载 HTML</a><a className="text-sm text-primary-strong underline" href={`${import.meta.env.VITE_API_BASE ?? ''}/v1/visit-summaries/${s.id}/download`}>下载 Markdown</a></div></details>)}</section>
   </div>;
 }

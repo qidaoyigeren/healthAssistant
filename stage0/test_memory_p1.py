@@ -189,7 +189,13 @@ class DependencyInvalidationTests(unittest.TestCase):
             self.assertEqual([c["id"] for c in rechecked], [head_id])
             self.assertEqual(store.pending_rechecks(), [])
 
-    def test_recheck_without_hook_keeps_tasks_open(self) -> None:
+    def test_recheck_without_an_agent_still_runs_and_never_reads_as_all_clear(self) -> None:
+        """没有 agent 的 hook 时，重查由**确定性**路径执行，而不是什么都不做。
+
+        这是"必要安全检查不依赖模型"的那条不变量：拿掉 agent 只是换谁跑检查，
+        不改变检查的结论。语义同时保持——检不出时记录的是保守的"未检出"结论，
+        绝不表述成风险解除。
+        """
         with tempfile.TemporaryDirectory() as directory, make_store(directory) as store:
             agent = MedicationCoordinatorAgent(store, ddi_tool=DDITool(fake_detect), rag_tool=EmptyRAG())
             self._record_warning(store, agent)
@@ -197,13 +203,21 @@ class DependencyInvalidationTests(unittest.TestCase):
                 CareEvent("medication_change", "新增辛伐他汀", {"action": "add", "medication": "辛伐他汀"}),
                 session_id="s1", turn_id="med3",
             )
+            # agent 不可用：hook 消失，只剩它留下的检测器。
             store.recheck_hook = None
-            receipt = store.recheck_pending()
-            self.assertEqual(receipt["status"], "no_hook")
             self.assertEqual(len(store.pending_rechecks()), 1)
-            # 没有 hook 时旧结论仍是 stale，不会冒充"当前结论"
+            receipt = store.recheck_pending()
+            self.assertEqual(receipt["status"], "ok")
+            self.assertEqual(receipt["completed"][0]["status"], "done")
+            self.assertEqual(store.pending_rechecks(), [])
+            # 旧结论仍是 stale（被后继版本取代，不是被抹掉），且绝不为 current。
             self.assertEqual(len(store.stale_conclusions()), 1)
-            self.assertTrue(all(c["status"] == "current" for c in store.current_conclusions()))
+            self.assertNotEqual(store.stale_conclusions()[0]["status"], "current")
+            # 后继结论不能读成"风险解除"。
+            successor = store.conclusion_chain(store.stale_conclusions()[0]["id"])["current_head"]
+            text = next(c["text"] for c in store.current_conclusions() if c["id"] == successor)
+            self.assertIn("未检出", text)
+            self.assertNotIn("风险已解除", text)
 
     def test_fact_correction_invalidates_dependent_conclusion(self) -> None:
         with tempfile.TemporaryDirectory() as directory, make_store(directory) as store:

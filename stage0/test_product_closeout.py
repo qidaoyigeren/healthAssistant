@@ -121,15 +121,6 @@ class CloseoutTests(unittest.TestCase):
             finally:
                 api.close()
 
-    def test_browser_gate_rejects_empty_or_incomplete_result(self):
-        from stage0.run_product_acceptance import parse_browser, REQUIRED_BROWSER
-        with self.assertRaises(ValueError):
-            parse_browser('### Result\n' + json.dumps({'checks': {}}))
-        body = {'checks': dict.fromkeys(REQUIRED_BROWSER, True), 'errors': [], 'serverErrors': []}
-        self.assertEqual(parse_browser('### Result\n' + json.dumps(body)), body)
-        with self.assertRaises(ValueError):
-            parse_browser('### Error\nfailed\n### Result\n' + json.dumps(body))
-
     def test_legacy_run_without_attribution_is_not_zero_impact(self):
         with tempfile.TemporaryDirectory() as directory:
             api = _App(Path(directory))

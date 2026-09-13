@@ -2,22 +2,38 @@ import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
-  FileClock, FileText, Home, MoreHorizontal, Pill, ScrollText,
-  Settings, ShieldAlert, User, X,
+  FileClock, FileText, MoreHorizontal, Pill, ScrollText,
+  Settings, ShieldAlert, ShieldCheck, User, X,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
-const NAV = [
-  { to: '/', label: '照护总览', icon: Home, short: '总览' },
-  { to: '/profile', label: '患者档案', icon: User, short: '档案' },
+interface NavItem {
+  to: string; label: string; icon: LucideIcon; short: string;
+  /** 支持入口排在主线之后,渲染时用一条分隔说明它。 */
+  support?: boolean;
+}
+
+/**
+ * 导航顺序就是产品顺序:用药安全事项是主线,材料核对等是支持入口。
+ * 前四项出现在移动端底栏(`!support`),其余收进「更多」。
+ */
+const NAV: NavItem[] = [
+  { to: '/', label: '用药安全', icon: ShieldCheck, short: '安全' },
   { to: '/medications', label: '用药记录', icon: Pill, short: '用药' },
-  { to: '/materials', label: '材料核对', icon: FileText, short: '材料' },
-  { to: '/alerts', label: '风险与证据', icon: ShieldAlert, short: '风险' },
-  { to: '/conflicts', label: '待核实', icon: FileText, short: '待核实' },
-  { to: '/history', label: '照护时间线', icon: FileClock, short: '时间线' },
-  { to: '/assistant', label: '照护助手', icon: ScrollText, short: '助手' },
   { to: '/tasks', label: '照护待办', icon: FileClock, short: '待办' },
-  { to: '/settings', label: '设置与数据', icon: Settings, short: '更多' },
-] as const;
+  { to: '/alerts', label: '风险与证据', icon: ShieldAlert, short: '风险' },
+  { to: '/materials', label: '材料核对', icon: FileText, short: '材料', support: true },
+  { to: '/profile', label: '患者档案', icon: User, short: '档案', support: true },
+  { to: '/conflicts', label: '待核实', icon: FileText, short: '待核实', support: true },
+  { to: '/history', label: '照护时间线', icon: FileClock, short: '时间线', support: true },
+  { to: '/assistant', label: '照护助手', icon: ScrollText, short: '助手', support: true },
+  { to: '/settings', label: '设置与数据', icon: Settings, short: '更多', support: true },
+];
+
+/** 主线页 `/` 与它的详情页 `/safety/:caseId` 是同一个导航项。 */
+function isNavActive(to: string, isActive: boolean, pathname: string): boolean {
+  return isActive || (to === '/' && pathname.startsWith('/safety'));
+}
 
 /** 桌面 220px 侧栏 + 内容区;移动端单列 + 底部主导航(次要导航收进「更多」)。 */
 export function Layout({ children }: { children: React.ReactNode }): React.ReactElement {
@@ -33,22 +49,26 @@ export function Layout({ children }: { children: React.ReactNode }): React.React
           <p className="mt-1 text-xs text-ink-muted">家庭照护记录 · 非医疗设备</p>
         </div>
         <nav aria-label="主导航" className="mt-3 flex-1 px-3 pb-6">
-          {NAV.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              className={({ isActive }) =>
-                `mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-[0.95rem] ${
-                  isActive
-                    ? 'bg-primary-soft font-medium text-primary-strong'
-                    : 'text-ink-secondary hover:bg-surface-alt'
-                }`
-              }
-            >
-              <Icon size={18} aria-hidden />
-              {label}
-            </NavLink>
+          {NAV.map(({ to, label, icon: Icon, support }, index) => (
+            <React.Fragment key={to}>
+              {support && !NAV[index - 1]?.support && (
+                <p className="mb-1 mt-4 px-3 text-xs text-ink-muted">支持入口</p>
+              )}
+              <NavLink
+                to={to}
+                end={to === '/'}
+                className={({ isActive }) =>
+                  `mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-[0.95rem] ${
+                    isNavActive(to, isActive, location.pathname)
+                      ? 'bg-primary-soft font-medium text-primary-strong'
+                      : 'text-ink-secondary hover:bg-surface-alt'
+                  }`
+                }
+              >
+                <Icon size={18} aria-hidden />
+                {label}
+              </NavLink>
+            </React.Fragment>
           ))}
         </nav>
         <p className="border-t border-border px-5 py-3 text-xs text-ink-muted">
@@ -67,12 +87,12 @@ export function Layout({ children }: { children: React.ReactNode }): React.React
           {children}
         </main>
 
-        {/* 移动端底部主导航:总览/档案/用药/风险 + 更多 */}
+        {/* 移动端底部主导航:主线四项(安全/用药/待办/风险) + 更多 */}
         <nav
           aria-label="主导航"
           className="no-print fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
         >
-          {NAV.slice(0, 4).map(({ to, label, icon: Icon, short }) => (
+          {NAV.filter((item) => !item.support).map(({ to, label, icon: Icon, short }) => (
             <NavLink
               key={to}
               to={to}
@@ -80,7 +100,8 @@ export function Layout({ children }: { children: React.ReactNode }): React.React
               aria-label={label}
               className={({ isActive }) =>
                 `flex flex-1 flex-col items-center gap-0.5 py-2 text-xs ${
-                  isActive ? 'font-medium text-primary-strong' : 'text-ink-muted'
+                  isNavActive(to, isActive, location.pathname)
+                    ? 'font-medium text-primary-strong' : 'text-ink-muted'
                 }`
               }
             >
@@ -113,7 +134,7 @@ export function Layout({ children }: { children: React.ReactNode }): React.React
                   </Dialog.Close>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  {NAV.slice(4).map(({ to, label, icon: Icon }) => (
+                  {NAV.filter((item) => item.support).map(({ to, label, icon: Icon }) => (
                     <NavLink
                       key={to}
                       to={to}

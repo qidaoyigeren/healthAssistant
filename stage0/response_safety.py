@@ -11,6 +11,10 @@ from typing import Any
 
 
 REF = re.compile(r"memory:[a-z_]+:\d+(?:@v\d+)?")
+# Topics that make a sentence safety-relevant: naming one without a source is
+# what the unrecorded-warning rule exists to catch.
+RISK = re.compile(r"风险|警告|相互作用|出血|低血压|致命|肾损伤|肝损伤|risk|warning|interaction|bleeding", re.I)
+CONCRETE_HAZARD = re.compile(r"出血|低血压|致命|肾损伤|肝损伤|bleeding|fatal", re.I)
 URI = re.compile(r"https?://[^\s\]\[<>()（）“”，。；、！;,\"]+")
 AUTHORITY = re.compile(
     r"(?:你|您|患者|她|他|老人).{0,4}(?:患有|得了|患上|就是|确实是|很可能是).{0,12}(?:病|炎|癌|感染|症)"
@@ -22,6 +26,39 @@ AUTHORITY = re.compile(
     r"|\b(?:diagnosed with|diagnosis is|prescribe|start|stop|take|increase|decrease|double|halve|switch to)\b",
     re.I,
 )
+
+
+# A clause that ASKS.  The question mark alone is not the signal: text that
+# ends in "？" without an interrogative marker is a rhetorical assertion
+# ("…可增加低血压风险？") and stays subject to the warning rule.  These markers
+# are the ones Chinese yes/no and wh-questions actually use, so the exemption
+# fails closed — a sentence that merely wears a question mark is still a claim.
+QUESTION = re.compile(
+    r"是否|有没有|有无|能否|可否|会不会|需不需要|是否需要|该不该|是否应"
+    r"|何时|什么时候|如何|怎么样|怎样|怎么|哪些|哪一|哪项|哪种|什么|为什么|多少|多久",
+)
+
+
+def asks_without_asserting(line: str) -> bool:
+    """Whether a line only ASKS — no part of it asserts a risk.
+
+    A question is a request for information, not a finding: it cannot be an
+    unrecorded warning claim, because it claims nothing.  The report renders
+    the model's own sub-questions this way under "就诊时可以向医生或药师确认
+    什么", which is the whole point of that section — there is deliberately no
+    citation to attach, because the evidence is exactly what is missing.
+
+    The whole line must be interrogative, and every part of it that names a
+    risk must be marked as asking.  A statement sharing the line with a
+    question ("…存在相互作用，是否需要监测？") still asserts, and so still
+    needs a source.  This fails closed in both directions: no trailing "？",
+    or a risk clause with no interrogative marker, keeps the line subject to
+    the rule.
+    """
+    if not line.strip().endswith(("？", "?")):
+        return False
+    clauses = [clause for clause in re.split(r"[。；;!！\n，,、]", line) if RISK.search(clause)]
+    return bool(clauses) and all(QUESTION.search(clause) for clause in clauses)
 
 
 def composed_text_prescribes(text: str) -> bool:
@@ -106,8 +143,8 @@ def check_composed_response(
     for index, line in enumerate(paragraphs):
         if index in grounded:
             continue
-        if re.search(r"风险|警告|相互作用|出血|低血压|致命|肾损伤|肝损伤|risk|warning|interaction|bleeding", line, re.I):
-            concrete_hazard = re.search(r"出血|低血压|致命|肾损伤|肝损伤|bleeding|fatal", line, re.I)
+        if RISK.search(line):
+            concrete_hazard = CONCRETE_HAZARD.search(line)
             # A reference to an already fully cited warning/conflict is not a
             # new warning: lines citing allowed memory refs summarize recorded
             # evidence, and escalation/disclaimer lines direct the user to
@@ -125,7 +162,7 @@ def check_composed_response(
                 r"|建议咨询医生/药师|提供给医生/药师",
                 line,
             )
-            if not summary and not disclaimer:
+            if not summary and not disclaimer and not asks_without_asserting(line):
                 errors.append("unrecorded_or_uncited_warning")
     if memory_refs is not None and set(REF.findall(text)) - allowed_refs:
         errors.append("fabricated_memory_ref")

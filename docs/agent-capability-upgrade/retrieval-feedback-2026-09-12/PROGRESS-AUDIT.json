@@ -1,0 +1,14 @@
+[
+  {
+    "sample": "correction-invalid-after",
+    "repeated_signatures": 2
+  },
+  {
+    "sample": "correction-invalid-before",
+    "repeated_signatures": 1
+  },
+  {
+    "sample": "correction-scope-before",
+    "repeated_signatures": 1
+  }
+]

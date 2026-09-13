@@ -84,3 +84,60 @@ interface OperationOutcomeDto =
 6. 冲突动作 / fact-actions / rechecks / 导出备份**没有**幂等键保护;前端不做自动重试,
    重复点击有 busy 状态防抖。
 7. 写事件(档案/用药/暴露)同会话串行;查询类(user_message/query_current_medications)不受限。
+
+## 六、长期用药安全事项主线(2026-09-13 前端轮)
+
+产品主线改为 `/`(别名 `/safety`),读 `stage0/safety_cases.py` 的读模型。
+事项是一条**引用层**:它保存 ref,真相仍在 medications / semantic_memory / conclusions 里。
+所以引用解析不了时字段是 `available:false`,前端如实标注「读取不到」,不补造内容。
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/v1/safety-mainline` | 主线六块内容,顺序即阅读顺序:`current_medications` / `recent_medication_changes` / `attention` / `awaiting_user` / `awaiting_professional` / `needs_recheck` / `recently_settled` + `counts` + `necessary_checks` |
+| GET | `/v1/safety-cases` | `{items: CaseView[], statuses: Record<string,string>}`(statuses 是服务端给的状态标签表) |
+| GET | `/v1/safety-cases/{case_id}` | CaseView |
+| GET | `/v1/safety-cases/{case_id}/closure-evidence` | 只读的「能不能关、为什么」现场核对:`{ok, reason, refs, checked:[{ref,state,reasons}], eliminated:[ref], still_present:[ref], blocking_inputs:[request_id]}`;`state` ∈ `trigger_eliminated`/`risk_present`/`unknown`。界面用它决定关闭按钮是否可用,不自己另算一套关闭条件 |
+| POST | `/v1/safety-cases/{case_id}/seen` | body `{key}`。**只**写 `user_seen_at` 时间戳:不关闭事项、不清空未决项。界面上不得表述为「已处理」 |
+| POST | `/v1/safety-cases/{case_id}/answer` | body `{key, expected_revision, request_id, value, answer_kind?}`;`answer_kind` ∈ `provided`/`unknown`/`empty`,省略则由服务端按内容判定。返回新的 CaseView。空值与「不知道」走**不同**路径:空值什么都不关;「不知道」结束追问但**不消除**不确定性,仍阻止关闭 |
+| POST | `/v1/safety-cases/{case_id}/disposition` | body `{key, expected_revision, disposition, basis_kind, note?, decision_id?, follow_up?}`。**不含 `actor`**:身份由服务端从认证上下文取,请求体里的 `actor` 不被读取。`follow_up` = `{kind: review_at\|on_event\|arrangement, at?, condition?, owner?, note?}` |
+| POST | `/v1/safety-cases/{case_id}/investigate` | body `{key, budget?, goal?}`;建 `care_task`(goal_type=`safety_case`)并排队,返回任务;进度用 `/v1/runs/{run_id}/progress` 轮询 |
+| POST | `/v1/care-tasks/{task_id}/input` | body `{key, revision, review_request_ids: string[], answers?: [{request_id, value, kind?}]}`;kind ∈ `user_report`/`material_note`。只关闭**指名回答**的那条 request_id(安全事项的补充现在直接走上面的 `/answer`) |
+| POST | `/v1/care-tasks/{task_id}/resume` | 提交补充后用 `revision+1` 继续;`record_input` 恰好把任务版本 +1 |
+
+CaseView 字段以 `case_view()` 序列化为准(见 `frontend/src/api/types.ts` 的 `SafetyCaseDto`)。
+`necessary_checks.note` 是服务端对队列语义的原文说明,必须在界面上可见:
+未运行时检查队列不会自动推进,「没有提示」不等于「检查通过」。
+
+### 状态与结论语义(前端必须照此显示)
+
+- `monitoring`(持续跟进中(风险仍在)):**风险仍然成立且已有一项安排**,不是「等待专业人员」,
+  也不是「风险已消除」。`case.follow_up` 的 `confirmed:false` 表示没有可信的复核时间或触发条件,
+  必须显示为「一项待确认的安排」,不得渲染成真实复查周期。
+  (当前 `case_view()` 尚未输出 `follow_up`;界面退回历史里那次持续跟进处置登记的同一份安排。)
+- `awaiting_professional`:只有专业人员能回答的问题;项目未连接真实医护服务,`NO_CLINICIAN_NOTICE`
+  必须始终可见,不得表述为「已送达医生」。
+- 结论的 `trigger_state`:`risk_present` = 检查显示风险仍然成立;`trigger_eliminated` = 触发条件已消失;
+  `unknown` = 无法判断。三者不能混读。
+- `required_inputs[].status`:`open`(等用户)/ `answered` / `unknown`(用户明说不知道 →
+  同时 `needs_alternative_evidence:true`)。`unknown` **不再等用户**,但**仍未解决、仍阻止关闭**,
+  不得显示为「已回答」。
+- 历史里的 `resolution_basis_retired`:此前的处置因事实变化**不再适用**,当前依据已清空;
+  该记录保留在历史里(它确实发生过),但不得当作现行依据展示。
+
+### 处置:关闭条件由服务端强制(前端只显示它的原话)
+
+- `disposition` ∈ `resolved_with_basis` / `escalated_to_professional` / `accepted_monitoring`。
+- `basis_kind` ∈ `deterministic_check_completed` / `professional_review_applied` / `user_reported`。
+- 只有前两种依据能关闭事项;`user_reported`(用户转述医生意见)用于关闭一律 409,
+  说明为「用户转述与模型判断不能作为关闭事项的依据;请提交给专业人员复核」。
+- `accepted_monitoring` 把事项置为 `monitoring`(**不**转入等待专业复核),同时记录一份
+  `resolution_basis.kind = 'monitoring_arrangement'` —— 那是「凭什么说风险还在」,**不是**关闭依据。
+- 其余非关闭处置把事项推向 `awaiting_professional`。
+- `professional_review_applied` 在当前项目里**必然失败**:没有真实医护服务,也不存在属于本事项的
+  已生效复核决定。界面要么不提供它,要么以禁用状态给出并说明原因,不让用户去撞一次 409。
+- `deterministic_check_completed` 现场校验(即 `closure-evidence`):被引用的结论仍是 `current`、
+  记录的 `input_revision` 等于当前 scope 版本、存在触发条件已消除的结论、没有仍显示风险成立的结论、
+  没有阻塞性的未决问题;任一不满足即 409(如「关联结论仍显示风险存在,不能关闭;如已有管理安排,
+  请登记为持续跟进」)。
+- 409 体走统一错误模型(`error.category = validation`),前端**原样**显示 `error.message`,
+  追踪号单独显示,不改写、不吞掉。

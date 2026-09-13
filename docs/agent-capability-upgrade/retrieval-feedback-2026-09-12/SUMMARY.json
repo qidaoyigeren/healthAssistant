@@ -1,0 +1,41 @@
+{
+  "sampled_task_runs": 3,
+  "scheduled_task_runs": 6,
+  "not_sampled": 3,
+  "provider_requests": 13,
+  "wire_ledger_all_matched": true,
+  "full_planner_trace_requests": 9,
+  "planner_trace_missing_requests": 4,
+  "prompt_tokens_reported": 66411,
+  "completion_tokens_reported": 1054,
+  "provider_connection_or_execution_errors": 0,
+  "execution_export_failures": 1,
+  "report_quality": {
+    "passed": 0,
+    "scored": 2,
+    "unknown_export_failure": 1,
+    "not_sampled": 3
+  },
+  "task_success": {
+    "passed": 0,
+    "attempted": 3,
+    "scheduled": 6
+  },
+  "after_screen": {
+    "passed": 0,
+    "denominator": 3,
+    "sampled": 1,
+    "not_sampled": 2
+  },
+  "real_autonomous_feedback_correction_original_cases": 0,
+  "gate_passed": false,
+  "expanded": false,
+  "decision": "keep B1 default and autonomous investigation default OFF; retain structured feedback and bounded partial reports",
+  "post_screen_source_changes": [
+    "stage0\\test_retrieval_feedback.py",
+    "stage0\\harness\\retrieval.py"
+  ],
+  "post_screen_changes": "candidate truncation total/unknown fix; preserve exact fallback with explicit primary failure and deterministic attribution; regressions; runner persists raw outcome before metrics; no additional remote calls",
+  "cost_money": null,
+  "cost_reason": "no billing receipt"
+}

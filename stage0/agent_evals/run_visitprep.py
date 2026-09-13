@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import asdict
 import json
+import logging
 import os
 from pathlib import Path
 import tempfile
@@ -29,6 +30,8 @@ import time
 from unittest.mock import patch
 
 from .batch_budget import BatchAllowance, attempts_sent
+
+logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = Path(__file__).with_name('visitprep_dev.json')
@@ -49,7 +52,10 @@ def _budget_env(call_budget, allowance):
     rather than on calls actually sent — not the hard limit it is reported as.
     """
     env = {'AGENT_TURN_BUDGET_SECONDS': '180', 'AGENT_TURN_TOKEN_BUDGET': '150000',
-           'AGENT_TURN_CALL_BUDGET': str(call_budget)}
+           'AGENT_TURN_CALL_BUDGET': str(call_budget),
+           # 冻结在批次配置里，而不是靠代码默认值：这个值决定"原地打转"何时
+           # 以明确原因收尾，属于评测口径的一部分，必须随产物一起可读。
+           'AGENT_NO_PROGRESS_LIMIT': os.getenv('AGENT_NO_PROGRESS_LIMIT', '2')}
     if allowance is not None:
         env['PLANNER_PROVIDER_REFUND_REFUSALS'] = '0'
     return env
@@ -171,6 +177,23 @@ def evaluate(task, observed):
     }
 
 
+def _persisted_trace(store, session_id='visitprep', turn_id='visitprep'):
+    """The executed actions of a turn that raised, read back from the store.
+
+    ``_flush_traces`` persists incrementally after every observation, so the
+    durable turn_traces rows survive an exception that the in-memory
+    ``state.trace`` does not.  Recording `[]` here would say "nothing was done"
+    about a turn that really did read, search and write — the wrong half of the
+    same mistake this function exists to undo.
+    """
+    try:
+        rows = store.traces_for_turn(session_id, turn_id)
+    except Exception:
+        logger.exception('persisted trace recovery failed')
+        return []
+    return [row['payload'] for row in rows if isinstance(row.get('payload'), dict)]
+
+
 def _attribution(trace):
     """Model choice / code-forced action / model correction / policy fallback.
 
@@ -200,7 +223,7 @@ def _attribution(trace):
     return counts
 
 
-def run_task(task, arm, live=False, allowance=None):
+def run_task(task, arm, live=False, allowance=None, artifact_dir=None):
     from stage0.agent import CareEvent, DDITool, MedicationCoordinatorAgent, RAGTool
     from stage0.memory import MemoryStore
     from stage0.product import MaterialIndex, ProductStore
@@ -231,7 +254,7 @@ def run_task(task, arm, live=False, allowance=None):
         # 取额，重试各取一次），上限才成为真上限。
         call_budget = STANDALONE_CALL_BUDGET if allowance is None else allowance.remaining()
         # 任务声明的检索预算必须真的下发：`first_search_empty` 族用它把可用检索
-        # 压到 1 次，考察的正是"首搜无果后改写查询"而不是"换个说法再搜"。
+        # 压到 1 次，只考察预算耗尽后的部分交付；二次纠错必须另设 >=2 次预算任务。
         # 只写在数据集里而不执行，这个键就是一句没有约束力的声明。
         declared_searches = (task.get('expected') or {}).get('search_budget')
         env = {**_budget_env(call_budget, allowance),
@@ -264,7 +287,7 @@ def run_task(task, arm, live=False, allowance=None):
             for case_index, material in enumerate(task.get('material_cases') or []):
                 product.import_csv(f'seed-case-{case_index}', material['csv'])
             agent = MedicationCoordinatorAgent(
-                store, ddi_tool=DDITool(lambda meds: []), rag_tool=LocalOnlyRAG(),
+                store, ddi_tool=DDITool(lambda meds: []), rag_tool=LocalOnlyRAG(exact_only=True),
                 max_cycles=task['budget']['max_cycles'],
                 # The scripted arm needs the hybrid planner so its provider is
                 # consulted at all; the deterministic planner never proposes a
@@ -275,6 +298,13 @@ def run_task(task, arm, live=False, allowance=None):
                 proposal_provider=None if live else provider)
             if config['materials']:
                 agent.attach_material_index(MaterialIndex(product))
+            if artifact_dir is not None:
+                from stage0.harness.manifest import build_manifest
+                folder = Path(artifact_dir)
+                folder.mkdir(parents=True, exist_ok=True)
+                manifest = build_manifest(run_id='visitprep', agent=agent, graph_version='legacy',
+                                          max_cycles=task['budget']['max_cycles'])
+                (folder / 'effective-manifest.json').write_text(manifest.to_json(), encoding='utf-8')
             outcome = {}
             try:
                 response = agent.handle(CareEvent('user_message', task['goal']),
@@ -300,6 +330,9 @@ def run_task(task, arm, live=False, allowance=None):
                     len((entry.get('planner') or {}).get('provider_attempts') or [])
                     for entry in response.tool_trace if entry.get('phase') == 'plan')
                 outcome = {
+                    'tool_trace': response.tool_trace,
+                    'investigation': investigation,
+                    'audit_trail': response.audit_trail,
                     'text': response.text,
                     'report_markdown': response.text,
                     'termination_reason': investigation.get('termination_reason'),
@@ -365,8 +398,16 @@ def run_task(task, arm, live=False, allowance=None):
                 # 读不到它要判的键（如 ``material_conflicts``），于是"这一轮没
                 # 观察到分歧"与"这一轮根本没跑完"变成同一个输入——归因方向
                 # 相反的两种情况被抹平。
+                #
+                # 形状不只是那些"评分器要判的键"：``tool_trace`` 也被逐个列出
+                # 它的消费者的读取。上一轮的导出正是死在这一点上——异常结果
+                # 里没有这个键，后处理直接 KeyError，于是**一份账本、wire 与
+                # SQLite 都完好的真实结果变成了读不出来的结果**。键集必须与
+                # 正常路径完全一致，由 ``test_report_delivery`` 逐一比对。
                 outcome = {
                     'error': f'{type(exc).__name__}: {exc}',
+                    'tool_trace': _persisted_trace(store),
+                    'investigation': None, 'audit_trail': {},
                     'text': '', 'report_markdown': '', 'termination_reason': None,
                     'subquestion_source': None, 'goal_status': None, 'execution_status': None,
                     'diff_kinds_seen': [], 'asked_fields': [], 'supported_claims': [],
@@ -380,6 +421,30 @@ def run_task(task, arm, live=False, allowance=None):
                 # dispatch **之前**写入，所以异常退出、甚至进程被杀，这里读到的
                 # 仍是真实发送过的尝试数——从 trace 累加做不到这一点。
                 outcome['provider_attempts_sent'] = attempts_sent(store, 'visitprep')
+                if artifact_dir is not None:
+                    import sqlite3
+                    artifact_dir = Path(artifact_dir)
+                    artifact_dir.mkdir(parents=True, exist_ok=True)
+                    ledger = [dict(row) for row in store.connection.execute(
+                        'SELECT * FROM llm_attempts WHERE run_id=? ORDER BY rowid', ('visitprep',))]
+                    outcome['request_ledger'] = ledger
+                    for table in ('llm_attempts', 'evidence_records', 'run_manifests'):
+                        exists = store.connection.execute(
+                            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()
+                        rows = ([dict(row) for row in store.connection.execute('SELECT * FROM ' + table)]
+                                if exists else {'unavailable': 'table not used by this runner'})
+                        (artifact_dir / (table + '.json')).write_text(
+                            json.dumps(rows, ensure_ascii=False, indent=2, default=str), encoding='utf-8')
+                    # ``with sqlite3.connect(...)`` commits the transaction but
+                    # does NOT close the handle: the file stays locked, and on
+                    # Windows the artifact directory cannot even be removed.
+                    # The backup is the durable copy of the ledger, so it has
+                    # to be closed and readable.
+                    backup = sqlite3.connect(artifact_dir / 'run.sqlite')
+                    try:
+                        store.connection.backup(backup)
+                    finally:
+                        backup.close()
             store.close()
             if client:
                 client.close()

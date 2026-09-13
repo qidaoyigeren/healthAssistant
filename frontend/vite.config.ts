@@ -10,7 +10,10 @@ export default defineConfig(({ mode }) => ({
     port: 5173,
     proxy: {
       '/v1': {
-        target: loadEnv(mode, '.', '').STAGE0_DEV_API_TARGET || 'http://127.0.0.1:8000',
+        // 进程环境变量优先于 .env 文件：验收脚本要让代理指向它自己起的那份隔离后端。
+        target: process.env.STAGE0_DEV_API_TARGET
+          || loadEnv(mode, '.', '').STAGE0_DEV_API_TARGET
+          || 'http://127.0.0.1:8000',
         changeOrigin: false,
       },
     },

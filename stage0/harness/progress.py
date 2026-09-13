@@ -43,6 +43,8 @@ EVENT_CANCELLED = "cancelled"                # 取消完成
 # Tools map to the product vocabulary; unknown tools keep a generic event.
 TOOL_EVENT_KINDS = {
     "rag_search": EVENT_RETRIEVING,
+    "acquire_evidence": EVENT_RETRIEVING,
+    "rag_catalog": EVENT_RETRIEVING,
     "ddi_check": EVENT_CHECKING_RISKS,
     "memory_read": EVENT_ORGANIZING,
     "memory_write": EVENT_ORGANIZING,
@@ -78,6 +80,22 @@ CREATE TABLE IF NOT EXISTS run_progress_state (
     repeats INTEGER NOT NULL DEFAULT 0,
     stopped_reason TEXT,
     updated_at TEXT NOT NULL
+);
+-- Every read signature this run has already executed.  The single
+-- ``last_signature`` column above can only see the IMMEDIATELY previous step,
+-- so alternating between two already-read tools (A,B,A,B,...) never looked
+-- like a repeat and never triggered feedback — the loop could spin forever
+-- without a single no-progress step being counted.  Membership is what makes
+-- "already obtained" order-insensitive; the streak column stays for the
+-- threshold.  A changed patient revision or corpus version produces a
+-- different signature, so new information is never a member.
+CREATE TABLE IF NOT EXISTS run_progress_signatures (
+    run_id TEXT NOT NULL,
+    signature TEXT NOT NULL,
+    seen_count INTEGER NOT NULL DEFAULT 1,
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    PRIMARY KEY (run_id, signature)
 );
 """
 
@@ -324,18 +342,24 @@ def read_signature(tool: str, arguments: Any, *, scope_id: str | None,
 class NoProgressTracker:
     """Persisted repeat counter per run (restart-safe, replay-safe).
 
-    ``record`` classifies one executed read observation:
+    ``record`` classifies one executed observation:
 
-    * a NEW signature (world changed / different call) is progress — the
-      counter resets;
-    * a REPEATED signature with no interleaved domain effect is a no-progress
-      step.  The first repeats return ``verdict='repeat'`` so the loop feeds
-      the planner structured feedback; at the configured threshold the verdict
-      is ``'stop'`` and the loop finishes safely with explicit unfinished items.
+    * a signature this run has NOT executed before is progress — the streak
+      resets.  Membership, not "equals the immediately previous step", is the
+      test, so a changed revision, a new corpus version, a different page of
+      the same evidence and a genuinely new write are all progress by
+      construction;
+    * an ALREADY-SEEN signature is a no-progress step whatever ran in between.
+      Alternating between two stale reads wastes the same cycles as repeating
+      one, and comparing only against the previous step could never see it.
+      The first repeats return ``verdict='repeat'`` so the loop feeds the
+      planner structured feedback; at the configured threshold the verdict is
+      ``'stop'`` and the loop finishes safely with explicit unfinished items.
 
-    A domain write, a revision change, or a cancel/interrupt are NOT passed
-    through here: callers reset the counter on those, so real progress and
-    bounded fault recovery are never mis-killed.
+    ``reset`` clears the STREAK and deliberately keeps the membership set: a
+    genuine progress reset happens because the world changed, and a changed
+    world produces different signatures anyway — clearing membership would
+    only re-open the alternating-repeat hole it exists to close.
     """
 
     def __init__(self, connection: sqlite3.Connection, lock: threading.RLock | None = None):
@@ -351,6 +375,28 @@ class NoProgressTracker:
                 "SELECT * FROM run_progress_state WHERE run_id=?", (run_id,)).fetchone()
         return dict(row) if row is not None else None
 
+    def forget(self, run_id: str) -> None:
+        """Drop this run's streak AND its membership — a NEW planning episode.
+
+        The membership is scoped to the episode that produced it, because what
+        it means is "this state has already obtained X" and the feedback names
+        X from the CURRENT state's own observations.  Two turns that share an
+        idempotency key (a duplicate submission is the same ``run_id`` by
+        design) are two episodes: the second one starts with no observations,
+        so re-reading the snapshot is new *for it*.  Without this, the second
+        turn's first read was scored as a repeat of the first turn's and the
+        run stopped as ``no_progress`` — a false positive on legitimate work.
+
+        A RESUME is not a new episode: the restored state carries its
+        observations, so the caller does not call this and a restart still
+        cannot reset the counter (P2 constraint 2).
+        """
+        with self._lock, self.connection:
+            self.connection.execute(
+                "DELETE FROM run_progress_signatures WHERE run_id=?", (run_id,))
+            self.connection.execute(
+                "DELETE FROM run_progress_state WHERE run_id=?", (run_id,))
+
     def reset(self, run_id: str, *, reason: str = "progress") -> None:
         with self._lock, self.connection:
             self.connection.execute(
@@ -359,26 +405,57 @@ class NoProgressTracker:
                    ON CONFLICT(run_id) DO UPDATE SET last_signature=NULL,repeats=0,updated_at=?""",
                 (run_id, None if reason == "progress" else reason, _now(), _now()))
 
-    def record(self, run_id: str, signature: str, *, limit: int) -> dict[str, Any]:
+    def _seen(self, run_id: str, signature: str) -> int:
+        with self._lock:
+            row = self.connection.execute(
+                "SELECT seen_count FROM run_progress_signatures WHERE run_id=? AND signature=?",
+                (run_id, signature)).fetchone()
+        return int(row["seen_count"]) if row is not None else 0
+
+    def recorded(self, run_id: str, signature: str) -> bool:
+        """Whether this exact observation (same call, same scope revision,
+        same result) has already been obtained in this run.  The loop uses it
+        for writes: a write that really changed the world produces a new
+        signature, an identical re-submission does not — so "a write happened"
+        is not by itself progress."""
+        return self._seen(run_id, signature) > 0
+
+    def record(self, run_id: str, signature: str, *, limit: int,
+               new_information: bool = True) -> dict[str, Any]:
+        """``new_information=False`` counts the step as a no-progress step even
+        when the signature is new.  The signature carries the arguments, so a
+        reworded query is a different signature — but if it brought back the
+        same evidence, the step still obtained nothing.  Callers that cannot
+        tell leave it True, so nothing is ever accused of adding nothing on a
+        guess."""
         row = self._row(run_id)
-        previous = (row or {}).get("last_signature")
         repeats = int((row or {}).get("repeats") or 0)
         if row is not None and row.get("stopped_reason"):
             return {"verdict": "stopped", "repeats": repeats, "signature": signature}
-        if previous == signature:
+        seen = self._seen(run_id, signature)
+        if seen or not new_information:
             repeats += 1
+            verdict = "stop" if repeats >= limit else "repeat"
         else:
             repeats = 0
-        verdict = "progress" if repeats == 0 else ("stop" if repeats >= limit else "repeat")
+            verdict = "progress"
+        now = _now()
         with self._lock, self.connection:
+            self.connection.execute(
+                """INSERT INTO run_progress_signatures(run_id,signature,seen_count,first_seen_at,last_seen_at)
+                   VALUES(?,?,1,?,?)
+                   ON CONFLICT(run_id,signature) DO UPDATE SET
+                     seen_count=seen_count+1,last_seen_at=excluded.last_seen_at""",
+                (run_id, signature, now, now))
             self.connection.execute(
                 """INSERT INTO run_progress_state(run_id,last_signature,repeats,stopped_reason,updated_at)
                    VALUES(?,?,?,?,?)
                    ON CONFLICT(run_id) DO UPDATE SET last_signature=excluded.last_signature,
                      repeats=excluded.repeats,stopped_reason=excluded.stopped_reason,
                      updated_at=excluded.updated_at""",
-                (run_id, signature, repeats, "no_progress" if verdict == "stop" else None, _now()))
-        return {"verdict": verdict, "repeats": repeats, "signature": signature}
+                (run_id, signature, repeats, "no_progress" if verdict == "stop" else None, now))
+        return {"verdict": verdict, "repeats": repeats, "signature": signature,
+                "seen_count": seen + 1}
 
     def stop_pending(self, run_id: str) -> bool:
         """True once this run has hit the no-progress threshold (the graph's

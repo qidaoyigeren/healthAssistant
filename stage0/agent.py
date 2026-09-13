@@ -29,12 +29,14 @@ try:
     from .memory import EpisodicFact, MemoryStore, SemanticFact
     from .memory_context import build_context
     from .response_safety import check_composed_response, composed_text_prescribes
+    from . import safety_checks
 except ImportError:  # Support ``python stage0/agent.py`` style imports.
     from turn_budget import (TurnBudget, BudgetExceeded, CURRENT, budget_scope, provider_call,
                              completion_call, check_lease, usage_split, usage_reasoning_tokens)
     import ddi_engine  # type: ignore
     import extract_ddi  # type: ignore
     import rag  # type: ignore
+    import safety_checks  # type: ignore
     from memory import EpisodicFact, MemoryStore, SemanticFact  # type: ignore
     from memory_context import build_context  # type: ignore
     from response_safety import check_composed_response, composed_text_prescribes
@@ -97,6 +99,11 @@ class ToolAction:
     rationale: str
     gap_id: str | None = None
     expected_observation: str | None = None
+    #: 这个决定依据的已有结论/证据引用。空列表 = "没有援引依据"，如实记录，
+    #: 不替模型补一条。
+    basis_refs: tuple[str, ...] = ()
+    #: 观察到什么会改变下一步。`None` = 未说明。
+    expected_change: str | None = None
 
 
 @dataclass
@@ -116,10 +123,20 @@ class Observation:
     error_kind: str | None = None
     recoverable: bool | None = None
     evidence_refs: list[str] = field(default_factory=list)
+    #: 这次动作是针对哪个缺口做的。safety_case 下 gap_id 就是 question_id，
+    #: 于是"这次尝试推进了哪条问题、结果如何"可追溯，而不是靠猜。
+    gap_id: str | None = None
     # Harness P2: set by the loop when this observation repeated the previous
     # read signature with no new progress — structured feedback to the
     # planner (existing evidence stands), never a safety violation by itself.
     no_progress: bool = False
+    # Whether this observation brought back anything the run did not already
+    # have.  A state that can tell — the investigation counts NEW content
+    # hashes from a retrieval — sets this to False, which is how "same query
+    # reworded, same evidence back" is counted as no progress even though the
+    # arguments (and therefore the signature) differ.  Defaults to True so a
+    # tool that cannot tell is never accused of adding nothing.
+    added_information: bool = True
 
 
 @dataclass
@@ -134,6 +151,10 @@ class AgentState:
     observations: list[Observation] = field(default_factory=list)
     trace: list[dict[str, Any]] = field(default_factory=list)
     reflection_notes: list[str] = field(default_factory=list)
+    # Harness P2 / evidence-loop fix: the structured "this step added nothing"
+    # feedback for the NEXT proposal — what already stands and what is still
+    # open.  Cleared as soon as a step really does produce something new.
+    no_progress_feedback: dict[str, Any] | None = None
     cycle: int = 0
     degraded_reason: str | None = None
     # Stage 8 B6: how many trace entries have been persisted to turn_traces,
@@ -153,6 +174,11 @@ class AgentState:
     # planner on any accepted/fallback decision; rendered as a top-level
     # ``correction_task`` in the next planner payload.
     pending_correction: dict[str, Any] | None = None
+    # B arm: set when the turn continues a RESTORED run.  Its earlier calls
+    # were made in another turn and are not in this turn's trace, so the
+    # tool-conversation history has to say the gap out loud instead of
+    # presenting a run that appears to have started from nothing.
+    history_note: str | None = None
 
     def observation(self, tool: str, purpose: str | None = None) -> Observation | None:
         for item in reversed(self.observations):
@@ -215,8 +241,17 @@ class DDITool:
 class RAGTool:
     """Lazy wrapper around the existing hybrid retriever with an offline fallback."""
 
-    def __init__(self, retriever: rag.HybridRetriever | None = None):
+    def __init__(self, retriever: rag.HybridRetriever | None = None, *, exact_only=False):
         self._retriever = retriever
+        self.exact_only = exact_only
+
+    def corpus_chunks(self):
+        if self._retriever is not None:
+            return self._retriever.chunks
+        return rag.read_jsonl(rag.INDEX_DIR / 'chunks.jsonl')
+
+    def search_in_scope(self, arguments, scope_id):
+        return self(**arguments, _scope_id=scope_id)
 
     def _get_retriever(self) -> rag.HybridRetriever:
         if self._retriever is None:
@@ -230,10 +265,14 @@ class RAGTool:
         top_k: int = 5,
         section: str | None = None,
         drug_name: str | None = None,
+        _scope_id: str | None = None,
     ) -> dict[str, Any]:
         try:
+            if self.exact_only:
+                raise RuntimeError('configured exact retrieval')
             results = self._get_retriever().search(
                 query, mode="hybrid", top_k=top_k, section=section, drug_name=drug_name,
+                **({'scope_id': _scope_id} if _scope_id is not None else {}),
             )
             return {
                 "query": query,
@@ -243,23 +282,30 @@ class RAGTool:
         except Exception as exc:
             # Exact token overlap over the same RAG chunks is a degraded local
             # mode, not a replacement corpus or a new knowledge source.
-            chunks = rag.read_jsonl(rag.INDEX_DIR / "chunks.jsonl")
+            from .harness.errors import PASSTHROUGH_EXCUSES
+            if type(exc).__name__ in PASSTHROUGH_EXCUSES:
+                raise
+            chunks = self.corpus_chunks()
             terms = {term for term in re.findall(r"[\u3400-\u9fff]{2,}|[A-Za-z0-9]+", query) if len(term) >= 2}
             eligible = [
                 chunk for chunk in chunks
                 if (not section or chunk.get("section") == section)
                 and (not drug_name or drug_name.lower() in (chunk.get("drug_name") or "").lower())
+                and chunk.get('scope_id') in (None, _scope_id)
             ]
             scored = sorted(
                 ((sum(term.lower() in (chunk.get("text") or "").lower() for term in terms), index, chunk)
                  for index, chunk in enumerate(eligible)),
                 key=lambda item: (-item[0], item[1]),
-            )[:top_k]
+            )
+            scored = [row for row in scored if row[0] > 0]
             return {
                 "query": query,
                 "mode": "degraded_exact_over_rag_corpus",
                 "degraded_reason": f"{type(exc).__name__}: {exc}",
-                "results": [{"score": float(score), "rank": rank, **chunk} for rank, (score, _, chunk) in enumerate(scored, 1)],
+                "retrieval_failure": not self.exact_only,
+                "total_matches": len(scored),
+                "results": [{"score": float(score), "rank": rank, **chunk} for rank, (score, _, chunk) in enumerate(scored[:top_k], 1)],
             }
 
 
@@ -456,9 +502,9 @@ class MemoryWriteTool:
 
     @staticmethod
     def _warning_text(warning: dict[str, Any]) -> str:
-        pair = f"{warning.get('drug_a')}×{warning.get('drug_b')}"
-        effect = warning.get("effect") or "存在需要核实的用药风险"
-        return f"{pair}：{effect}（{warning.get('severity', 'unknown')} / {warning.get('confidence', 'unknown')}）"
+        # 唯一实现在 safety_checks：必要检查与交互路径必须写出**逐字一致**的结论
+        # 文本，否则依赖索引（从"："前的 a×b 解析药物对）会读出两套身份。
+        return safety_checks.warning_text(warning)
 
     @staticmethod
     def _warning_sources(warning: dict[str, Any]) -> list[dict[str, Any]]:
@@ -723,76 +769,13 @@ class AgentPlanner:
         current_medications: Sequence[dict[str, Any]],
         rag_result: dict[str, Any],
     ) -> list[dict[str, Any]]:
-        warnings: list[dict[str, Any]] = []
-        condition_added = False
-        for result in rag_result.get("results", []):
-            text = result.get("text") or ""
-            if medication.lower() not in (result.get("drug_name") or "").lower():
-                continue
-            matched: list[str] = []
-            severity = "moderate"
-            for fact in critical_facts:
-                namespace = fact["namespace"]
-                value = fact["value"]
-                if namespace == "allergy":
-                    allergen = value.get("allergen") if isinstance(value, dict) else str(value)
-                    if allergen and allergen in text and "过敏" in text:
-                        matched.append(f"过敏史:{allergen}")
-                        severity = "major" if "禁用" in text else "moderate"
-                elif namespace == "renal_function" and any(word in text for word in ("肾功能不全", "肝肾功能不全", "肾功能受损")):
-                    matched.append(f"肾功能:{value}")
-                elif namespace == "hepatic_function" and any(word in text for word in ("肝功能不全", "肝肾功能不全", "肝功能受损")):
-                    matched.append(f"肝功能:{value}")
-                elif namespace == "age" and isinstance(value, (int, float)) and value >= 60 and "60岁以上" in text:
-                    matched.append(f"年龄:{value}岁")
-            if condition_added or not matched or not re.search(r"慎用|禁用|医师指导|风险|不良反应", text):
-                continue
-            warnings.append({
-                "drug_a": medication,
-                "drug_b": "患者个体风险",
-                "severity": severity,
-                "mechanism": "说明书注意事项与结构化患者事实匹配",
-                "effect": "；".join(matched) + "，需由医生/药师复核适用性",
-                "management": None,
-                "source_text": text,
-                "source_url": result.get("source_url"),
-                "confidence": "medium" if result.get("source_url") else "low",
-                "detection_path": rag_result.get("mode", "hybrid_bm25_bge"),
-            })
-            condition_added = True  # One best exact-label citation is sufficient for this condition finding.
+        """说明书注意事项 × 患者事实（唯一实现在 ``safety_checks.condition_warnings``）。
 
-        # The Stage 2 detector remains the primary pair detector.  If it has no
-        # direct aspirin×ibuprofen record, the agent can still notice that the
-        # retrieved ibuprofen label warns about concurrent antipyretic/
-        # analgesic/anti-inflammatory medicines.  This is explicitly marked as
-        # an ontology/class inference (low confidence), never presented as a
-        # direct pair assertion, and therefore triggers the reflection branch.
-        current_names = {item.get("display_name") for item in current_medications}
-        if medication == "布洛芬" and "阿司匹林" in current_names:
-            for result in rag_result.get("results", []):
-                text = result.get("text") or ""
-                if "其他解热、镇痛、抗炎药物同用" not in text or not any(word in text for word in ("胃肠道不良反应", "溃疡", "出血")):
-                    continue
-                warnings.append({
-                    "drug_a": "阿司匹林",
-                    "drug_b": "布洛芬",
-                    "severity": "major" if "出血" in text else "moderate",
-                    "mechanism": "布洛芬说明书类别警示与当前阿司匹林记录的保守匹配（非直接药物对证据）",
-                    "effect": "胃肠道不良反应/溃疡风险可能叠加；是否构成出血风险需医生/药师核实",
-                    "management": None,
-                    "source_text": text,
-                    "source_url": result.get("source_url"),
-                    "confidence": "low",
-                    "detection_path": f"{rag_result.get('mode', 'hybrid_bm25_bge')}+class_inference",
-                    "additional_sources": [{
-                        "source_type": "agent_inference_disclosure",
-                        "uri": str((ROOT / "agent.py").resolve()),
-                        "quote": "类别匹配，不是说明书直接点名阿司匹林×布洛芬",
-                        "retrieval": "reflection_required",
-                    }],
-                })
-                break
-        return warnings
+        必要检查走的是同一个函数——所以"看提示的时候"和"程序自己检查的时候"不会
+        得到两套不同的个体风险结论。
+        """
+        return safety_checks.condition_warnings(medication, critical_facts,
+                                                current_medications, rag_result)
 
 
 # Public role name; ``AgentPlanner`` is retained for Stage 3 compatibility.
@@ -883,7 +866,8 @@ PLANNER_PROTOCOL_VERSION = 'propose-next-action@3'
 # model demonstrably emits named properties.  These are stripped back out of
 # ``arguments`` into the existing proposal shape, so the validator/executor
 # contract is unchanged.
-PROPOSAL_META_KEYS = ('purpose', 'gap_id', 'expected_observation', 'rationale')
+PROPOSAL_META_KEYS = ('purpose', 'gap_id', 'expected_observation', 'rationale',
+                      'basis_refs', 'expected_change')
 
 # Hydrated by ``materialize`` from real observations; the prompt forbids the
 # model to supply them, so they never enter the advertised schema either.
@@ -900,14 +884,12 @@ INVESTIGATION_ONLY_TOOLS = frozenset({'plan_questions'})
 def _tool_descriptions() -> dict[str, str]:
     specs = dict(DEFAULT_TOOL_SPECS)
     try:
-        from .harness.default_tools import (BATCH_READ_SPEC, DELEGATE_TASK_SPEC,
-                                            LIST_MATERIALS_SPEC, PLAN_QUESTIONS_SPEC,
+        from .harness.default_tools import (LIST_MATERIALS_SPEC, PLAN_QUESTIONS_SPEC,
                                             READ_EVIDENCE_SPEC, READ_MATERIAL_ITEM_SPEC)
     except ImportError:  # pragma: no cover - script-style import
-        from harness.default_tools import (BATCH_READ_SPEC, DELEGATE_TASK_SPEC,
-                                           LIST_MATERIALS_SPEC, PLAN_QUESTIONS_SPEC,
+        from harness.default_tools import (LIST_MATERIALS_SPEC, PLAN_QUESTIONS_SPEC,
                                            READ_EVIDENCE_SPEC, READ_MATERIAL_ITEM_SPEC)  # type: ignore
-    for spec in (READ_EVIDENCE_SPEC, BATCH_READ_SPEC, DELEGATE_TASK_SPEC, PLAN_QUESTIONS_SPEC,
+    for spec in (READ_EVIDENCE_SPEC, PLAN_QUESTIONS_SPEC,
                  LIST_MATERIALS_SPEC, READ_MATERIAL_ITEM_SPEC):
         specs.setdefault(spec.name, spec)
     return {name: spec.description for name, spec in specs.items()}
@@ -940,6 +922,13 @@ CANONICAL_PROPOSAL_SCHEMA = {
         "arguments": {"type": "object"},
         "gap_id": {"type": "string"},
         "expected_observation": {"type": "string"},
+        # 结构化决策字段（不是让模型写长篇推理）：
+        #   basis_refs  —— 这个决定**依据**哪些已有结论/证据；没有依据的提案会被
+        #                  记为"无依据"，而不是被当成有理由。
+        #   expected_change —— 观察到什么会改变下一步。缺省时不算错，但界面与轨迹
+        #                  会显示"未说明"，不替模型补一个。
+        "basis_refs": {"type": "array", "items": {"type": "string"}},
+        "expected_change": {"type": "string"},
     },
     "required": ["decision"],
     "additionalProperties": True,
@@ -1159,11 +1148,59 @@ class PlannerPolicyGuard:
         if code == 'clarification_without_missing_fact':
             return ("ask_clarification 需要先完成 authority 快照读取，且存在带 field 的 patient_fact_missing open gap；"
                     f"当前 open gaps: {open_gaps}。")
+        if code == 'plan_questions_only_when_revisable':
+            existing = [self._question_line(q) for q in (inv.questions or [])]
+            return ('问题集已经建立，本轮不再重复采纳同一份计划。已有问题：'
+                    f'{existing or "（暂无）"}。当前可执行的动作：{allowed}。'
+                    '只有出现新信息、用户回答、或某个来源确实取不到时，才可以改换取证方式。')
+        if code == 'strategy_cannot_serve_target':
+            return ('这条问题要弄清的信息类型与所选取证来源不匹配：'
+                    '一般药品资料可以说"这类药一般怎么用"，但证明不了"这位用户实际怎么服用"。'
+                    '请按信息类型换一个来源（问用户 / 读患者记录 / 读材料 / 查一般资料 / 请专业复核），'
+                    '或把信息目标改成资料确实能回答的那一类。')
+        if code == 'unknown_information_target':
+            return ('每条问题都要声明 information_target，取值为：'
+                    'patient_actual_state（这位患者实际是什么情况）/ material_record（材料里记了什么）'
+                    '/ general_reference（一般参考知识）/ professional_judgment（需要专业判断）。')
+        if code == 'unknown_question_strategy':
+            return ('strategy 只能是：patient_record / ask_user / patient_material '
+                    '/ general_reference / professional_review，或省略按信息目标推断。')
+        if code == 'strategy_is_not_ask_user':
+            return ('这条问题当前的取证来源不是"问用户"，ask_clarification 只能用于'
+                    'strategy=ask_user 的问题；换来源请用 plan_questions 修订。')
         if code == 'question_does_not_match_missing_fact':
             expected = [g['description'] for g in inv.gaps
                         if g['kind'] == 'patient_fact_missing' and g.get('field')]
             return f"question 必须逐字使用缺失字段缺口的 description: {expected}。"
+        # ---- safety_case 的类型化问题契约 ----------------------------------
+        if code == 'unknown_question_kind':
+            return ('每条问题都要声明 kind，取值为：'
+                    'user_fact / material_read / reference_lookup / source_conflict '
+                    '/ professional_judgment。')
+        if code == 'unknown_question_source':
+            return ('source_direction 只能是 user / material / reference / professional / code，'
+                    '或省略。')
+        if code == 'invalid_question_target':
+            return 'target_field 必须是简短的字段名（同一条药的不同字段是不同的问题）。'
+        if code == 'clarification_without_question_id':
+            return ('ask_clarification 必须指明 question_id——即你要问的那条 user_fact 问题的编号，'
+                    f'当前等待用户回答的问题: {[q["question_id"] for q in inv.open_questions(["user_fact"])]}。')
+        if code == 'unknown_question_id':
+            return (f'question_id 必须是当前已声明的问题之一: '
+                    f'{[q["question_id"] for q in inv.questions]}。')
+        if code == 'question_kind_mismatch':
+            return ('这条问题不是等用户回答的（ask_clarification 只用于 user_fact）；'
+                    '按它的类型换用相应工具，或如实记为需要其他来源。')
+        if code == 'question_already_settled':
+            return '这条问题已经有结果了，不要重复追问。'
+        if code == 'question_prescribes':
+            return '问句里不得包含诊断、处方或调整用药的指令。'
         return f"proposal 必须针对当前 open gap 并给出可观察结果；open gaps: {open_gaps}；当前允许: {allowed}。"
+
+    @staticmethod
+    def _question_line(question) -> str:
+        return (f"{question.get('question_id')}（{question.get('information_target')}"
+                f"/{question.get('strategy')}）")
 
     @staticmethod
     def _arg_autocorrect_enabled() -> bool:
@@ -1257,8 +1294,12 @@ class PlannerPolicyGuard:
             if "reported_event_ref" in arguments or "warning_ref" in arguments:
                 self.last_corrections.append("create_clinical_conflict.refs")
             arguments = self._clinical_conflict_arguments(state)
+        change = proposal.get('expected_change')
         return ToolAction(tool, purpose, arguments, rationale,
-                          proposal.get('gap_id'), proposal.get('expected_observation'))
+                          proposal.get('gap_id'), proposal.get('expected_observation'),
+                          tuple(text for text in PlannerPolicyGuard._strings(
+                              proposal.get('basis_refs')) if text.strip()),
+                          change.strip() if isinstance(change, str) and change.strip() else None)
 
     def effective_purpose(self, proposal: Any) -> str:
         """Lenient purpose: the LLM picks it; fall back to the tool name."""
@@ -1494,14 +1535,50 @@ class LLMPlanner:
         self.config: dict[str, str] | None = None
         # Stage 8 B1: size of the last serialized payload (token estimate input).
         self.last_payload_chars = 0
+        # The executed call as the provider actually emitted it — id plus the
+        # raw argument string.  Cleared per proposal so a failed call cannot
+        # leave the previous call's identity on the next record.
+        self.last_call_id: str | None = None
+        self.last_call_arguments: Any = None
         if proposal_provider is None and model is None:
             self.config = extract_ddi.resolve_llm_config(require_key=False)
             self.model = self.config["model"]
+
+    # Fields of the A-arm payload that the B arm renders as message history
+    # instead of as payload keys.  Everything else is passed through unchanged,
+    # so the two arms hand the model the same facts and the same constraints —
+    # only the organisation of the run's own calls differs.
+    HISTORY_RENDERED_KEYS = ('observations', 'completed_steps', 'recent_trace', 'dropped_calls')
+
+    def system_prompt(self, state: AgentState) -> str:
+        return INVESTIGATION_SYSTEM_PROMPT if state.investigation else PLANNER_SYSTEM_PROMPT
+
+    def wire_messages(self, state: AgentState, payload: dict[str, Any]) -> list[dict[str, Any]]:
+        """The actual message list for one planner call.
+
+        One seam, so the offline capture measures the same object the live call
+        sends — checking an internal state object instead would prove nothing
+        about the request the provider receives.
+        """
+        from . import tool_history
+        if not tool_history.enabled():
+            return [{"role": "system", "content": self.system_prompt(state)},
+                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False, default=str)}]
+        block = {key: value for key, value in payload.items()
+                 if key not in self.HISTORY_RENDERED_KEYS}
+        return tool_history.build_messages(self.system_prompt(state), block, state.trace,
+                                           unrecoverable_note=state.history_note)
 
     def propose(self, state: AgentState) -> Any:
         self.last_provider_attempts = []
         payload = self.prompt_payload(state)
         self.last_payload_chars = len(json.dumps(payload, ensure_ascii=False, default=str))
+        # Consumed by the payload above; cleared so a FAILED call cannot leave
+        # a stale "these calls were dropped" note on the next request.
+        self.last_multi_call_dropped_detail = []
+        self.last_multi_call_dropped = []
+        self.last_call_id = None
+        self.last_call_arguments = None
         if self.proposal_provider is not None:
             try:
                 return self._parse_json(provider_call("planner", self.proposal_provider, payload))
@@ -1529,21 +1606,28 @@ class LLMPlanner:
             degraded_tool_choice = False
             for attempt in range(2 + rate_retries_left):
                 attempt_started = time.perf_counter()
+                from .turn_budget import CURRENT as _CURRENT
+                session = _CURRENT.get()
+                if session is not None:
+                    session.last_attempt_id = None
                 try:
                     response = completion_call("planner", self.client,
                         model=self.model,
-                        messages=[
-                            {"role": "system", "content": INVESTIGATION_SYSTEM_PROMPT if state.investigation else PLANNER_SYSTEM_PROMPT},
-                            {"role": "user", "content": json.dumps(payload, ensure_ascii=False, default=str)},
-                        ],
+                        messages=self.wire_messages(state, payload),
                         tools=self.tool_definitions(state),
                         tool_choice=tool_choice,
+                        parallel_tool_calls=False,
                         temperature=0,
                         refund_if=self._is_rate_limit_error if self._refund_refusals_enabled() else None,
                         **agent_completion_options(),
                     )
                 except Exception as exc:
                     if isinstance(exc, BudgetExceeded):
+                        context = self._attempt_context()
+                        if context.get('attempt_id'):
+                            self.last_provider_attempts.append(dict(context,
+                                outcome='budget_after_reservation',
+                                latency_ms=round((time.perf_counter() - attempt_started) * 1000, 3)))
                         raise
                     if not degraded_tool_choice and self._is_tool_choice_rejection(exc, tool_choice):
                         # The provider refused the forced tool_choice before
@@ -1551,13 +1635,13 @@ class LLMPlanner:
                         # Degrade once to 'auto' rather than losing the cycle.
                         degraded_tool_choice = True
                         tool_choice = 'auto'
-                        self.last_provider_attempts.append({'outcome': 'tool_choice_degraded',
+                        self.last_provider_attempts.append({**self._attempt_context(), 'outcome': 'tool_choice_degraded',
                             'error_type': type(exc).__name__,
                             'latency_ms': round((time.perf_counter() - attempt_started) * 1000, 3)})
                         continue
                     category = ('rate_limit' if self._is_rate_limit_error(exc) else
                         'timeout' if isinstance(exc, TimeoutError) or type(exc).__name__ == 'APITimeoutError' else 'provider_error')
-                    self.last_provider_attempts.append({'outcome': category, 'error_type': type(exc).__name__,
+                    self.last_provider_attempts.append({**self._attempt_context(), 'outcome': category, 'error_type': type(exc).__name__,
                         'latency_ms': round((time.perf_counter() - attempt_started) * 1000, 3)})
                     if rate_retries_left > 0 and self._is_rate_limit_error(exc):
                         attempt_number = self._provider_retry_limit() - rate_retries_left + 1
@@ -1569,7 +1653,9 @@ class LLMPlanner:
                 # point at ONE call rather than at a turn total.  Observational
                 # only.
                 prompt_tokens, completion_tokens = usage_split(response)
-                self.last_provider_attempts.append({'outcome': 'response',
+                self.last_provider_attempts.append({**self._attempt_context(), 'outcome': 'response',
+                    'response_id': getattr(response, 'id', None),
+                    'response_model': getattr(response, 'model', None),
                     'prompt_tokens': prompt_tokens,
                     'completion_tokens': completion_tokens,
                     'reasoning_tokens': usage_reasoning_tokens(response),
@@ -1586,6 +1672,17 @@ class LLMPlanner:
             raise
         except Exception as exc:
             raise PlannerProposalError("provider_error", "provider_error", f"{type(exc).__name__}: {exc}") from exc
+
+    @staticmethod
+    def _attempt_context() -> dict:
+        from .turn_budget import CURRENT
+        session = CURRENT.get()
+        attempt_id = getattr(session, 'last_attempt_id', None)
+        if not attempt_id:
+            return {}
+        row = session.memory.connection.execute(
+            'SELECT status FROM llm_attempts WHERE attempt_id=?', (attempt_id,)).fetchone()
+        return {'attempt_id': attempt_id, 'ledger_status': row[0] if row else None}
 
     @staticmethod
     def _provider_retry_limit() -> int:
@@ -1713,11 +1810,29 @@ class LLMPlanner:
                 self.last_multi_call_dropped = [f'{call.function.name}'
                                                 + ('(repeat)' if self._already_executed(call, state) else '')
                                                 for call in dropped]
+                # The same fact, in the shape the next payload needs: which
+                # tools were discarded and whether they were merely repeats or
+                # brand-new intents the one-action contract could not run.
+                self.last_multi_call_dropped_detail = [
+                    {'tool': call.function.name,
+                     'call_id': getattr(call, 'id', None),
+                     'arguments': call.function.arguments,
+                     'status': 'not_executed',
+                     'reason': 'one_action_per_cycle',
+                     'already_executed': self._already_executed(call, state)}
+                    for call in dropped]
                 calls = [chosen]
             else:
                 self.last_multi_call_dropped = []
+                self.last_multi_call_dropped_detail = []
             if len(calls) == 1:
                 name = calls[0].function.name
+                # Protocol: the executed call is kept with its REAL id and the
+                # raw argument string the provider sent, so a tool-conversation
+                # history can present the call/result pair instead of a
+                # re-serialised approximation.
+                self.last_call_id = getattr(calls[0], 'id', None)
+                self.last_call_arguments = calls[0].function.arguments
                 if name == "propose_next_action":
                     # Legacy unified contract: still accepted so a cached or
                     # differently-configured provider cannot break the turn.
@@ -1784,8 +1899,15 @@ class LLMPlanner:
             meta = {
                 'gap_id': {'type': 'string', 'description': '本提案针对的 open gap_id'},
                 'expected_observation': {'type': 'string', 'description': '本步预期观察到的结果'},
+                'basis_refs': {
+                    'type': 'array', 'items': {'type': 'string'},
+                    'description': ('这个决定依据的已有结论/证据引用（如 memory:conclusion:3@v1 '
+                                    '或 evidence_id）。没有依据就留空，不要编。')},
+                'expected_change': {
+                    'type': 'string',
+                    'description': '观察到什么会改变你的下一步；缺省表示未说明'},
             }
-            meta_required = list(meta)
+            meta_required = ['gap_id', 'expected_observation']
         else:
             permitted = [name for name in self.tool_schemas
                          if name not in INVESTIGATION_ONLY_TOOLS]
@@ -1883,6 +2005,27 @@ class LLMPlanner:
             },
         }
 
+    def _dropped_calls_note(self) -> dict[str, Any] | None:
+        """The provider's extra tool calls from the LAST response, as the next
+        request should see them.
+
+        The one-action contract cannot execute them, and silently discarding
+        them is how a model that emitted ``[memory_read, rag_search]`` in one
+        response kept re-emitting the first call: it never learned the second
+        was dropped.  Stating it costs nothing and pre-fills nothing — the
+        choice of what to do next stays with the planner.
+        """
+        detail = list(getattr(self, 'last_multi_call_dropped_detail', None) or [])
+        if not detail:
+            return None
+        return {
+            "note": ("上一条响应里含有多个工具调用，本契约一次只执行一个。"
+                     "下面列出**没有执行**的调用；若其中一个才是你真正想做的，"
+                     "请把它作为下一步单独提交。"),
+            "selection_policy": "first not already executed; selected proposal still requires safety validation",
+            "not_executed": detail,
+        }
+
     def prompt_payload(self, state: AgentState) -> dict[str, Any]:
         successful = [
             {"tool": item.tool, "purpose": item.purpose}
@@ -1915,10 +2058,23 @@ class LLMPlanner:
                     "ddi_check.medications is safety-critical: it is checked against the patient memory snapshot",
                     "For an investigation, every tool decision must name an open gap_id and expected_observation. Only memory_read(snapshot) closes authority. DDI results do not close label evidence gaps; read the retrieved evidence before responding. Do not respond until termination_reason is set by code.",
                     "tool_catalog 只列当前状态允许的工具；investigation.evidence_unread 列出已检索但尚未 read_evidence 回读的证据——'搜到'不等于'已读取并验证'，引用前必须回读。",
+                    "case_context 存在时，你是在跟进一件**具体的安全事项**：它给出这件事的触发原因、相关记录、当前结论与它们的触发条件状态、未决问题与已收到的回答、上次已经做过什么、以及相对上次新增了什么。默认只围绕这件事调查——要扩大范围必须在 purpose 里给出具体理由。questions.unanswered_by_user 里的条目表示用户表示不知道：不确定性**没有**消除，应改从其他来源核实或明确列为阻塞。",
                     "respond 由代码终止条件控制：investigation.termination_reason 为空时 respond 一定被拒绝；correction_task 存在时先按它的提示修改提案。",
                 ],
             },
             "correction_task": state.pending_correction,
+            # The previous step repeated an observation this run already has.
+            # The observation itself says so too (``no_progress``), but this
+            # field states WHAT already stands and WHAT is still open, which
+            # is the difference between "try again" and a correction the
+            # planner can actually act on.  It names no tool and no argument.
+            "no_progress_feedback": state.no_progress_feedback,
+            # Tool calls the provider returned in one response that the
+            # one-action contract could not execute.  Previously this was
+            # recorded only in the trace, so a model whose SECOND call was the
+            # one it wanted never learned the call was dropped and re-issued
+            # the first one.  Visible now; still never auto-executed.
+            "dropped_calls": self._dropped_calls_note(),
             "care_event": event,
             "investigation": inv_view,
             "patient_memory_snapshot": snapshot if inv_view is None else {
@@ -1964,7 +2120,6 @@ class LLMPlanner:
         for observation in state.observations:
             if observation.cycle >= state.cycle - cls.OBSERVATION_FULL_CYCLES:
                 item = asdict(observation)
-                cls._truncate_result_strings(item, cls.RESULT_CHARS)
                 result = item.get("result")
                 if isinstance(result, dict) and isinstance(result.get("results"), list):
                     # RAG chunk text is truncated to what citations need; the
@@ -1972,7 +2127,10 @@ class LLMPlanner:
                     # this payload.
                     for chunk in result["results"]:
                         if isinstance(chunk, dict) and isinstance(chunk.get("text"), str):
-                            chunk["text"] = chunk["text"][: cls.RAG_TEXT_CHARS]
+                            if len(chunk['text']) > cls.RAG_TEXT_CHARS:
+                                marker = cls.TRUNCATION_MARKER.format(total=len(chunk['text']))
+                                chunk['text'] = chunk['text'][:cls.RAG_TEXT_CHARS - len(marker)] + marker
+                cls._truncate_result_strings(item, cls.RESULT_CHARS)
                 out.append(item)
             else:
                 # Harness P1-B: structured summary instead of the hash-only
@@ -1988,12 +2146,19 @@ class LLMPlanner:
                 out.append(item)
         return out
 
+    # A sliced string with no marker is indistinguishable from a complete one,
+    # so a planner could quote a half sentence as if it were the whole body.
+    # The marker makes the omission visible where the omission happens; the
+    # authoritative byte count stays in the tool's own result shape
+    # (``total_chars``/``truncated`` for evidence).
+    TRUNCATION_MARKER = '…[已截断，原文共 {total} 字]'
+
     @classmethod
     def _truncate_result_strings(cls, value: Any, limit: int) -> None:
         if isinstance(value, dict):
             for key, item in value.items():
                 if isinstance(item, str) and len(item) > limit:
-                    value[key] = item[:limit]
+                    value[key] = item[:limit] + cls.TRUNCATION_MARKER.format(total=len(item))
                 else:
                     cls._truncate_result_strings(item, limit)
         elif isinstance(value, list):
@@ -2362,13 +2527,22 @@ class HybridPlanner:
             # one-action contract could not execute.  Kept as its own field so
             # a dropped call is never confused with a hydrated argument.
             "dropped_calls": ((getattr(self.llm_planner, 'last_multi_call_dropped', None) or [])
-                              if source in {"llm", "llm_post_correction"} else []),
+                              if source in {"llm", "llm_post_correction", "rejected", "fallback"} else []),
+            "not_executed_calls": (list(getattr(self.llm_planner, 'last_multi_call_dropped_detail', []) or [])
+                if source in {"llm", "llm_post_correction", "rejected", "fallback"} else []),
+            # The executed call's real identity, as the provider emitted it.
+            # Without it a tool-conversation history could only show a
+            # re-serialised guess at the call that produced each result.
+            "call_id": (getattr(self.llm_planner, 'last_call_id', None)
+                        if source in {"llm", "llm_post_correction", "rejected", "fallback"} else None),
+            "call_arguments": (getattr(self.llm_planner, 'last_call_arguments', None)
+                               if source in {"llm", "llm_post_correction", "rejected", "fallback"} else None),
             "model": self.llm_planner.model,
             "latency_ms": round((time.perf_counter() - started) * 1000, 3),
             # Only sources that actually made a provider call carry attempts;
             # a code-forced or deterministic step has none of its own.
             "provider_attempts": list(getattr(self.llm_planner, 'last_provider_attempts', []))
-                if source in {"llm", "llm_post_correction", "fallback"} and fallback_kind != 'circuit_break' else [],
+                if source in {"llm", "llm_post_correction", "fallback", "rejected"} and fallback_kind != 'circuit_break' else [],
         }
 
     @staticmethod
@@ -2696,8 +2870,14 @@ class MedicationCoordinatorAgent:
             self.verifier = ResponseVerifier(client=llm_planner_client, model=llm_planner_model)
         # P1: the agent owns the recheck consumer — stale conclusions are
         # re-verified with the real detector over the current medication list.
+        # The deterministic fallback (used when this hook is absent — an agent
+        # that could not be constructed, or a provider outage) is handed the
+        # SAME detector and retrieval tool, so removing the agent changes who
+        # runs the check, never what the check finds.
         if hasattr(self.memory, "recheck_hook"):
             self.memory.recheck_hook = self._recheck_hook
+            self.memory.recheck_detector = self.tools.get("ddi_check")
+            self.memory.recheck_rag_tool = self.tools.get("rag_search")
         # Protocol v2: uploaded materials are invisible until a MaterialIndex is
         # attached, so a run without materials keeps exactly its old catalog.
         self.material_index = None
@@ -2739,6 +2919,7 @@ class MedicationCoordinatorAgent:
         self.progress_store.emit(
             ctx.run_id, kind, cycle=meta.get("cycle"), tool=event.tool,
             detail={"ok": bool(meta.get("ok")),
+                    "retrieval_status": meta.get('retrieval_status'),
                     "error_kind": meta.get("error_kind"),
                     "evidence_count": len(meta.get("evidence_refs") or []),
                     "reused": bool(meta.get("reused"))})
@@ -2756,39 +2937,59 @@ class MedicationCoordinatorAgent:
         except Exception:
             return "corpus:unversioned"
 
+    # 连续"什么也没新增"的步数上限。默认 **2**（第一次重复给反馈，第二次重复
+    # 安全收尾）。默认 0 = 关闭是 P2 当初的保守选择——理由是"会改变终止语义"，
+    # 但那把唯一的重复纠正机制留在了关着的抽屉里：真实批次 8/8 任务里模型连续
+    # 5–9 次调用同一个工具，没有任何一步被记成"没有进展"，回合以"预算用完了"
+    # 收尾，而事实是"它没在做新事"。两种标签是两回事，后者才是可纠正的。
+    NO_PROGRESS_LIMIT_DEFAULT = 2
+
     def _no_progress_limit(self) -> int:
-        """0 / unset = disabled (default).  Set to >=1 to enable loop-level
-        no-progress detection (first repeats give structured feedback; at the
-        threshold the loop stops re-planning and finishes safely)."""
+        """0 = detection disabled entirely (no annotation, no feedback, no
+        stop); otherwise the number of consecutive no-new-information steps
+        tolerated before the loop stops re-planning and finishes safely.
+        Every repeat BELOW the threshold still gets the structured feedback —
+        the stop is the last resort, not the mechanism."""
         import os as _os
+        raw = (_os.getenv("AGENT_NO_PROGRESS_LIMIT") or "").strip()
+        if not raw:
+            return self.NO_PROGRESS_LIMIT_DEFAULT
         try:
-            return max(0, int(_os.getenv("AGENT_NO_PROGRESS_LIMIT", "0")))
+            return max(0, int(raw))
         except ValueError:
-            return 0
+            return self.NO_PROGRESS_LIMIT_DEFAULT
+
+    @staticmethod
+    def _progress_key(state: AgentState) -> str:
+        """The run this planning episode belongs to — one key for both the
+        verdict and the episode reset, so they can never disagree."""
+        return state.ctx.run_id if state.ctx else state.turn_id
 
     def _progress_verdict(self, state: AgentState, observation: Observation) -> str:
         """Classify one executed action for the no-progress contract.
 
-        * a successful domain WRITE is always progress and resets the counter;
-        * a read (or failed action) with the SAME normalized signature as the
-          previous action — same tool, args, revision, result — is a repeat:
-          the observation is annotated ``no_progress`` and structured feedback
-          names the evidence that already stands;
+        * an observation whose signature this run has NOT produced before is
+          progress — the streak resets.  The signature carries the scope
+          revision and corpus version, so a new page, a new version, a source
+          update or new user information are progress by construction;
+        * an ALREADY-SEEN signature is a repeat whatever ran in between, so
+          alternating between two stale reads is caught as well as repeating
+          one.  The observation is annotated ``no_progress`` and structured
+          feedback (``state.no_progress_feedback``) states what already stands
+          and which problems are still open;
+        * a WRITE is classified the same way rather than short-circuited: a
+          write that changed the world has a new signature and is progress, an
+          identical re-submission does not and must not reset the streak;
         * at the configured threshold the verdict is ``stop``: the loop stops
-          re-planning and finishes safely.  Nothing here treats a single
-          repeat as a safety violation, and a changed revision (write, review
-          round, new user information) produces a different signature, so real
-          progress is never mis-killed.
+          re-planning and finishes safely.  A single repeat is never a safety
+          violation.
         """
-        run_id = state.ctx.run_id if state.ctx else state.turn_id
-        if observation.ok and observation.tool == "memory_write":
-            self.no_progress_tracker.reset(run_id)
-            return "progress"
+        run_id = self._progress_key(state)
         limit = self._no_progress_limit()
         if limit <= 0:
             return "continue"
         spec = self.executor.spec(observation.tool)
-        if spec is None or spec.kind != "read":
+        if spec is None or spec.kind not in {"read", "write"}:
             return "continue"
         import hashlib as _hashlib
         import json as _json
@@ -2802,13 +3003,17 @@ class MedicationCoordinatorAgent:
             if state.ctx else "local-demo",
             patient_revision=revision, corpus_version=self._corpus_version(),
             tool_version=f"{spec.schema_version}:{'ok' if observation.ok else observation.error_kind}:{result_digest}")
-        verdict = self.no_progress_tracker.record(run_id, signature, limit=limit)
+        verdict = self.no_progress_tracker.record(
+            run_id, signature, limit=limit,
+            new_information=bool(getattr(observation, 'added_information', True)))
         if verdict["verdict"] == "stopped":
             # Already shut down for this run (e.g. a graph replay after the
             # stop) — keep the terminal no-progress verdict.
             return "stop"
         if verdict["verdict"] == "repeat":
             observation.no_progress = True
+            state.no_progress_feedback = self._no_progress_feedback(
+                state, observation, verdict, limit)
             state.trace.append({
                 "phase": "no_progress", "cycle": state.cycle,
                 "note": (f"重复读取 {observation.tool} 未产生新信息；已有证据继续有效"
@@ -2817,9 +3022,68 @@ class MedicationCoordinatorAgent:
             })
             state.reflection_notes.append(
                 f"重复读取 {observation.tool} 未带来新证据；不因相同结果提高置信度。")
-        # verdict == "progress": record() already advanced the tracker — no
-        # reset here, or the repeat baseline would be wiped every step.
+        else:
+            # 真的拿到新东西了：上一步的重复反馈已经过时，清掉，免得旧提示继续
+            # 影响下一次决策。
+            state.no_progress_feedback = None
         return verdict["verdict"]
+
+    def _no_progress_feedback(self, state: AgentState, observation: Observation,
+                              verdict: dict[str, Any], limit: int) -> dict[str, Any]:
+        """What a repeat is owed: what already stands, and what is still open.
+
+        The contract is *constraint, not direction*: this names the evidence
+        that is already in hand and the problems that remain, and it must not
+        name a tool, a query or any other执行顺序 — choosing the next legal
+        action stays the planner's job (代填动作就是把自主规划伪装成脚本).
+        """
+        obtained: list[str] = []
+        open_problems: list[str] = []
+        investigation = state.investigation
+        if investigation is not None:
+            if getattr(investigation, 'authority_read', False):
+                obtained.append("完整权威用药快照")
+            listed = list(getattr(investigation, 'material_refs', []) or [])
+            if listed:
+                read = set(getattr(investigation, 'material_read_refs', []) or [])
+                obtained.append(f"材料索引 {len(listed)} 条（已读回原文 {len(read)} 条）")
+            searched = list(getattr(investigation, 'evidence_refs', []) or [])
+            if searched:
+                read = set(getattr(investigation, 'read_refs', []) or [])
+                obtained.append(f"已检索证据 {len(searched)} 条（已回读 {len(read)} 条）")
+            settled = [c for c in getattr(investigation, 'claims', []) or []
+                       if c.get('status') != 'insufficient']
+            if settled:
+                obtained.append(f"已有证据支持的子问题 {len(settled)} 个")
+            for gap in getattr(investigation, 'gaps', []) or []:
+                if gap.get('status') == 'open':
+                    # gap_id 与描述一起给：每次提案都必须链接一个开放的 gap_id，
+                    # 只给描述会让模型知道"还差什么"却无法合法地指向它。
+                    open_problems.append({'gap_id': gap.get('gap_id'),
+                                          'problem': str(gap.get('description') or gap.get('gap_id'))})
+            unread = [ref for ref in getattr(investigation, 'evidence_refs', []) or []
+                      if ref not in set(getattr(investigation, 'read_refs', []) or [])]
+            if unread:
+                open_problems.append(f"已检索但尚未回读的原文 {len(unread)} 条")
+            pending_materials = [ref for ref in listed
+                                 if ref not in set(getattr(investigation, 'material_read_refs', []) or [])]
+            if pending_materials:
+                open_problems.append(f"材料索引中尚未读回原文的条目 {len(pending_materials)} 条")
+        else:
+            try:
+                open_problems.extend(PlannerPolicyGuard().unmet_requirements(state))
+            except Exception:
+                pass
+        return {
+            "note": (f"上一步没有带来新信息（第 {verdict.get('repeats', 1)}/{limit} 次），"
+                     "已有结果继续有效，重复同一次读取不会提高置信度。"),
+            "already_obtained": obtained or ["（本轮尚未取得可复用的结果）"],
+            "still_open": open_problems or ["（代码未记录开放问题；请检查是否已可收尾）"],
+            "still_open_note": "提案的 gap_id 必须取自上面的 still_open（或保持不变的开放缺口）。",
+            "instruction": ("请自行判断：若上面列出的未解决问题确实无法再由你推进，"
+                            "就按契约收尾；否则提出一个与刚才不同的、能满足约束的动作。"
+                            "本反馈只陈述状态，不指定动作、工具或参数。"),
+        }
 
     def run_pending_rechecks(self, *, max_jobs: int = 2) -> dict[str, Any]:
         """Consume pending recheck tasks (called by the app after each turn).
@@ -2915,98 +3179,22 @@ class MedicationCoordinatorAgent:
         return dict(result)
 
     def _recheck_ddi(self, store: MemoryStore, conclusion: dict[str, Any]) -> dict[str, Any] | None:
-        """Re-run the real detector over the current medication list.
+        """按当前药单重跑真实检测器（唯一实现在 ``safety_checks.recheck_ddi``）。
 
-        Findings matching the stale conclusion's drug pair become a new
-        conclusion version; no finding returns None so the memory layer records
-        the conservative no-match conclusion — never phrased as risk removal.
+        这里保留批内记忆化：一批失效结论付一次检测的钱。
         """
         ddi_tool = self.tools.get("ddi_check")
         medications = [item["display_name"] for item in store.current_medications()]
         if ddi_tool is None or not medications:
             return None
         result = self._current_detect_result(store, ddi_tool, medications)
-        warnings = result.get("warnings", []) if isinstance(result, dict) else []
-        old_text = conclusion.get("text", "")
-        related = [
-            warning for warning in warnings
-            if warning.get("drug_a") in old_text or warning.get("drug_b") in old_text
-        ]
-        if not related:
-            return None
-        source_refs = [
-            {"uri": warning.get("source_url"), "text": warning.get("source_text")}
-            for warning in related
-        ]
-        lines = [
-            f"重查完成：按当前已记录药单（{'、'.join(medications)}）重新检查，仍检出 {len(related)} 条与原结论相关的相互作用提示："
-        ]
-        for warning in related:
-            lines.append(
-                f"- {warning.get('drug_a')} × {warning.get('drug_b')}（{warning.get('severity')}）：{warning.get('effect')}"
-            )
-        lines.append("以上为按当前记录重新检查的结果；未检出的其他风险不因此排除，用药调整请咨询医生/药师。")
-        return {
-            "text": "\n".join(lines),
-            "memory_refs": list(conclusion.get("memory_refs", [])),
-            "source_refs": source_refs,
-        }
+        return safety_checks.recheck_ddi(store, conclusion,
+                                         detector=lambda _medications: result)
 
     def _recheck_condition(self, store: MemoryStore, conclusion: dict[str, Any]) -> dict[str, Any] | None:
-        """Re-derive patient-condition warnings for the focus drug (A2.3).
-
-        Deterministic throughout: the focus drug comes from the conclusion's
-        medication refs, the label text from the rag_search tool (fake-able in
-        tests), and the derivation is the same executor-side rule used during
-        the original turn.  No finding returns None for the conservative
-        memory-layer template.
-        """
-        focus: str | None = None
-        for ref in conclusion.get("memory_refs", []):
-            if isinstance(ref, str) and ref.startswith("memory:medication:"):
-                try:
-                    resolved = store.resolve_ref(ref)
-                except ValueError:
-                    continue
-                focus = resolved["row"]["display_name"]
-                break
-        rag_tool = self.tools.get("rag_search")
-        if not focus or rag_tool is None:
-            return None
-        snapshot = store.snapshot()
-        context = {
-            "semantic": snapshot.get("semantic", []),
-            "medications": snapshot.get("medications", []),
-        }
-        try:
-            rag_result = rag_tool(f"{focus} 注意事项 禁忌 慎用", drug_name=focus, top_k=5)
-        except Exception:
-            return None
-        warnings = AgentPlanner._condition_warnings(
-            focus,
-            PlannerPolicyGuard()._critical_facts(context),
-            context.get("medications", []),
-            rag_result,
-        )
-        if not warnings:
-            return None
-        source_refs = [
-            {"uri": warning.get("source_url"), "text": warning.get("source_text")}
-            for warning in warnings
-        ]
-        lines = [
-            f"重查完成：按当前已记录的患者事实重新核对 {focus} 的注意事项，仍检出 {len(warnings)} 条与原结论相关的个体风险提示："
-        ]
-        for warning in warnings:
-            lines.append(
-                f"- {warning.get('drug_a')}×{warning.get('drug_b')}（{warning.get('severity')}）：{warning.get('effect')}"
-            )
-        lines.append("以上为按当前记录重新检查的结果；未检出的其他风险不因此排除，用药调整请咨询医生/药师。")
-        return {
-            "text": "\n".join(lines),
-            "memory_refs": list(conclusion.get("memory_refs", [])),
-            "source_refs": source_refs,
-        }
+        """按当前患者事实重推个体风险（唯一实现在 ``safety_checks.recheck_condition``）。"""
+        return safety_checks.recheck_condition(store, conclusion,
+                                               rag_tool=self.tools.get("rag_search"))
 
     def handle(self, event: CareEvent, *, session_id: str, turn_id: str | None = None,
                client_event_id: str | None = None) -> AgentResponse:
@@ -3027,6 +3215,16 @@ class MedicationCoordinatorAgent:
         # Harness P1-A: one RunContext per turn carries the trusted local-demo
         # principal, identity and budget handle through every tool dispatch.
         state.ctx = self._context_for(state)
+        # No-progress detection is scoped to a planning EPISODE: a state that
+        # starts with no observations has obtained nothing yet, and re-reading
+        # what a previous turn read is not a repeat for this one.  Two events
+        # sharing an idempotency key (the duplicate-submission case) share a
+        # run_id, so without this the second turn's first read inherited the
+        # first turn's membership and the run stopped as ``no_progress`` for
+        # doing exactly the right thing.  A resumed run restores its
+        # observations and therefore keeps its counter.
+        if not state.observations:
+            self.no_progress_tracker.forget(self._progress_key(state))
         # Stage 8 B1: per-turn budget (wall-clock / estimated tokens / cycles).
         budget = CURRENT.get()
         # Stage 8 B3: consecutive-rejection circuit breaker.
@@ -3154,7 +3352,7 @@ class MedicationCoordinatorAgent:
         return self._finalize(state, self._respond(state))
 
     def _prepare_investigation(self, state: AgentState) -> None:
-        from .investigation import InvestigationState, CONTRACT
+        from .investigation import InvestigationState, CONTRACT, policy_of
         from .router import route_request
         if state.investigation_policy is None:
             # A3: one explicit routing decision per request, recorded with its
@@ -3248,14 +3446,16 @@ class MedicationCoordinatorAgent:
                         session_id: str = 'local-demo', turn_id: str | None = None,
                         initial_state: dict[str, Any] | None = None,
                         max_cycles: int | None = None,
-                        saved_budget: dict[str, Any] | None = None) -> dict[str, Any]:
+                        saved_budget: dict[str, Any] | None = None,
+                        case_context: dict[str, Any] | None = None,
+                        policy: str | None = None) -> dict[str, Any]:
         """A2: bounded open-goal evidence review executed for a persisted care
         task.  Same planner guard, executor and investigation engine as the
         interactive path — no new tool and no write outside the existing
         policy/receipt path.  Cross-run continuation is carried by the
         serialized investigation state; the caller owns task status, artifacts
         and the task-level resource budget."""
-        from .investigation import InvestigationState, CONTRACT
+        from .investigation import InvestigationState, CONTRACT, policy_of
         from .harness.progress import cancel_event_for
         prior = self.memory.workflow_run_get(run_id)
         if prior and prior.get('graph_version') != 'care-task-evidence-review@1':
@@ -3269,6 +3469,21 @@ class MedicationCoordinatorAgent:
             inv = InvestigationState.restore(initial_state, scope_id)
         else:
             inv = InvestigationState(goal, scope_id)
+        # 事项上下文每轮**重新装入**（而不是只在首次设置）：恢复后的这一轮看到的
+        # 必须是**现在**的已知/未知/新增，而不是上次开跑时的那一份快照。
+        if case_context:
+            inv.case_context = case_context
+            # 上次消费位置之后真的事件才算"新"。有就要给模型一轮机会，
+            # 否则用户的补充到达后系统会立刻回到等待，回答永远用不上。
+            fresh = (case_context.get('new_since_last_run') or {}).get('events') or []
+            inv.new_information_pending = bool(fresh)
+            if fresh and inv.termination_reason in ('waiting_input', 'no_progress'):
+                # 上一轮停止的**理由**已经不成立了：那时在等这条补充，或者那时
+                # 已经没路可走。带着旧的终止原因进新一轮，循环会一次都不跑就
+                # 原样退出——用户补了信息，系统却什么都没发生。
+                inv.termination_reason = None
+        if policy:
+            inv.policy = policy
         if isinstance(self.planner, HybridPlanner) and self.planner.enabled:
             inv.mode = 'scripted' if self.planner.llm_planner.proposal_provider else 'llm'
         turn_id = turn_id or run_id
@@ -3285,7 +3500,16 @@ class MedicationCoordinatorAgent:
         last_fingerprint = None
         consecutive_rejections = int(persisted.get('consecutive_rejections') or 0)
         state.pending_correction = persisted.get('pending_correction')
+        # B arm: a resumed run reuses the persisted trace, so its earlier calls
+        # and results ARE reconstructible and are never re-executed.  When the
+        # investigation shows prior work but no trace was carried, that gap is
+        # stated rather than filled with invented calls.
         state.trace = list(persisted.get('trace') or [])
+        if not state.trace and (inv.queries or inv.read_refs or inv.retrieval_attempts):
+            state.history_note = (
+                '本次是恢复后的任务：此前已执行的工具调用没有随本次运行保留，'
+                '其调用与结果无法重建，也不得重复执行。'
+                '以 investigation 中已记录的检索、已回读证据与缺口状态为准。')
         try:
             rejection_limit = max(1, int(os.getenv('PLANNER_SAFETY_REJECTION_LIMIT', '2')))
         except ValueError:
@@ -3294,6 +3518,15 @@ class MedicationCoordinatorAgent:
             with budget_scope(store, run_id, self.max_cycles if max_cycles is None else max_cycles):
                 inv.sync_authority(self.memory)
                 inv.validate_sources(self.evidence_store)
+                # 权威记录由**程序**读并校验（sync_authority 拿的是完整快照，
+                # 不是相关性截断）。记下来源，而不是把 authority_read 直接置真
+                # 冒充"读过了"——也不为此花掉一次模型决策。
+                if policy_of(inv.policy).get('typed_questions') and not inv.authority_read:
+                    inv.authority_read = True
+                    inv.authority_source = 'code_snapshot_validated'
+                    for name in inv.checks:
+                        if name == 'authority':
+                            inv.checks[name] = 'checked'
                 while inv.termination_reason is None:
                     if state.ctx.cancel_event is not None and state.ctx.cancel_event.is_set():
                         state.degraded_reason = 'cancelled'
@@ -3304,6 +3537,11 @@ class MedicationCoordinatorAgent:
                         if reason:
                             state.degraded_reason = f'budget_exhausted:{reason}'
                             break
+                    # 非协商的停止条件先于规划：只剩"等人回答"时，这一轮该结束
+                    # 去等，而不是继续烧预算——旧循环从不问这个问题，于是"等用户"
+                    # 只能靠撞上 no_progress 来收场，报告里长得像原地打转。
+                    if policy_of(inv.policy).get('typed_questions') and inv.forced_stop():
+                        break
                     try:
                         action = self._decide(state)
                         consecutive_rejections = 0
@@ -3349,6 +3587,7 @@ class MedicationCoordinatorAgent:
                         state.degraded_reason = 'no_progress:repeated_proposal'
                         break
                     last_fingerprint = fingerprint
+                    inv.new_information_pending = False
                     observation = self._act(state, action)
                     observation.cycle = state.cycle
                     budget.cycle(state)
@@ -3356,9 +3595,32 @@ class MedicationCoordinatorAgent:
                     state.trace.append({'phase': 'act', 'cycle': state.cycle, 'tool': action.tool,
                                         'arguments': action.arguments, 'purpose': action.purpose,
                                         'planner_source': (state.trace[-1].get('planner') or {}).get('source'), 'ok': observation.ok})
+                    # **先在观察阶段定案，再写轨迹**。顺序反了的话，轨迹（也就是
+                    # 模型下一步读到的历史）留下的是处理器返回的"待定"结果，而真正
+                    # 的采纳/拒绝发生在下一行——模型看到的和实际发生的就是两回事。
+                    self._reflect(state, observation)
                     state.trace.append({'phase': 'observe', 'cycle': state.cycle, 'tool': action.tool,
                                         'ok': observation.ok, 'observation': asdict(observation)})
-                    self._reflect(state, observation)
+                    if policy_of(inv.policy).get('typed_questions') and inv.forced_stop():
+                        break
+                    # The same no-progress contract the interactive loop runs.
+                    # This loop previously had only an "identical proposal as
+                    # the previous step" guard, which cannot see ALTERNATING
+                    # stale reads — the shape the live cohort actually produced
+                    # (5×list_materials, 9×memory_read) — so a persistent task
+                    # could spin to its cycle cap with every step counted as
+                    # progress.  One classifier for both paths.
+                    if self._progress_verdict(state, observation) == 'stop':
+                        state.degraded_reason = 'no_progress:repeated_reads'
+                        state.trace.append({
+                            'phase': 'no_progress', 'cycle': state.cycle,
+                            'note': '连续重复读取未产生新进展；停止重复规划并安全收尾，不以重复结果提高置信度。',
+                            'unfinished_items': self._unfinished_items(state)})
+                        check_lease()
+                        store.workflow_run_update(run_id, result={'investigation': inv.to_dict(),
+                            'pending_correction': state.pending_correction, 'trace': state.trace,
+                            'consecutive_rejections': consecutive_rejections})
+                        break
                     check_lease()
                     store.workflow_run_update(run_id, result={'investigation': inv.to_dict(),
                         'pending_correction': state.pending_correction, 'trace': state.trace,
@@ -3505,7 +3767,13 @@ class MedicationCoordinatorAgent:
             "bundle_version": "answer-bundle@1",
             "execution_status": execution,
             "goal_status": goal,
-            "answer_status": 'bounded_report' if inv else 'llm_validated' if audit.get('response_source') == 'llm' else 'template',
+            # A report that failed its own check is NOT a bounded report: the
+            # delivered text is a failure notice, and a consumer that reads
+            # `bounded_report` as "the investigation answered" would be reading
+            # success out of a rejection.
+            "answer_status": ('blocked_report' if audit.get('response_source') == 'template_blocked'
+                              else 'bounded_report' if inv
+                              else 'llm_validated' if audit.get('response_source') == 'llm' else 'template'),
             "investigation": inv.to_dict() if inv else None,
             "multi_review": multi_review,
             "route": (state.route_info or {}).get('route'),
@@ -3583,11 +3851,12 @@ class MedicationCoordinatorAgent:
         if tool_result.ok:
             return Observation(action.tool, action.purpose, action.arguments,
                                tool_result.value, True,
-                               evidence_refs=tool_result.evidence_refs)
+                               evidence_refs=tool_result.evidence_refs,
+                               gap_id=action.gap_id)
         error = dict(tool_result.error or {})
         return Observation(action.tool, action.purpose, action.arguments,
                            error, False, error_kind=error.get("error_kind"),
-                           recoverable=error.get("recoverable"))
+                           recoverable=error.get("recoverable"), gap_id=action.gap_id)
 
     def _context_for(self, state: AgentState) -> RunContext:
         """Build the shared RunContext for a turn (both runners converge here
@@ -3720,14 +3989,39 @@ class MedicationCoordinatorAgent:
             errors = self._check_response(text, warnings=warnings, conflicts=conflicts,
                 memory_refs=[*memory_refs, *inv.citable_memory_refs()],
                 escalation_required=True, refusal_required=False)
+            source, reason = 'template', state.degraded_reason
             if errors:
-                raise RuntimeError('investigation final response blocked: ' + ','.join(errors))
-            state.trace.append({'phase': 'respond', 'cycle': state.cycle, 'source': 'template',
-                                'delivered_text': text, 'investigation': inv.to_dict()})
+                # The report cannot go out as written.  The turn still owes the
+                # caregiver an honest record, so it ends as a STRUCTURED FAILURE
+                # rather than an exception: raising loses the trace, the
+                # evidence, the stop reason and the ledger-shaped result the
+                # runner has to export, and it tells the caller nothing about
+                # what did happen.  The safety bar is unchanged -- the rejected
+                # text is not delivered, only recorded for audit.
+                source, reason = 'template_blocked', 'final_check_blocked:' + ','.join(errors)
+                state.degraded_reason = state.degraded_reason or 'report_blocked'
+                delivered = self._blocked_report_text(inv, warnings, conflicts)
+                # The substitute is code-owned, but "code-owned" is an argument,
+                # not an observation.  Check it too and record the result, so a
+                # notice that itself failed the gate would be visible in the
+                # artifact instead of being assumed clean.
+                notice_errors = self._check_response(
+                    delivered, warnings=warnings, conflicts=conflicts,
+                    memory_refs=[*memory_refs, *inv.citable_memory_refs()],
+                    escalation_required=True, refusal_required=False)
+                state.trace.append({'phase': 'respond_blocked', 'cycle': state.cycle,
+                                    'errors': errors, 'rejected_text': text,
+                                    'delivered_text': delivered, 'notice_errors': notice_errors,
+                                    'stop_reason': inv.termination_reason,
+                                    'investigation': inv.to_dict()})
+                text = delivered
+            else:
+                state.trace.append({'phase': 'respond', 'cycle': state.cycle, 'source': 'template',
+                                    'delivered_text': text, 'investigation': inv.to_dict()})
             return AgentResponse(text, warnings, conflicts,
                 {'session_id': state.session_id, 'turn_id': state.turn_id, 'memory_refs': memory_refs,
-                 'source_refs': source_refs, 'response_source': 'template',
-                 'response_fallback_reason': state.degraded_reason, 'investigation': inv.to_dict(),
+                 'source_refs': source_refs, 'response_source': source,
+                 'response_fallback_reason': reason, 'investigation': inv.to_dict(),
                  'planner_endpoint': self._endpoint_identity()},
                 state.trace, operation_outcomes=self._operation_outcomes(state))
         if self.response_composer is None and not state.degraded_reason:
@@ -3828,6 +4122,37 @@ class MedicationCoordinatorAgent:
             tool_trace=state.trace,
             operation_outcomes=self._operation_outcomes(state),
         )
+
+    # Code-owned, so the rejected text cannot be smuggled back in through it.
+    # It states the failure rather than reporting success, and it deliberately
+    # names no hazard: a sentence the caregiver would read as a finding is the
+    # one thing this notice must not contain.
+    FAILED_REPORT_NOTICE = (
+        "本次核查报告未通过交付前的安全校验，因此没有生成可供医生或药师核对的完整报告。"
+        "此前的检索与已取得的证据均已保留；未完成的部分未能核实，"
+        "不能据此判断所查事项没有问题。")
+
+    def _blocked_report_text(self, inv, warnings: list[dict[str, Any]],
+                             conflicts: list[dict[str, Any]]) -> str:
+        """What is delivered when the report fails its own final check.
+
+        The recorded warnings and open conflicts still go out in full: they are
+        code-owned, already grounded in their citations and memory refs, and
+        withholding them would leave the caregiver less informed than before the
+        turn.  What is dropped is the report body that could not be delivered.
+        """
+        lines = ['# 有界证据核查报告 · 就诊准备', '', self.FAILED_REPORT_NOTICE, '',
+                 '终止原因：' + str(inv.termination_reason) + '。']
+        if inv.read_refs:
+            lines.append('已回读并核验的原文：' + '、'.join(sorted(inv.read_refs)) + '。')
+        for warning in warnings:
+            lines.append(self._format_warning(warning))
+        for conflict in conflicts:
+            lines.append(f"未决矛盾 [{conflict['ref']}]：报告 [{conflict['left_ref']}]；"
+                         f"证据 [{conflict['right_ref']}]。")
+        lines.append('本系统不做诊断、处方或用药调整建议。请携带本报告与医生或药师当面确认；'
+                     '建议咨询医生/药师后再做任何用药决定。')
+        return '\n'.join(lines)
 
     def _endpoint_identity(self) -> dict[str, Any]:
         """Endpoint attribution for the response artifact — never the credential.

@@ -44,7 +44,9 @@ jobs:
           pip install -r stage0/requirements-stage10.txt
           pip install -r stage0/requirements-graph.txt
 
-      - name: Offline closeout (34 modules, dev sets)
+      - name: Offline closeout (every stage0/test_*.py + mainline acceptance)
+        # The module count is whatever the glob matches -- deliberately not
+        # pinned here, so adding a suite never needs a workflow edit.
         # No .env is present in CI and none is needed: the suite is verified to
         # pass with every provider credential absent. The script exits non-zero
         # unless status == pass, and refuses to reuse an existing output dir.
@@ -52,7 +54,7 @@ jobs:
 
       - name: Show summary
         if: always()
-        run: python -c "import json;d=json.load(open('output/ci-closeout/engineering.json',encoding='utf-8'));print('status',d['status'],'tests',d['tests_executed'],'suites',len(d['suites']));print('failed',[s['name'] for s in d['suites'] if not s['passed']] or 'none')"
+        run: python -c "import json;d=json.load(open('output/ci-closeout/engineering.json',encoding='utf-8'));print('status',d['status'],'tests',d['tests_executed'],'suites',len(d['suites']));print('failed',[s['name'] for s in d['suites'] if not s['passed']] or 'none');print('mainline',d.get('mainline',{}).get('passed'),{k:v['passed'] for k,v in (d.get('mainline',{}).get('categories') or {}).items()})"
 
       - name: Upload closeout report
         if: always()

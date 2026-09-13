@@ -1,0 +1,210 @@
+[
+  {
+    "task_id": "vp-conflict-003b",
+    "wire_path": "output\\model-tool-controlled-2026-09-12\\live\\14-B2-vp-conflict-003b\\wire-005.json",
+    "wire_sha256": "a3f78180ea52c6d30c7e62f1b97a325a29dfa2ec95d7edec01cbf6ba82545a33",
+    "raw_call": {
+      "id": "01a0954665fe23d609dc70e945790e3e",
+      "function": {
+        "arguments": "{\"query\": \"确认氨氯地平的用药信息是否准确。\", \"top_k\": 1, \"section\": \"用药信息\", \"drug_name\": \"氨氯地平\", \"gap_id\": \"claim:2e11044806d0\", \"expected_observation\": \"找到支持或反对氨氯地平用药信息的证据。\"}",
+        "name": "acquire_evidence"
+      },
+      "type": "function",
+      "index": 0
+    },
+    "frozen_materials": [
+      {
+        "chunk_id": "c1",
+        "drug_name": "氨氯地平",
+        "section": "药物相互作用",
+        "source_url": "label://a-1",
+        "text": "氨氯地平与克拉霉素合用可增加低血压风险，需监测血压。"
+      },
+      {
+        "chunk_id": "c2",
+        "drug_name": "氨氯地平",
+        "section": "药物相互作用",
+        "source_url": "label://a-2",
+        "text": "氨氯地平与克拉霉素合用可增加低血压风险，需监测血压。"
+      }
+    ],
+    "variants": [
+      {
+        "variant": "original",
+        "arguments": {
+          "query": "确认氨氯地平的用药信息是否准确。",
+          "top_k": 1,
+          "section": "用药信息",
+          "drug_name": "氨氯地平"
+        },
+        "result": {
+          "query": "确认氨氯地平的用药信息是否准确。",
+          "mode": "degraded_exact_over_rag_corpus",
+          "degraded_reason": "RuntimeError: offline exact retrieval; embeddings disabled",
+          "results": []
+        },
+        "candidate_count": 0,
+        "positive_score_count": 0,
+        "target_original_count": 0,
+        "relevance_basis": "frozen target text identity; positive retrieval score reported separately"
+      },
+      {
+        "variant": "unfiltered",
+        "arguments": {
+          "query": "确认氨氯地平的用药信息是否准确。",
+          "top_k": 1,
+          "drug_name": "氨氯地平"
+        },
+        "result": {
+          "query": "确认氨氯地平的用药信息是否准确。",
+          "mode": "degraded_exact_over_rag_corpus",
+          "degraded_reason": "RuntimeError: offline exact retrieval; embeddings disabled",
+          "results": [
+            {
+              "score": 0.0,
+              "rank": 1,
+              "chunk_id": "c1",
+              "drug_name": "氨氯地平",
+              "section": "药物相互作用",
+              "source_url": "label://a-1",
+              "text": "氨氯地平与克拉霉素合用可增加低血压风险，需监测血压。"
+            }
+          ]
+        },
+        "candidate_count": 1,
+        "positive_score_count": 0,
+        "target_original_count": 1,
+        "relevance_basis": "frozen target text identity; positive retrieval score reported separately"
+      },
+      {
+        "variant": "existing_section",
+        "arguments": {
+          "query": "确认氨氯地平的用药信息是否准确。",
+          "top_k": 1,
+          "section": "药物相互作用",
+          "drug_name": "氨氯地平"
+        },
+        "result": {
+          "query": "确认氨氯地平的用药信息是否准确。",
+          "mode": "degraded_exact_over_rag_corpus",
+          "degraded_reason": "RuntimeError: offline exact retrieval; embeddings disabled",
+          "results": [
+            {
+              "score": 0.0,
+              "rank": 1,
+              "chunk_id": "c1",
+              "drug_name": "氨氯地平",
+              "section": "药物相互作用",
+              "source_url": "label://a-1",
+              "text": "氨氯地平与克拉霉素合用可增加低血压风险，需监测血压。"
+            }
+          ]
+        },
+        "candidate_count": 1,
+        "positive_score_count": 0,
+        "target_original_count": 1,
+        "relevance_basis": "frozen target text identity; positive retrieval score reported separately"
+      }
+    ]
+  },
+  {
+    "task_id": "vp-missing-002a",
+    "wire_path": "output\\model-tool-controlled-2026-09-12\\live\\01-B1-vp-missing-002a\\wire-004.json",
+    "wire_sha256": "23d90df3a8d1ba00aa0f9cef4d2f0d5bf576088349cee2fefa5f463b55f030e8",
+    "raw_call": {
+      "id": "01a0954478522a243bf25fbff0d20e3b",
+      "function": {
+        "arguments": "{\"query\": \"氨氯地平\", \"top_k\": 5, \"section\": \"适应症\", \"drug_name\": \"氨氯地平\", \"gap_id\": \"claim:2e11044806d0\", \"expected_observation\": \"确认氨氯地平的用药信息是否与权威记录一致。\"}",
+        "name": "rag_search"
+      },
+      "type": "function"
+    },
+    "frozen_materials": [
+      {
+        "chunk_id": "c1",
+        "drug_name": "氨氯地平",
+        "section": "用法用量",
+        "source_url": "label://amlodipine",
+        "text": "氨氯地平常用起始剂量为每日一次5mg；剂量调整需监测血压。"
+      }
+    ],
+    "variants": [
+      {
+        "variant": "original",
+        "arguments": {
+          "query": "氨氯地平",
+          "top_k": 5,
+          "section": "适应症",
+          "drug_name": "氨氯地平"
+        },
+        "result": {
+          "query": "氨氯地平",
+          "mode": "degraded_exact_over_rag_corpus",
+          "degraded_reason": "RuntimeError: offline exact retrieval; embeddings disabled",
+          "results": []
+        },
+        "candidate_count": 0,
+        "positive_score_count": 0,
+        "target_original_count": 0,
+        "relevance_basis": "frozen target text identity; positive retrieval score reported separately"
+      },
+      {
+        "variant": "unfiltered",
+        "arguments": {
+          "query": "氨氯地平",
+          "top_k": 5,
+          "drug_name": "氨氯地平"
+        },
+        "result": {
+          "query": "氨氯地平",
+          "mode": "degraded_exact_over_rag_corpus",
+          "degraded_reason": "RuntimeError: offline exact retrieval; embeddings disabled",
+          "results": [
+            {
+              "score": 1.0,
+              "rank": 1,
+              "chunk_id": "c1",
+              "drug_name": "氨氯地平",
+              "section": "用法用量",
+              "source_url": "label://amlodipine",
+              "text": "氨氯地平常用起始剂量为每日一次5mg；剂量调整需监测血压。"
+            }
+          ]
+        },
+        "candidate_count": 1,
+        "positive_score_count": 1,
+        "target_original_count": 1,
+        "relevance_basis": "frozen target text identity; positive retrieval score reported separately"
+      },
+      {
+        "variant": "existing_section",
+        "arguments": {
+          "query": "氨氯地平",
+          "top_k": 5,
+          "section": "用法用量",
+          "drug_name": "氨氯地平"
+        },
+        "result": {
+          "query": "氨氯地平",
+          "mode": "degraded_exact_over_rag_corpus",
+          "degraded_reason": "RuntimeError: offline exact retrieval; embeddings disabled",
+          "results": [
+            {
+              "score": 1.0,
+              "rank": 1,
+              "chunk_id": "c1",
+              "drug_name": "氨氯地平",
+              "section": "用法用量",
+              "source_url": "label://amlodipine",
+              "text": "氨氯地平常用起始剂量为每日一次5mg；剂量调整需监测血压。"
+            }
+          ]
+        },
+        "candidate_count": 1,
+        "positive_score_count": 1,
+        "target_original_count": 1,
+        "relevance_basis": "frozen target text identity; positive retrieval score reported separately"
+      }
+    ]
+  }
+]

@@ -91,6 +91,9 @@ def run_task(task, policy, path, live=False):
         chunks = task['materials']
         (root / 'chunks.jsonl').write_text('\n'.join(json.dumps(c, ensure_ascii=False) for c in chunks), encoding='utf-8')
         class Retrieval:
+            def corpus_chunks(self):
+                return chunks
+
             def __call__(self, query, **kwargs):
                 if task.get('fault') == 'tool_timeout':
                     raise TimeoutError('synthetic tool timeout')
@@ -127,7 +130,7 @@ def run_task(task, policy, path, live=False):
                 if override:
                     budget_cycles = min(budget_cycles, int(override))
                 agent = MedicationCoordinatorAgent(store, ddi_tool=DDITool(lambda meds: []),
-                    rag_tool=Retrieval() if path == 'replay' else LocalOnlyRAG(), max_cycles=budget_cycles,
+                    rag_tool=Retrieval() if path == 'replay' else LocalOnlyRAG(exact_only=True), max_cycles=budget_cycles,
                     llm_planner_enabled=live or task.get('fault') == 'model_rate_limit',
                     llm_planner_client=client, llm_planner_model=config['model'] if config else None,
                     proposal_provider=None if live else provider, response_provider=provider if task.get('fault') == 'model_rate_limit' else None)
@@ -179,7 +182,22 @@ def run_task(task, policy, path, live=False):
                 outcome['receipts'] = receipts
                 outcome['duplicate_effects'] = len(receipts) - len({(r['scope_id'], r['operation_id']) for r in receipts})
             except Exception as exc:
-                outcome = {'error': f'{type(exc).__name__}: {exc}', 'responses': responses}
+                # Same key set as the success path: the responses that DID
+                # complete keep their bundles, and consumers that read
+                # `investigation`/`tool_calls` see an honest empty value rather
+                # than a KeyError that turns a real partial result into an
+                # unreadable one.
+                last = responses[-1] if responses else {}
+                outcome = {'error': f'{type(exc).__name__}: {exc}', 'responses': responses,
+                    'investigation': (last.get('answer_bundle') or {}).get('investigation'),
+                    'execution_status': (last.get('answer_bundle') or {}).get('execution_status', 'failed'),
+                    'goal_status': (last.get('answer_bundle') or {}).get('goal_status', 'unknown'),
+                    'answer_status': (last.get('answer_bundle') or {}).get('answer_status', 'template'),
+                    'tool_calls': sum(e.get('phase') == 'act' for r in responses
+                                      for e in (r.get('tool_trace') or [])),
+                    'model_calls': 0, 'actual_tokens': 0, 'unknown_usage': 0,
+                    'mode': 'scripted' if task.get('fault') == 'model_rate_limit' else 'deterministic',
+                    'degradation_reasons': [], 'recovery_success': None, 'duplicate_effects': 0}
             finally:
                 attempts = [dict(r) for r in store.connection.execute('SELECT * FROM llm_attempts')]
                 outcome['usage_ledger'] = attempts

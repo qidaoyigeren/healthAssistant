@@ -21,6 +21,10 @@ def summarize_observation(observation: Any) -> dict[str, Any]:
         "cycle": observation.cycle,
     }
     result = observation.result
+    if isinstance(result, dict) and observation.tool in {'rag_search', 'acquire_evidence', 'rag_catalog'}:
+        from .retrieval import FEEDBACK_KEYS
+        summary['retrieval_feedback'] = {k: result[k] for k in FEEDBACK_KEYS if k in result}
+        summary['arguments'] = observation.arguments
     if observation.ok and isinstance(result, dict):
         summary["key_fields"] = sorted(result.keys())
         for key, out_key in (("warnings", "warning_count"), ("recorded_warnings", "recorded_warning_count"),
