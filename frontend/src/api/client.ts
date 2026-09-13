@@ -10,7 +10,8 @@ import type {
   FactActionResponseDto, FailedEventDto, HealthDto, HistorySearchDto, MedicationRecordDto,
   MemoryItemDto, MemoryStateDto, OverviewDto, Page, RecheckTasksDto,
   RunProgressDto, SafetyCaseDto, SafetyCaseListDto, SafetyClosureEvidenceDto,
-  SafetyFollowUpInputDto, SafetyMainlineDto,
+  SafetyFollowUpConditionDto, SafetyFollowUpConfirmationDto, SafetyFollowUpInputDto,
+  SafetyMainlineDto,
   SessionDto, SessionEventDto, TurnTraceDto, WarningDto,
 } from './types';
 
@@ -266,6 +267,50 @@ export const api = {
     return request<SafetyCaseDto>(`/v1/safety-cases/${encodeURIComponent(caseId)}/disposition`, {
       method: 'POST', body,
     });
+  },
+
+  /**
+   * 安排 / 改期一条长期跟进(CONTRACT.md §4.6.1)。
+   *
+   * 请求体里**没有 `confirmed`**:送出时间或触发条件只表示"排了期",
+   * 不表示"已确认" —— 确认是另一个动作(`safetyCaseFollowUpConfirmation`)。
+   * 事项已 `resolved` 时服务端返回 409(终态不可再安排)。
+   */
+  safetyCaseFollowUpSchedule(caseId: string, body: {
+    key: string; expected_revision: number;
+    kind: 'review_at' | 'on_event' | 'arrangement';
+    at?: string;
+    condition?: SafetyFollowUpConditionDto;
+    owner?: string;
+    note?: string;
+  }) {
+    return request<SafetyCaseDto>(`/v1/safety-cases/${encodeURIComponent(caseId)}/follow-up`, {
+      method: 'POST', body: { ...body, action: 'schedule' },
+    });
+  },
+
+  /**
+   * 取消一条长期跟进(§4.6.2)。取消**不清空** `at`/`condition`/`owner`/`note`:
+   * 历史留着,靠 `schedule_state='cancelled'` 表达"已取消"。
+   */
+  safetyCaseFollowUpCancel(caseId: string, body: {
+    key: string; expected_revision: number; reason?: string;
+  }) {
+    return request<SafetyCaseDto>(`/v1/safety-cases/${encodeURIComponent(caseId)}/follow-up`, {
+      method: 'POST', body: { ...body, action: 'cancel' },
+    });
+  },
+
+  /**
+   * 确认一条**已经排期**的安排(§4.6.3)。这是产生 `confirmed: true` 的**唯一**路径。
+   * 没有已安排(`schedule_state ∈ {scheduled, due}`)的安排时服务端返回 409。
+   * `confirmed_by` 由服务端从认证上下文取,请求体自称无效。
+   */
+  safetyCaseFollowUpConfirmation(caseId: string, body: SafetyFollowUpConfirmationDto) {
+    return request<SafetyCaseDto>(
+      `/v1/safety-cases/${encodeURIComponent(caseId)}/follow-up/confirmation`, {
+        method: 'POST', body,
+      });
   },
 
   /** 围绕这一件事项发起一次有界调查。返回排队中的 care_task,进度另轮询。 */

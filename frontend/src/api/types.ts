@@ -661,36 +661,147 @@ export interface SafetyRequiredInputDto {
    */
   information_state?: string | null;
   /** 已经答上的那部分(含来源属性与仍不确定的地方)。 */
-  answered_parts?: {
-    value?: string | null;
-    field?: string | null;
-    source?: string | null;
-    provenance?: string | null;
-    still_uncertain?: string[];
-  }[];
+  answered_parts?: SafetyAnsweredPartDto[];
   still_uncertain?: string[];
 }
 
 /**
- * 持续跟进安排。`confirmed: false` = 没有可信的复核时间或触发条件,
- * 是一项**待确认的安排** —— 界面不得把它当成一个真实的复查周期。
+ * 一条答案的**核验评估**(CONTRACT.md §3.2,由 A 产出)。
+ *
+ * `status` 的四种取值与「根本没有这个键」是**五个**不同的状态,不能合并:
+ *  - `verified`    —— 在约定范围内,这条答案的**依据**已核对;
+ *  - `candidate`   —— 有候选依据,但核对未完成;
+ *  - `stale`       —— 曾有依据,但依赖的版本已变化,需要重新核对;
+ *  - `unsupported` —— 没有可支撑这条答案的依据;
+ *  - **缺失**      —— 未核实。缺失**不等于** `verified`,消费方不得补默认值。
+ *
+ * `verified` 的含义边界:它**只**说明依据核对过。它不是"用药安全",不是
+ * "风险已排除",也不是任何专业医疗判断。
+ */
+export interface SafetyAnswerAssessmentDto {
+  status: 'verified' | 'candidate' | 'stale' | 'unsupported' | string;
+  /** 具体原因,服务端原话。界面原样显示,不改写成结论。 */
+  reason: string;
+  /** 来源引用;定位不到时为 null。 */
+  source_ref: string | null;
+  /** 字段路径或片段位置;定位不到时为 null(服务端不编造)。 */
+  locator: string | null;
+  /** 版本化依赖引用,例如 `memory:medication:45@2`。 */
+  dependency_refs: string[];
+}
+
+/**
+ * 一条已答上来的答案。
+ *
+ * 后端实际下发的键比历史声明宽(11 个);这里按**兼容式扩展**补齐,不改动既有
+ * 键的语义。`assessment` 缺失时按「未核实」显示。
+ */
+export interface SafetyAnsweredPartDto {
+  value?: string | null;
+  field?: string | null;
+  source?: string | null;
+  provenance?: string | null;
+  still_uncertain?: string[];
+  source_ref?: string | null;
+  quote?: string | null;
+  origin?: string | null;
+  answer_ref?: string | null;
+  at?: string | null;
+  /** 这条答案写下时的记录版本快照。 */
+  version?: Record<string, number> | null;
+  /** 核验评估。**缺失 = 未核实**,不是 verified。 */
+  assessment?: SafetyAnswerAssessmentDto | null;
+}
+
+/**
+ * 跟进安排的触发条件。**只接受白名单结构**(CONTRACT.md §4.3);
+ * 不执行自然语言,也不接受任意表达式。未知 `kind` 服务端返回 422,
+ * 并且**不得**静默降级成"永不触发"。
+ */
+export interface SafetyFollowUpConditionDto {
+  kind: 'conclusion_recorded' | 'necessary_check' | 'medication_change'
+    | 'fact_change' | string;
+  /** 版本化引用,例如 `memory:conclusion:123@1`。 */
+  ref: string;
+  /** 仅 `conclusion_recorded` 使用。 */
+  conclusion_kind?: string | null;
+  /** 仅 `necessary_check` 使用。 */
+  check_id?: number | string | null;
+}
+
+/**
+ * 长期跟进安排(CONTRACT.md §4.2)。
+ *
+ * 两处必须分清:
+ *  1. **`kind` 与 `schedule_state` 是两件事**。`kind` 是安排的种类(按时间 /
+ *     按事件 / 仅备忘);`schedule_state` 是这条安排现在走到哪了。
+ *     `kind='arrangement'` 的安排可以永久停在 `unscheduled`,这是合法的。
+ *  2. **`confirmed` 与"有时间/有条件"是两件事**。§4.5 之后,仅有 `at` 或
+ *     `condition` ⇒ `confirmed: false`,`schedule_state` 仍可为 `scheduled`。
+ *     「已安排」不等于「已确认」。
+ *
+ * `confirmed: true` 时 `confirmed_at` 与 `confirmation_ref` 必须非空;三者不一致
+ * 的记录视为损坏,按 `confirmed: false` 读(存量老记录一律按 false 读)。
  */
 export interface SafetyFollowUpDto {
   kind: string;                  // review_at | on_event | arrangement
   confirmed: boolean;
   at?: string | null;
-  condition?: string | null;
+  /**
+   * 白名单结构(§4.3)。类型里保留 `string`,是因为存量记录可能还存着契约收紧
+   * 之前的自由文本 —— 界面如实显示它,不解析、不执行、不静默丢弃。
+   */
+  condition?: SafetyFollowUpConditionDto | string | null;
   owner?: string | null;
   note?: string | null;
   recorded_at?: string | null;
+
+  confirmed_at?: string | null;
+  confirmed_by?: string | null;
+  confirmation_ref?: string | null;
+
+  revision?: number;
+  /** scheduled | due | triggered | blocked | cancelled | unscheduled */
+  schedule_state?: string | null;
+  last_triggered_at?: string | null;
+  last_trigger_reason?: string | null;
+  care_task_id?: string | null;
+  blocked_reason?: string | null;
 }
 
 /** 提交「持续跟进」时可以带上的安排(服务端会自行判定是否可信)。 */
 export interface SafetyFollowUpInputDto {
   kind?: 'review_at' | 'on_event' | 'arrangement';
   at?: string;
-  condition?: string;
+  /** §4.3:只接受白名单结构,自由文本会被 422。 */
+  condition?: SafetyFollowUpConditionDto;
   owner?: string;
+  note?: string;
+}
+
+/**
+ * `POST /v1/safety-cases/{case_id}/follow-up` 的请求体(§4.6.1 安排/改期、
+ * §4.6.2 取消)。**没有 `confirmed` 字段**:确认只能由确认端点产生,
+ * 请求体里自称的确认一律被忽略。
+ */
+export interface SafetyFollowUpCommandDto {
+  key: string;
+  expected_revision: number;
+  action: 'schedule' | 'cancel';
+  // action='schedule' 时:
+  kind?: 'review_at' | 'on_event' | 'arrangement';
+  at?: string;
+  condition?: SafetyFollowUpConditionDto;
+  owner?: string;
+  note?: string;
+  // action='cancel' 时:
+  reason?: string;
+}
+
+/** `POST /v1/safety-cases/{case_id}/follow-up/confirmation` 的请求体(§4.6.3)。 */
+export interface SafetyFollowUpConfirmationDto {
+  key: string;
+  expected_revision: number;
   note?: string;
 }
 

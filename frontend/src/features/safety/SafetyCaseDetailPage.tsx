@@ -20,7 +20,7 @@ import { api } from '../../api/client';
 import { request, newIdempotencyKey } from '../../api/http';
 import { qk } from '../../api/queryKeys';
 import type {
-  CareTaskDto, SafetyCaseDto, SafetyClosureEvidenceDto, SafetyFollowUpInputDto,
+  CareTaskDto, SafetyCaseDto, SafetyClosureEvidenceDto,
 } from '../../api/types';
 import {
   Badge, Card, ErrorState, LiveAnnouncement, SkeletonList, TimeText,
@@ -30,27 +30,34 @@ import { RUN_PROGRESS_LABELS, RunProgressLine, type RunProgress } from '../share
 import {
   AnswerPanel, InvestigateButton, SeenButton, triggerStateTone, type AnswerReceipt,
 } from './CaseCard';
+import { AnswerPartList } from './assessment';
+import { FollowUpCard } from './FollowUpPanel';
+import {
+  fixtureModeOn, loadCareTasks, loadCase, loadClosureEvidence,
+} from './fixtureBridge';
 import {
   ANSWER_KIND_LABELS, MONITORING_NOTICE, NO_CLINICIAN_NOTICE, TRIGGER_STATE_MEANING,
-  UNCONFIRMED_FOLLOW_UP_NOTICE, UNKNOWN_ANSWER_NOTICE, answerKindLabel, basisText,
+  UNKNOWN_ANSWER_NOTICE, answerKindLabel, basisText, careTaskStatusLabel,
   caseTypeLabel, dispositionLabel, dispositionOutcome, followUpOf, followUpText,
   historyText, informationStateText, informationTargetText, partyActionLabel,
-  provenanceText, questionStrategyText, serverMessage, stateLabel, statusTone,
+  questionStrategyText, serverMessage, stateLabel, statusTone,
   traceId, triggerStateLabel, triggerText,
 } from './labels';
 
 export function SafetyCaseDetailPage(): React.ReactElement {
   const params = useParams<{ caseId: string }>();
   const caseId = params.caseId ?? '';
+  // 三个读查询都经 fixtureBridge:开发期 fixture 打开时它替换请求,
+  // 生产构建里那条分支根本不存在(见 fixtureBridge.ts 的说明)。
   const detail = useQuery({
     queryKey: qk.safetyCase(caseId),
-    queryFn: ({ signal }) => api.safetyCase(caseId, signal),
+    queryFn: ({ signal }) => loadCase(caseId, signal),
     enabled: caseId.length > 0,
     refetchInterval: 15_000,
   });
   const tasks = useQuery({
     queryKey: qk.careTasks,
-    queryFn: ({ signal }) => api.careTasks(signal),
+    queryFn: ({ signal }) => loadCareTasks(signal),
     refetchInterval: 15_000,
   });
   /**
@@ -59,7 +66,7 @@ export function SafetyCaseDetailPage(): React.ReactElement {
    */
   const evidence = useQuery({
     queryKey: qk.safetyClosureEvidence(caseId),
-    queryFn: ({ signal }) => api.safetyCaseClosureEvidence(caseId, signal),
+    queryFn: ({ signal }) => loadClosureEvidence(caseId, signal),
     enabled: caseId.length > 0,
     // 关闭条件会随记录变化:过期的"可以关闭"会是危险的假话。
     refetchInterval: 15_000,
@@ -76,6 +83,7 @@ export function SafetyCaseDetailPage(): React.ReactElement {
         <ArrowLeft size={13} aria-hidden /> 回到用药安全主线
       </Link>
 
+      {fixtureModeOn() && <FixtureBanner />}
       {!caseId && <ErrorState error="链接里没有事项编号。" title="链接不完整" />}
       {detail.isPending && caseId.length > 0 && <SkeletonList rows={4} />}
       {detail.isError && (
@@ -110,6 +118,8 @@ export function SafetyCaseDetailPage(): React.ReactElement {
 
           <WhatToDoStep view={view} task={task} onAnswered={setReceipt} />
 
+          <FollowUpCard view={view} task={task} />
+
           <DeltaStep view={view} receipt={receipt} task={task} />
 
           <EvidenceRefsCard view={view} />
@@ -143,6 +153,28 @@ export function SafetyCaseDetailPage(): React.ReactElement {
           </details>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * 开发期 fixture 的显式提示。
+ *
+ * 加了这一个条幅,是为了让"这一页显示的是合成数据"永远是**看得见的事实** ——
+ * 没有它,一张画得很像的 fixture 页面会被当成真实事项读。
+ */
+function FixtureBanner(): React.ReactElement {
+  return (
+    <div role="status"
+      className="rounded-card border border-caution/40 bg-caution-soft px-4 py-3 text-sm">
+      <p className="font-medium text-caution">开发期 fixture 已打开：本页显示的是合成数据</p>
+      <p className="mt-1 text-ink-secondary">
+        这一页没有连接真实后端，也没有真实患者数据、没有调用模型。
+        场景可用 <span className="font-mono">?fx=legacy</span>（旧记录）、
+        <span className="font-mono"> ?fx=empty</span>（空数据）、
+        <span className="font-mono"> ?fx=conflict</span>（版本冲突）、
+        <span className="font-mono"> ?fx=failure</span>（提交失败）切换。
+      </p>
     </div>
   );
 }
@@ -408,14 +440,8 @@ function StillUncertainStep({ view, evidence }: {
                     查到了什么程度：{informationStateText(item.information_state)}
                   </p>
                 )}
-                {(item.answered_parts ?? []).map((part, index) => (
-                  <p key={index} className="text-xs text-ink-secondary">
-                    已经拿到：{part.value}
-                    {part.field ? `（${part.field}）` : ''}
-                    {provenanceText(part.provenance)
-                      ? `；来源属性：${provenanceText(part.provenance)}` : ''}
-                  </p>
-                ))}
+                <AnswerPartList parts={item.answered_parts}
+                  emptyHint="这条问题还没有拿到任何一部分内容。" />
                 {(item.still_uncertain ?? []).length > 0 && (
                   <p className="text-xs text-caution">
                     仍不能判断：{(item.still_uncertain ?? []).join('、')}
@@ -439,18 +465,16 @@ function StillUncertainStep({ view, evidence }: {
             {(view.answered_inputs ?? []).map((item) => (
               <li key={item.request_id}>
                 <span className="font-medium">问题：</span>{item.question}
-                {(item.answered_parts ?? []).map((part, index) => (
-                  <p key={index} className="text-xs text-ink-secondary">
-                    已经拿到：{part.value}
-                    {provenanceText(part.provenance)
-                      ? `；来源属性：${provenanceText(part.provenance)}` : ''}
-                    {(part.still_uncertain ?? []).length > 0
-                      ? `；仍不能判断：${(part.still_uncertain ?? []).join('、')}` : ''}
-                  </p>
-                ))}
-                {(item.answered_parts ?? []).length === 0 && (
+                {informationStateText(item.information_state) && (
                   <p className="text-xs text-ink-muted">
-                    这一条已经收到补充；具体依据见下方经过与依据。
+                    查到了什么程度：{informationStateText(item.information_state)}
+                  </p>
+                )}
+                <AnswerPartList parts={item.answered_parts}
+                  emptyHint="这一条已经收到补充，但没有记录下具体内容；具体依据见下方「经过」。" />
+                {(item.still_uncertain ?? []).length > 0 && (
+                  <p className="text-xs text-caution">
+                    仍不能判断：{(item.still_uncertain ?? []).join('、')}
                   </p>
                 )}
               </li>
@@ -582,11 +606,10 @@ function WhatToDoStep({ view, task, onAnswered }: {
       {view.status === 'monitoring' && (
         <div className="rounded-lg border border-caution/30 bg-caution-soft/40 px-3 py-2">
           <p className="text-caution">{MONITORING_NOTICE}</p>
-          <p className="mt-1">跟进安排：{followUpText(followUp)}</p>
-          {/* 只有拿到了安排、且服务端判定它不可信时才这么说——没拿到安排是另一回事。 */}
-          {followUp && !followUp.confirmed && (
-            <p className="mt-1 text-xs text-ink-secondary">{UNCONFIRMED_FOLLOW_UP_NOTICE}</p>
-          )}
+          <p className="mt-1">
+            跟进安排：{followUpText(followUp)}
+            {' '}要查看它现在算不算数、并做确认/改期/取消，见下方「下一次跟进」。
+          </p>
         </div>
       )}
       <AnswerPanel view={view} onAnswered={onAnswered} />
@@ -764,20 +787,6 @@ function EvidenceRefsCard({ view }: { view: SafetyCaseDto }): React.ReactElement
 
 // ---- 调查过程明细(折叠) ------------------------------------------------------
 
-const CARE_TASK_STATUS_LABELS: Record<string, string> = {
-  ready: '可以继续',
-  running: '正在处理',
-  waiting_input: '等待补充',
-  waiting_review: '等待本地模拟审核',
-  completed: '已完成',
-  cancelled: '已取消',
-  failed: '处理未完成',
-};
-
-function careTaskStatusLabel(status: string): string {
-  return CARE_TASK_STATUS_LABELS[status] ?? `未识别状态（${status}）`;
-}
-
 /**
  * 工具调用与预算的明细。**故意收在折叠区里**:它们是核对用的过程记录,不是结论,
  * 也不该被读成"做了多少步 = 这件事查得多清楚"。
@@ -896,8 +905,6 @@ function DispositionPanel({ view, evidence }: {
   const client = useQueryClient();
   const [mode, setMode] = useState<DispositionMode>('accepted_monitoring');
   const [note, setNote] = useState('');
-  const [reviewAt, setReviewAt] = useState('');
-  const [condition, setCondition] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [trace, setTrace] = useState<string | null>(null);
@@ -914,21 +921,8 @@ function DispositionPanel({ view, evidence }: {
     setTrace(null);
     setDone('');
     try {
-      let followUp: SafetyFollowUpInputDto | undefined;
-      if (mode === 'accepted_monitoring') {
-        if (reviewAt) {
-          const at = new Date(reviewAt);
-          if (Number.isNaN(at.getTime())) {
-            setError('复核时间的格式无法识别，请重新选择时间后再提交。');
-            setBusy(false);
-            return;
-          }
-          followUp = { kind: 'review_at', at: at.toISOString(), owner: 'caregiver' };
-        } else if (condition.trim()) {
-          followUp = { kind: 'on_event', condition: condition.trim(), owner: 'caregiver' };
-        }
-        // 两项都不填:不发送 follow_up —— 服务端会如实记成"待确认的安排"。
-      }
+      // **不在这里安排跟进**。时间与条件改由下方「下一次跟进」统一安排:
+      // 那里用的是白名单结构(§4.3),而且不会把"排了期"说成"已确认"(§4.5)。
       const updated = await api.safetyCaseDisposition(view.case_id, {
         key: newIdempotencyKey(),
         expected_revision: view.revision,
@@ -936,13 +930,12 @@ function DispositionPanel({ view, evidence }: {
         basis_kind: mode === 'escalated_to_professional'
           ? 'user_reported' : 'deterministic_check_completed',
         note: note.trim() || undefined,
-        ...(followUp ? { follow_up: followUp } : {}),
       });
       setNote('');
-      setReviewAt('');
-      setCondition('');
       setDone(`处置已记录，事项现在是「${updated.status_label}」。`
-        + (updated.next_action_summary ? `下一步：${updated.next_action_summary}` : ''));
+        + (updated.next_action_summary ? `下一步：${updated.next_action_summary}` : '')
+        + (mode === 'accepted_monitoring'
+          ? '这件事还没有跟进安排——请在下方「下一次跟进」里排一次。' : ''));
       await client.invalidateQueries({ queryKey: qk.safetyMainline });
       await client.invalidateQueries({ queryKey: qk.safetyCases });
       await client.invalidateQueries({ queryKey: qk.safetyClosureEvidence(view.case_id) });
@@ -1074,20 +1067,14 @@ function DispositionPanel({ view, evidence }: {
         {mode === 'accepted_monitoring' && (
           <div className="space-y-2 rounded-lg bg-surface-alt px-3 py-2">
             <p className="text-ink-secondary">
-              可以填一项跟进的依据（时间或触发条件）。两项都不填也可以提交：
-              服务端会如实记成「尚无可信依据的复核时间或触发条件；这是一项待确认的安排」，
+              这一步只记下「持续跟进」这个处置，不会同时排一个复核时间：
+              服务端会把安排如实记成「尚无可信依据的复核时间或触发条件；这是一项待确认的安排」，
               不会替您编一个复查周期。
             </p>
-            <label className="block">
-              <span className="text-xs text-ink-muted">复核时间（可选）</span>
-              <input type="datetime-local" className={inputClass} value={reviewAt}
-                onChange={(event) => setReviewAt(event.target.value)} />
-            </label>
-            <label className="block">
-              <span className="text-xs text-ink-muted">触发条件（可选，例如「出现黑便时」）</span>
-              <input className={inputClass} value={condition}
-                onChange={(event) => setCondition(event.target.value)} />
-            </label>
+            <p className="text-xs text-ink-muted">
+              要排时间或触发条件，用下方「下一次跟进」——那里记录的是白名单触发条件，
+              而且排了期不等于已确认：确认要在那里单独做一次。
+            </p>
           </div>
         )}
 
