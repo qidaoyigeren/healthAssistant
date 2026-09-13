@@ -7,7 +7,8 @@
  */
 import { ApiError } from '../../api/http';
 import type {
-  SafetyBasisDto, SafetyCaseDto, SafetyFollowUpDto, SafetyTriggerDto,
+  SafetyAnswerAssessmentDto, SafetyBasisDto, SafetyCaseDto, SafetyFollowUpConditionDto,
+  SafetyFollowUpDto, SafetyTriggerDto,
 } from '../../api/types';
 
 // ---- 枚举 → 中文 -------------------------------------------------------------
@@ -130,27 +131,142 @@ export function followUpKindLabel(kind: string | null | undefined): string {
 }
 
 /**
+ * 跟进安排的时间 → 一个**时刻**，不是一串被截断的字符。
+ *
+ * CONTRACT.md §4.4 之后服务端把 `at` 规范化成 `+00:00` 秒精度，所以 `（UTC）`
+ * 这个标注本身是对的；但它此前是靠 `at.slice(0, 16)` 截出来的，遇到毫秒 + `Z`
+ * 或别的偏移量就会把"截出来的墙钟"当成 UTC 显示。这里改成从**解析出的时刻**
+ * 算 UTC 墙钟：无论存量记录写的是哪种偏移量，显示的都是同一个时刻。
+ */
+export function followUpAtText(at: string | null | undefined): string {
+  if (!at) return '未记录时间';
+  const parsed = new Date(at);
+  if (Number.isNaN(parsed.getTime())) return `${at}（时间格式无法识别，按原样显示）`;
+  return `${parsed.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+}
+
+/** 触发条件白名单的种类(§4.3)，与 `safety_checks.py` 的触发器词汇同一套。 */
+export const FOLLOW_UP_CONDITION_KIND_LABELS: Record<string, string> = {
+  conclusion_recorded: '某条结论被记录时',
+  necessary_check: '某项必要检查完成时',
+  medication_change: '用药集合变化时',
+  fact_change: '患者事实变化时',
+};
+
+/**
+ * 触发条件 → 一句人话。
+ *
+ * 存量记录里可能还存着契约收紧之前的**自由文本**。那种值既不能被执行、也不能
+ * 假装它是一条可用的触发条件，所以如实标注它是旧写法，而不是把它渲染成正常条件。
+ */
+export function followUpConditionText(
+  condition: SafetyFollowUpConditionDto | string | null | undefined,
+): string {
+  if (!condition) return '未记录触发条件';
+  if (typeof condition === 'string') {
+    return `${condition}（旧版自由文本；契约收紧后新记录只接受白名单条件，本条不会被当成分辨得出的触发条件）`;
+  }
+  const kind = FOLLOW_UP_CONDITION_KIND_LABELS[condition.kind]
+    ?? `未识别的触发条件种类（${condition.kind}）`;
+  const parts = [kind];
+  if (condition.ref) parts.push(`对象：${condition.ref}`);
+  if (condition.conclusion_kind) parts.push(`结论种类：${condition.conclusion_kind}`);
+  if (condition.check_id !== undefined && condition.check_id !== null) {
+    parts.push(`检查编号：${condition.check_id}`);
+  }
+  return parts.join('，');
+}
+
+/** 这条安排现在走到哪了。与 `kind`(安排的种类)是两件事，不能合并。 */
+export const SCHEDULE_STATE_LABELS: Record<string, string> = {
+  scheduled: '已排期（尚未到期）',
+  due: '已到期，等待执行',
+  triggered: '已触发',
+  blocked: '执行受阻',
+  cancelled: '已取消',
+  unscheduled: '未排期（既没有时间也没有触发条件）',
+};
+
+export function scheduleStateLabel(state: string | null | undefined): string {
+  if (!state) return '调度状态未记录';
+  return SCHEDULE_STATE_LABELS[state] ?? `未识别的调度状态（${state}）`;
+}
+
+export function scheduleStateTone(state: string | null | undefined):
+'primary' | 'caution' | 'danger' | 'neutral' {
+  if (state === 'triggered') return 'primary';
+  if (state === 'blocked') return 'danger';
+  if (state === 'due' || state === 'unscheduled') return 'caution';
+  return 'neutral';
+}
+
+/** 安排的种类(按时间/按事件/仅备忘) → 谁来做这件事。个人提醒与专业复核不是一回事。 */
+export function followUpOwnerText(owner: string | null | undefined): string {
+  if (!owner) return '未记录这项安排由谁做';
+  if (owner === 'caregiver') return '个人提醒（由您自己按这条安排跟进）';
+  if (owner === 'professional') return '专业复核安排（需要医生或药师的判断）';
+  return `未识别的执行方（${owner}）`;
+}
+
+/**
+ * 这条安排的确认记录可信吗。
+ *
+ * §4.5:`confirmed: true` 必须同时有 `confirmed_at` 与 `confirmation_ref`；
+ * 三者不一致的记录视为损坏。存量老记录(有 `confirmed=true` 但没有确认记录)
+ * 也走这一条——一律按未确认读。界面绝不把一条没有确认记录的安排显示成已确认。
+ */
+export function confirmationIsRecorded(followUp: SafetyFollowUpDto): boolean {
+  return followUp.confirmed === true
+    && !!followUp.confirmed_at && !!followUp.confirmation_ref;
+}
+
+/** 「已安排但尚未确认」：本轮要建立的那一处关键区分。 */
+export function isScheduledNotConfirmed(followUp: SafetyFollowUpDto): boolean {
+  return !confirmationIsRecorded(followUp)
+    && (followUp.schedule_state === 'scheduled' || followUp.schedule_state === 'due');
+}
+
+/**
  * 跟进安排 → 一句**说清它算不算数**的话。
- * `confirmed` 为假时说的是"这是一项待确认的安排",绝不当成真实复查周期展示。
+ *
+ * 三层区分,一层都不能省:
+ *  1. 有没有安排(没拿到字段 ≠ 没有风险,也 ≠ 已经安排好);
+ *  2. 排了期没有(`schedule_state`) —— "已安排"不是"已确认";
+ *  3. 有没有**确认记录**(`confirmed_at` + `confirmation_ref`)。
  */
 export function followUpText(followUp: SafetyFollowUpDto | null | undefined): string {
   if (!followUp) {
     return '本次读取没有拿到跟进安排（服务端未返回该字段）。'
       + '这不代表没有风险，也不代表已经安排好了。';
   }
-  const owner = followUp.owner ? `，记录人：${followUp.owner}` : '';
-  if (!followUp.confirmed) {
-    const note = followUp.note?.trim() ? followUp.note.trim() : UNCONFIRMED_FOLLOW_UP_NOTICE;
-    const plain = note.includes('待确认') ? note : `${note}；${UNCONFIRMED_FOLLOW_UP_NOTICE}`;
-    return `${followUpKindLabel(followUp.kind)}：${plain}（这不是一个真实的复查周期）${owner}`;
+  const owner = followUp.owner ? `，执行方：${followUpOwnerText(followUp.owner)}` : '';
+  const confirmed = confirmationIsRecorded(followUp);
+  const corrupted = followUp.confirmed === true && !confirmed;
+  const detail = followUp.kind === 'review_at'
+    ? `约定时间复核：${followUpAtText(followUp.at)}`
+    : followUp.kind === 'on_event'
+      ? `满足条件时复核：${followUpConditionText(followUp.condition)}`
+      : followUpKindLabel(followUp.kind);
+
+  if (confirmed) {
+    return `${detail}；已确认（${followUpAtText(followUp.confirmed_at)}`
+      + `${followUp.confirmed_by ? `，由 ${followUp.confirmed_by}` : ''}`
+      + `${followUp.confirmation_ref ? `，确认记录 ${followUp.confirmation_ref}` : ''}）${owner}`;
   }
-  if (followUp.kind === 'review_at' && followUp.at) {
-    return `约定时间复核：${followUp.at.slice(0, 16).replace('T', ' ')}（UTC）${owner}`;
+
+  // 排了期但没有确认记录 —— 这正是"已安排、尚未确认"。
+  if (isScheduledNotConfirmed(followUp)) {
+    return `${detail}；调度状态：${scheduleStateLabel(followUp.schedule_state)}。`
+      + '这条安排已经排期，但还没有确认记录，因此不算一个已确认的复查周期。'
+      + `${owner}`;
   }
-  if (followUp.kind === 'on_event' && followUp.condition) {
-    return `满足条件时复核：${followUp.condition}${owner}`;
-  }
-  return `跟进安排（${followUpKindLabel(followUp.kind)}）${owner}`;
+
+  const note = followUp.note?.trim() ? followUp.note.trim() : UNCONFIRMED_FOLLOW_UP_NOTICE;
+  const plain = note.includes('待确认') ? note : `${note}；${UNCONFIRMED_FOLLOW_UP_NOTICE}`;
+  return `${followUpKindLabel(followUp.kind)}：${plain}`
+    + `${corrupted
+      ? '（这条记录自称已确认，但缺少确认时间或确认记录，按未确认显示）' : ''}`
+    + `（这不是一个真实的复查周期）${owner}`;
 }
 
 /**
@@ -468,4 +584,188 @@ export const PROVENANCE_LABELS: Record<string, string> = {
 export function provenanceText(value?: string | null): string | null {
   if (!value) return null;
   return PROVENANCE_LABELS[value] ?? `未识别的来源属性（${value}）`;
+}
+
+// ---- 答案的可信性:assessment(CONTRACT.md §3)---------------------------------
+
+/**
+ * 「依据已核对」的含义边界。**这句话必须跟着 `verified` 一起出现**:
+ * `verified` 只说明这条答案的依据在约定范围内核对过,绝不表示用药安全、
+ * 风险已经排除,也不是任何专业医疗判断。
+ */
+export const VERIFIED_SCOPE_NOTICE =
+  '「依据已核对」只说明这条答案所依据的材料在约定范围内核对过。'
+  + '它不表示用药安全，不表示风险已经排除，也不是医生或药师的判断。';
+
+/** 缺 assessment 时显示什么。**缺失不等于 verified**,这一条是硬约束。 */
+export const ASSESSMENT_MISSING_LABEL = '未核实（没有核验记录）';
+
+/** 四个 `status` 的标签。加上"缺失",一共五个视觉状态。 */
+export const ASSESSMENT_STATUS_LABELS: Record<string, string> = {
+  verified: '依据已核对',
+  candidate: '候选依据，尚未核对完',
+  stale: '来源已变化，需要重新核对',
+  unsupported: '没有可支撑的依据',
+};
+
+export function assessmentLabel(status: string | null | undefined): string {
+  if (!status) return ASSESSMENT_MISSING_LABEL;
+  return ASSESSMENT_STATUS_LABELS[status] ?? `未识别的核验状态（${status}）`;
+}
+
+/** 五个视觉状态的配色。文字徽标同时表义,不靠颜色单独区分。 */
+export function assessmentTone(status: string | null | undefined):
+'primary' | 'caution' | 'danger' | 'neutral' {
+  if (status === 'verified') return 'primary';
+  if (status === 'stale') return 'danger';
+  if (status === 'candidate' || status === 'unsupported') return 'caution';
+  return 'neutral';   // 缺失
+}
+
+/**
+ * 一条答案的**依据到底是什么** —— 把 `status` 与既有 `provenance` 合起来读。
+ *
+ * 五种要分清的情形:
+ *  - 与当前有效记录一致        (verified + authoritative_record)
+ *  - 来源原文记载              (verified + reference_evidence / material_record)
+ *  - 用户提供、待确认          (candidate + user_reported)
+ *  - 模型解释候选              (candidate,其余)
+ *  - 来源变化，需要重新核对    (stale)
+ * 外加"没有可支撑的依据"(unsupported)与"未核实"(缺 assessment)。
+ */
+export function assessmentMeaning(
+  assessment: SafetyAnswerAssessmentDto | null | undefined,
+  provenance: string | null | undefined,
+): { headline: string; detail: string } {
+  if (!assessment) {
+    return {
+      headline: ASSESSMENT_MISSING_LABEL,
+      detail: '这条答案没有核验记录。没有核验记录不等于已经核对通过，'
+        + '也不能按"已验证"理解——请按「依据尚未核对」来看它。',
+    };
+  }
+  const reason = assessment.reason?.trim();
+  const because = reason ? `服务端给出的原因：${reason}` : null;
+  const join = (...parts: (string | null)[]) => parts.filter(Boolean).join('');
+  // 注意:`VERIFIED_SCOPE_NOTICE` **不**写进 detail —— 它由调用方在 verified
+  // 徽标下面单独渲染一次。写两遍只会让这句边界显得像套话。
+  switch (assessment.status) {
+    case 'verified':
+      if (provenance === 'authoritative_record') {
+        return {
+          headline: '与当前有效记录一致',
+          detail: join('这条答案取自当前有效的患者记录，核对了它依据的记录版本。', because),
+        };
+      }
+      if (provenance === 'reference_evidence') {
+        return {
+          headline: '来源原文记载（已核对）',
+          detail: join('这条答案的依据是一段已回读的参考资料原文，核对方式是与原文逐字比对。',
+            because),
+        };
+      }
+      if (provenance === 'material_record') {
+        return {
+          headline: '与上传材料的记载一致（材料本身未经核实）',
+          detail: join('这条答案与您上传材料里的记载一致；材料写了什么已经核对，',
+            '但材料本身说了什么不等于事实。', because),
+        };
+      }
+      if (provenance === 'professional_opinion') {
+        return {
+          headline: '与已记录的专业意见一致（本系统未连接真实医护服务）',
+          detail: join('依据是一条已记录的专业意见。', because),
+        };
+      }
+      return {
+        headline: '依据已核对（来源属性未记录）',
+        detail: join('服务端判定这条答案的依据已核对，但没有记录来源属性。', because),
+      };
+    case 'candidate':
+      if (provenance === 'user_reported') {
+        return {
+          headline: '用户提供、待确认',
+          detail: join('这条答案来自您提供的信息。',
+            '您陈述的内容不会因为被记下来就变成已核实的事实，需要另行核对。', because),
+        };
+      }
+      if (provenance === 'professional_opinion') {
+        return {
+          headline: '专业意见候选（尚未核对完）',
+          detail: join('这条答案的依据是一条专业意见，核对尚未完成。', because),
+        };
+      }
+      return {
+        headline: '模型解释候选（依据尚未核对完）',
+        detail: join('这条答案有候选依据，但核对没有完成——它现在是一条候选，不是结论。',
+          because),
+      };
+    case 'stale':
+      // 依赖的版本由调用方单独渲染一条警示,这里不重复列一遍。
+      return {
+        headline: '来源变化，需要重新核对',
+        detail: join('这条答案曾经有依据，但它依赖的记录版本已经变化，'
+          + '因此不再适用于当前记录，需要重新核对。', because),
+      };
+    case 'unsupported':
+      return {
+        headline: '没有可支撑的依据',
+        detail: join('服务端没有找到能支撑这条答案的依据。',
+          '这不代表这条内容是错的，只表示它现在没有依据。', because),
+      };
+    default:
+      return {
+        headline: `未识别的核验状态（${assessment.status}）`,
+        detail: join('这条核验状态读不出来，不能按"已核对"理解。', because),
+      };
+  }
+}
+
+/** 依赖版本引用 → 一句人话(空数组时说清楚"没有记录依赖")。 */
+export function dependencyRefsText(refs: string[] | undefined): string {
+  if (!refs || refs.length === 0) return '这条答案没有记录它依赖的记录版本。';
+  return `它依赖的记录版本：${refs.join('、')}。`;
+}
+
+/** 原文定位:`locator` 定位不到时服务端给 null——界面不替它编一个位置。 */
+export function locatorText(locator: string | null | undefined): string {
+  return locator?.trim()
+    ? `原文定位：${locator}`
+    : '这条答案没有记录原文定位（服务端未给出可定位的位置）。';
+}
+
+// ---- 长期跟进:措辞约束 -------------------------------------------------------
+
+/** 填写时间/条件**不**等于确认。这句必须出现在排期表单旁边。 */
+export const SCHEDULE_IS_NOT_CONFIRMATION_NOTICE =
+  '填写时间或触发条件只表示「排了期」，不表示已确认。'
+  + '确认是另一次单独的操作，且只会记录您本人这一次的确认。';
+
+/** 没有已排期的安排时，确认按钮为什么不可用。 */
+export const NOTHING_TO_CONFIRM_NOTICE =
+  '现在没有已排期（或已到期）的安排，因此没有可以确认的东西。'
+  + '请先安排一次跟进，再做确认。';
+
+/** 取消不删历史。 */
+export const CANCEL_KEEPS_HISTORY_NOTICE =
+  '取消不会删掉这条安排的时间与条件——历史留着，只是调度状态变成「已取消」。';
+
+// ---- 执行任务状态 ------------------------------------------------------------
+
+/**
+ * 关联执行任务的状态。到期、排队、等待用户、执行失败必须各自说清 ——
+ * 它们不是同一件事,也不能都读成"在处理中"。
+ */
+export const CARE_TASK_STATUS_LABELS: Record<string, string> = {
+  ready: '可以继续',
+  running: '正在处理',
+  waiting_input: '等待补充',
+  waiting_review: '等待本地模拟审核',
+  completed: '已完成',
+  cancelled: '已取消',
+  failed: '处理未完成',
+};
+
+export function careTaskStatusLabel(status: string): string {
+  return CARE_TASK_STATUS_LABELS[status] ?? `未识别状态（${status}）`;
 }
