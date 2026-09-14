@@ -684,7 +684,8 @@ class CareTasks:
         # 问题状态回写到事项上（**派生**，不是第二份真相）：问题由调查状态
         # 权威维护，事项上的请求只是它的投影。已经拿到适用依据的问题不再挂在
         # "等您补充"里；只答上一部分的把已知部分与剩余缺口一起显示出来。
-        self._sync_questions_to_case(store, case['id'], inv)
+        inv = self._sync_questions_to_case(store, case['id'], inv)
+        task['investigation'] = inv
 
         # 这一次如果是一次**回访**，把它的结果落下来。
         # 回访记录只存引用与渲染后的叙述（见 `review_visits`），患者事实、药单、
@@ -793,17 +794,24 @@ class CareTasks:
         if changed:
             task['investigation'] = investigation.to_dict()
 
-    def _sync_questions_to_case(self, store, case_id, inv) -> None:
-        """把调查里每条问题的状态投到事项的对应请求上。
+    def _sync_questions_to_case(self, store, case_id, inv):
+        """把调查里每条问题的状态投到事项的对应请求上，**并把重开反向同步回去**。
 
         `required_inputs` 只是**视图**：它跟随问题走，不自己保存一份 answered。
+
+        投影是双向的。只做"问题 → 请求"这一半时，记录变化重开了一条请求，
+        而 investigation 里那条答案的 assessment 仍是 `verified`——界面会同时
+        看到"这条要重新补充"和"这条的答案仍然可靠"。返回（可能被改写的）``inv``，
+        调用方负责存回任务：investigation 状态在任务上，不在事项上。
         """
-        from .investigation import INFO_AVAILABLE, is_question_answered
+        from .investigation import INFO_AVAILABLE, is_question_answered, InvestigationState
+        from .product import SCOPE as _SCOPE
         questions = (inv or {}).get('questions') or []
         if not questions:
-            return
+            return inv
         by_id = {safety_case_request_id(case_id, q): q for q in questions
                  if q.get('question_id')}
+        state = InvestigationState.restore(inv, _SCOPE)
         with self.p.transaction():
             case = store.get(case_id)
             changed = False
@@ -824,9 +832,31 @@ class CareTasks:
                     request['answered_at'] = question.get('answered_at') or utc_now()
                 changed = True
             if changed:
+                # 先按被引用的真相重算状态——**重开过期回答正是这一步做的**。
                 store.derive_status(case)
+                # 再反向同步。顺序反了的话，重开发生在反向同步之后，
+                # 两边要等到下一轮运行时才一致。
+                if self._invalidate_reopened_answers(state, case):
+                    changed = True
                 case['revision'] += 1
                 self.p.save('safety_case', case)
+        return state.to_dict() if changed else inv
+
+    def _invalidate_reopened_answers(self, state, case) -> bool:
+        """事项上被重开的请求 → 调查里那条答案也不再可靠。"""
+        changed = False
+        for request in case.get('required_inputs') or []:
+            if request.get('status') != 'open' or not request.get('answer_invalidated'):
+                continue
+            request_id = str(request.get('request_id') or '')
+            question_id = request_id[len(f'case:{case["id"]}:'):] \
+                if request_id.startswith(f'case:{case["id"]}:') else request_id
+            if state.invalidate_answer(
+                    question_id,
+                    str(request.get('reopened_reason') or '记录变化使这条回答不再适用')):
+                changed = True
+            request.pop('answer_invalidated', None)
+        return changed
 
     def _record_visit_outcome(self, task, store, case, inv) -> None:
         """把这一轮的结果记进**这次回访**（如果有的话）。

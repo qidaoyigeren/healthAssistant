@@ -775,11 +775,36 @@ class SafetyCaseStore:
         self.derive_status(case)
         return case
 
+    def dependency_scopes_for(self, item: dict[str, Any]) -> list[str] | None:
+        """这条请求的回答**依赖**哪些记录范围。
+
+        解析不出来时返回 ``None``，调用方按**旧口径**处理（记录一变就重开）。
+        方向与 `retire_stale_answers` 原本的注释一致：重新打开是保守方向，
+        宁可再问一次——所以"不知道它依赖什么"只能落在"全都算依赖"那一侧。
+        """
+        subjects = [str(ref) for ref in (item.get('subject_refs') or [])]
+        if not subjects:
+            return None
+        scopes = set()
+        for ref in subjects:
+            if ref.startswith('memory:medication'):
+                scopes.add('medications')
+            elif ref.startswith('memory:'):
+                scopes.add('semantic')
+            else:
+                # 引用的是事项自己、材料或证据：它们不在这套版本范围里，
+                # 按依赖什么也说不清处理。
+                return None
+        return sorted(scopes) if scopes else None
+
     def retire_stale_answers(self, case: dict[str, Any]) -> dict[str, Any]:
         """回答之后事实变了 → 那条回答不再适用于当前状态，重新打开该问题。
 
         只影响**依赖当前记录版本**的回答。重新打开是保守方向：宁可再问一次，
         也不要拿一条针对旧状态的回答去支撑新状态下的判断。
+
+        比较的是这条回答**真正依赖的范围**，不是"记录整体变没变"：后者会让
+        任何无关变化把全部已回答问题重新问一遍，用户回来一次就要重答一遍。
 
         这与 `require_input` 的按 id 去重是两件事：去重防止"每次恢复都生成新问题"，
         这里防止"一个历史 answered 永久阻止重新核对"。两条一起才成立。
@@ -792,8 +817,18 @@ class SafetyCaseStore:
             recorded = item.get('answered_against') or {}
             if recorded == current:
                 continue
+            scopes = self.dependency_scopes_for(item)
+            if scopes is not None and not any(recorded.get(scope) != current.get(scope)
+                                              for scope in scopes):
+                # 变的是别的范围，这条回答仍然适用于它依赖的那些记录。
+                continue
             item['status'] = 'open'
             item['reopened_reason'] = '记录在回答之后发生变化，这条回答不再适用于当前状态'
+            item['reopened_scopes'] = list(scopes) if scopes is not None else sorted(current)
+            # 请求重开与答案失效是**同一件事的两面**：只重开请求，investigation
+            # 里那条答案的 assessment 仍然是 verified，界面会同时看到"要重新补充"
+            # 和"答案仍可靠"。这个标记就是给反向同步读的。
+            item['answer_invalidated'] = True
             item['answer_ref'] = None
             # 注意区分：这里**要**再问这位用户一次（回答过期了），所以不设
             # ``needs_alternative_evidence``——那是"用户说不知道、别再等他"的标记。
@@ -802,6 +837,7 @@ class SafetyCaseStore:
             case['history'].append({'at': utc_now(), 'event': 'answer_retired',
                                     'request_id': item['request_id'],
                                     'reason': item['reopened_reason'],
+                                    'scopes': list(item['reopened_scopes']),
                                     'answered_against': recorded, 'now': current})
         if reopened:
             case['updated_at'] = utc_now()

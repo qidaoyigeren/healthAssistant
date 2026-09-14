@@ -430,5 +430,110 @@ class ModelProposalTests(unittest.TestCase):
                       investigation.allowed_tools(self.inv))
 
 
+class ReopenScopeTests(_VisitFixture):
+    """重开只看这条回答**真正依赖**的范围，不因无关变化重问全部问题。"""
+
+    def _answered(self, case, *, subject_refs, key):
+        request_id = f"case:{case['id']}:{key}"
+        self.cases.require_input(case['id'], request_id=request_id,
+                                 question='当前的剂量是多少？', fields=['dose'],
+                                 subject_refs=list(subject_refs),
+                                 command_key=f'req-{key}')
+        return self.cases.record_input(case['id'], request_id=request_id,
+                                       answer_ref=f'answer-{key}', value='5mg',
+                                       answer_kind=sc.ANSWER_PROVIDED,
+                                       command_key=f'ans-{key}')
+
+    def _current(self, case_id, request_id):
+        case = self.cases.get(case_id)
+        return next(item for item in case['required_inputs']
+                    if item['request_id'] == request_id)
+
+    def test_a_change_to_the_scope_this_answer_depends_on_reopens_it(self):
+        case = self.open_case()
+        medication = case['related_medication_refs'][0]
+        case = self._answered(case, subject_refs=[medication], key='med')
+        request_id = f"case:{case['id']}:med"
+        self.assertEqual('answered', self._current(case['id'], request_id)['status'])
+
+        self.add_drug('合成药丙', key='v3')
+        case = self.cases.get(case['id'])
+        self.cases.derive_status(case)
+        self.product.save(sc.KIND, case)
+
+        reopened = self._current(case['id'], request_id)
+        self.assertEqual('open', reopened['status'])
+        self.assertIn('medications', reopened['reopened_scopes'])
+
+    def test_an_unrelated_scope_change_does_not_reopen_the_question(self):
+        """这条回答只依赖"相关背景"；只改用药记录，不该把它重新问一遍。"""
+        case = self.open_case()
+        case = self._answered(case, subject_refs=['memory:conclusion:1@v1'], key='fact')
+        request_id = f"case:{case['id']}:fact"
+
+        self.add_drug('合成药丙', key='v3')
+        case = self.cases.get(case['id'])
+        self.cases.derive_status(case)
+        self.product.save(sc.KIND, case)
+
+        self.assertEqual('answered', self._current(case['id'], request_id)['status'])
+
+    def test_an_answer_whose_scope_cannot_be_resolved_reopens_conservatively(self):
+        """解析不出依赖范围时按旧口径处理——重新打开是保守方向，宁可再问一次。"""
+        case = self.open_case()
+        case = self._answered(case, subject_refs=[], key='bare')
+        request_id = f"case:{case['id']}:bare"
+        self.assertIsNone(self.cases.dependency_scopes_for(
+            self._current(case['id'], request_id)))
+
+        self.add_drug('合成药丙', key='v3')
+        case = self.cases.get(case['id'])
+        self.cases.derive_status(case)
+        self.product.save(sc.KIND, case)
+
+        self.assertEqual('open', self._current(case['id'], request_id)['status'])
+
+
+class InvalidatedAnswerTests(unittest.TestCase):
+    """答案自己承认不再适用——与请求重开是同一件事的两面。"""
+
+    def _state(self, *, status='verified'):
+        from stage0 import investigation
+        state = investigation.InvestigationState('目标', 'scope')
+        state.questions.append({
+            'question_id': 'q:1', 'statement': '当前剂量是多少？',
+            'target_field': 'dose', 'status': investigation.QUESTION_STATUS_ANSWERED,
+            'information_state': investigation.INFO_AVAILABLE,
+            'answers': [{'value': '5mg',
+                         'assessment': {'status': status, 'reason': '原来成立',
+                                        'source_ref': 'memory:medication:1'}}]})
+        return state
+
+    def test_a_verified_answer_becomes_stale_when_its_record_moved(self):
+        state = self._state()
+        self.assertTrue(state.invalidate_answer('q:1', '记录在回答之后发生变化'))
+
+        question = state.question('q:1')
+        assessment = question['answers'][0]['assessment']
+        self.assertEqual('stale', assessment['status'])
+        self.assertIn('记录在回答之后发生变化', assessment['reason'])
+        # 问题本身也重开——否则界面会同时看到"要重新补充"和"答案仍可靠"。
+        self.assertEqual('open', question['status'])
+
+    def test_an_answer_that_was_only_a_candidate_is_left_alone(self):
+        """候选答案本来就没被当成依据，不因记录变化再改一次它的性质。"""
+        state = self._state(status='candidate')
+        state.invalidate_answer('q:1', '记录变化')
+        self.assertEqual('candidate',
+                         state.question('q:1')['answers'][0]['assessment']['status'])
+
+    def test_a_question_with_no_answer_is_not_touched(self):
+        from stage0 import investigation
+        state = investigation.InvestigationState('目标', 'scope')
+        state.questions.append({'question_id': 'q:2', 'status': 'open',
+                                'information_state': investigation.INFO_NOT_ATTEMPTED})
+        self.assertFalse(state.invalidate_answer('q:2', '记录变化'))
+
+
 if __name__ == '__main__':
     unittest.main()

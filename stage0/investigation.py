@@ -957,6 +957,33 @@ class InvestigationState:
             self._new_claim(question['statement'], list(question['subject_refs']),
                             'model', question_id=question['question_id'])
 
+    def invalidate_answer(self, question_id: str, reason: str) -> bool:
+        """一条已有答案不再适用于当前记录：标成 ``stale`` 并重开问题。
+
+        与 `safety_cases.retire_stale_answers` 是**同一件事的两面**——那边重开
+        请求，这边让答案自己承认不再适用。只做前一半的话，界面会同时看到
+        "这条要重新补充"和"这条的答案仍然可靠"。
+
+        只降 `verified`：``candidate`` 本来就没被当成依据，改它的性质等于
+        凭空给它加一次判定。返回是否真的改动了什么，调用方据此决定要不要存回。
+        """
+        question = self.question(question_id)
+        if question is None or not question.get('answers'):
+            return False
+        changed = False
+        for answer in question['answers']:
+            assessment = answer.get('assessment') or {}
+            if assessment.get('status') == grounding.STATUS_VERIFIED:
+                assessment['status'] = grounding.STATUS_STALE
+                assessment['reason'] = reason
+                answer['assessment'] = assessment
+                changed = True
+        if question.get('status') == QUESTION_STATUS_ANSWERED:
+            self.settle_question(question_id, QUESTION_STATUS_OPEN,
+                                 information_state=INFO_RECEIVED_UNCONFIRMED)
+            changed = True
+        return changed
+
     def claim_target_field(self, claim_id: str) -> str | None:
         """这条 claim 对应的问题问的是哪个字段。
 
