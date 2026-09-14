@@ -567,11 +567,35 @@ def render_result(product, case: dict[str, Any], visit: dict[str, Any], *,
             'text': f"已记录您关于「{item.get('question')}」的回答",
             'basis': {'kind': 'user_report', 'refs': [item.get('request_id')]}})
 
+    # —— 复用了哪些已有信息。**不是**"又确认了一遍"：这些是上次就已经有依据、
+    #    本次直接沿用的判断，用户要能看出"系统记得上次做过的事"。
+    reused: list[dict[str, Any]] = []
+    for item in answered_inputs:
+        reused.append({'text': f"沿用了已有的回答：{item.get('question')}",
+                       'basis': {'kind': 'record', 'refs': [item.get('request_id')]}})
+
+    # —— 哪些判断需要重新核对。由**程序**判定（依据失效才会出现在这里），
+    #    与模型的解释是两种来源，界面上分得开。
+    recheck: list[dict[str, Any]] = []
+    for item in inputs:
+        if item.get('answer_invalidated') or item.get('reopened_reason'):
+            recheck.append({
+                'text': f"需要重新核对：{item.get('question')}"
+                        f"（{item.get('reopened_reason') or '记录变化'}）",
+                'basis': {'kind': 'program_check', 'refs': [item.get('request_id')]}})
+    for entry in new_entries:
+        if entry.get('event') == 'resolution_basis_retired':
+            recheck.append({'text': '原有处置依据已失效，需按当前记录重新核对',
+                            'basis': {'kind': 'program_check', 'refs': []}})
+
     result = {
         'why': dict(visit['reason']),
         'since_last': since_last,
         'actions': actions,
         'unresolved': unresolved,
+        'reused': reused,
+        'recheck': recheck,
+        'end_reason': _end_reason(visit, task, open_inputs, unknown_inputs, new_entries),
         'answered_count': len(answered_inputs),
         'next_step': case.get('next_action_summary'),
         'next_arrangement': _arrangement_view(follow_up, case),
@@ -580,6 +604,28 @@ def render_result(product, case: dict[str, Any], visit: dict[str, Any], *,
         'rendered_at': utc_now(),
     }
     return result
+
+
+def _end_reason(visit: dict[str, Any], task: dict[str, Any] | None,
+                open_inputs: Sequence[dict[str, Any]],
+                unknown_inputs: Sequence[dict[str, Any]],
+                new_entries: Sequence[dict[str, Any]]) -> str:
+    """本次为什么结束或等待——按**实际状态**说，不套一句通用的结尾。
+
+    三件事分开讲：真的没有新情况、在等用户补什么、这一轮没跑成。
+    把它们都说成"本次回访已完成"会让等待看起来像结论。
+    """
+    status = status_from_task(task)
+    if status == STATUS_BLOCKED:
+        reason = (task or {}).get('waiting_reason')
+        return f'本次回访没有跑成：{reason}' if reason else '本次回访没有跑成，可以稍后重试。'
+    if open_inputs:
+        return f'本次在等您补充：{open_inputs[0].get("question")}'
+    if unknown_inputs:
+        return f'您表示不清楚，系统转去找其他来源：{unknown_inputs[0].get("question")}'
+    if not new_entries:
+        return '本次没有新的变化，已有结论仍然有效，因此结束。'
+    return '本次已按新到的情况处理完，可以结束这一回。'
 
 
 def history_line(entry: dict[str, Any]) -> dict[str, Any]:

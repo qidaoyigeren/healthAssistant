@@ -996,6 +996,12 @@ export interface SafetyVisitResultDto {
   since_last: SafetyVisitStatementDto[];
   actions: SafetyVisitStatementDto[];
   unresolved: SafetyVisitStatementDto[];
+  /** 沿用下来的已有结论。与"又确认了一遍"是两回事。 */
+  reused?: SafetyVisitStatementDto[];
+  /** 依据失效、需要重新核对的判断。由程序判定，不是模型的解释。 */
+  recheck?: SafetyVisitStatementDto[];
+  /** 本次为什么结束或等待。结束与等待分开说，等待不冒充结论。 */
+  end_reason?: string;
   answered_count: number;
   next_step: string | null;
   next_arrangement: SafetyVisitArrangementDto | null;

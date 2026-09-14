@@ -167,6 +167,12 @@ REVIEW_CONTRACT = 'material-review@2'
 CONSUMED_TERMINATIONS = ('checks_completed', 'waiting_input', 'waiting_review')
 
 
+def _news_events() -> tuple:
+    """哪些事项事件算"有信息"。定义在 `review_visits` 里，这里只是取用。"""
+    from .review_visits import NEWS_EVENTS
+    return NEWS_EVENTS
+
+
 def consumed_cursor(current: int, consumed_at: int, termination: str | None,
                     history_length: int) -> int:
     """这一轮结束后消费游标停在哪。**规则只在这里**。
@@ -998,6 +1004,12 @@ class CareTasks:
             'new_since_last_run': {
                 'changed_scopes': [key for key in current if current[key] != previous.get(key)],
                 'since_cursor': task.get('case_history_cursor'),
+                # 只算**信息到达或记录改变**的那些事件，与回访摘要同一口径
+                # （`review_visits.NEWS_EVENTS`）。游标之后剩下的往往正是本轮
+                # 自己写下的东西——刚才问出去的那条问题、事项状态的转移——它们
+                # 是这次运行的**产出**，不是给下一轮的新闻。把它们算成"有新信息
+                # 没看过"，下一轮会为了消费自己的输出再跑一次，而那次既没有可做
+                # 的事又终止不了，最后以熔断收场。
                 'events': [
                     {'event': entry.get('event'), 'at': entry.get('at'),
                      'request_id': entry.get('request_id'),
@@ -1006,7 +1018,8 @@ class CareTasks:
                      'from': entry.get('from'), 'to': entry.get('to'),
                      'why': entry.get('why')}
                     for entry in (case.get('history') or ())[
-                        int(task.get('case_history_cursor') or 0):]],
+                        int(task.get('case_history_cursor') or 0):]
+                    if entry.get('event') in _news_events()],
             },
             'budget': {
                 'max_cycles': contract['max_steps'],

@@ -130,6 +130,14 @@ async function main() {
       await start.first().click();
       await page.waitForTimeout(2500);
     }
+    // 产品里"回访开始"之后由后台 worker 把任务跑掉；验收关掉了 worker 线程
+    // 以求确定性，所以在这里显式推进一步——接口只存在于合成后端。
+    await fetch(`http://127.0.0.1:${apiPort}/__fixture/drain`, { method: 'POST' })
+      .catch(() => {});
+    await page.waitForTimeout(400);
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(1200);
+
     const after = await body();
     record('开始之后仍停在同一路回访页', /\/visit$/.test(new URL(page.url()).pathname));
     record('第 2 步：上次之后已记录的变化', /上次之后已记录的变化/.test(after));
@@ -155,7 +163,23 @@ async function main() {
       record('本轮没有需要用户回答的问题（如实说明）', /没有需要您补充的问题/.test(after));
     }
 
-    // 5) 刷新后仍在**同一次**回访上：不从头开始。
+    // 5) 结果说清实际变化：复用了什么、什么需要重核、为什么结束或等待。
+    //    每条还要看得出**来源属性**——程序的核对与模型的解释是两回事。
+    for (const [section, label] of [['reused', '复用了已有信息'],
+                                    ['recheck', '需要重新核对'],
+                                    ['why-ended', '本次为什么结束或等待']]) {
+      record(`结果区有「${label}」`,
+        await page.locator(`[data-visit-section="${section}"]`).count() > 0);
+    }
+    record('为什么结束/等待有一句实际的话',
+      (await page.locator('[data-end-reason]').innerText().catch(() => '')).trim().length > 0);
+
+    const basisKinds = await page.locator('[data-basis]')
+      .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-basis')));
+    record('关键内容带来源属性', basisKinds.length > 0 && basisKinds.every(Boolean),
+      `basis=${[...new Set(basisKinds)].join(',') || '（无）'}`);
+
+    // 6) 刷新后仍在**同一次**回访上：不从头开始。
     const beforeReload = await body();
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForTimeout(1200);

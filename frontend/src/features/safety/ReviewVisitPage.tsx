@@ -183,7 +183,8 @@ function StatementList({ title, lines, empty }: {
         : (
           <ul className="mt-1 space-y-1">
             {lines.map((line, index) => (
-              <li key={`${index}-${line.text}`} className="text-sm text-ink-secondary">
+              <li key={`${index}-${line.text}`} className="text-sm text-ink-secondary"
+                  data-basis={line.basis?.kind ?? 'unknown'}>
                 {line.text}
                 <span className="ml-1 text-xs text-ink-muted">
                   （{basisKindLabel(line.basis?.kind)}）
@@ -300,8 +301,22 @@ function StepFive({ view, busy, caseId, onAction }: {
       {result
         ? (
           <div className="mt-2 space-y-3">
+            <section data-visit-section="reused">
+              <StatementList title="复用的已有信息" lines={result.reused ?? []}
+                empty="本次没有可复用的已有结论。" />
+            </section>
+            <section data-visit-section="recheck">
+              <StatementList title="需要重新核对" lines={result.recheck ?? []}
+                empty="没有依据需要重新核对。" />
+            </section>
             <StatementList title="仍未解决" lines={result.unresolved}
               empty="这次没有留下未解决的问题。" />
+            <section data-visit-section="why-ended">
+              <h3 className="text-sm font-medium">本次为什么结束或等待</h3>
+              <p className="mt-1 text-sm text-ink-secondary" data-end-reason>
+                {result.end_reason ?? '—'}
+              </p>
+            </section>
             {result.next_step && (
               <p className="text-sm text-ink-secondary">下一步：{result.next_step}</p>
             )}

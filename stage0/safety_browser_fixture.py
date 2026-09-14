@@ -87,6 +87,17 @@ def build_app(db_path: Path):
         # worker 与同步路径必须用**同一个**脚本化 agent：否则"恢复那一轮"会
         # 退回降级路径，浏览器看到的就不是同一条链路。
         agent_factory=lambda: scripted_agent(app.state.store))
+
+    @app.post("/__fixture/drain")
+    def _drain():
+        """**验收专用**：把 outbox 里排队的任务跑掉。
+
+        产品里这件事由后台 worker 线程做；验收关掉那个线程是为了确定性，于是需要
+        一个显式的推进口。它只存在于这个合成后端——`stage0/server.py` 上没有这条
+        路由，产品路径不会多出一个"手动跑任务"的入口。
+        """
+        return {"drained": len(app.state.worker.drain_once(max_tasks=5))}
+
     return app
 
 
