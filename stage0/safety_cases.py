@@ -638,7 +638,15 @@ class SafetyCaseStore:
                                         'note': '用户表示不知道；需要替代证据，不能当成已解决'}
                                        for i in inputs if i.get('status') == ANSWER_UNKNOWN],
                 'answered': [{'request_id': i['request_id'], 'question': i.get('question'),
-                              'answer_kind': i.get('answer_kind')}
+                              'answer_kind': i.get('answer_kind'),
+                              # 答案本身，不只是"这条答过"。缺了这三样，模型读得到
+                              # "有人答过"、读不到"答的是什么、依据是什么"，下一轮
+                              # 回访就只能把同一件事重新查一遍——复用无从谈起。
+                              'value': _answer_value(i),
+                              'source': _answer_source(i),
+                              'assessment': _answer_assessment(i),
+                              'answered_against': i.get('answered_against'),
+                              'answered_at': i.get('answered_at')}
                              for i in inputs if i.get('status') == 'answered'],
             },
             'existing_disposition': {'disposition': case.get('disposition'),
@@ -746,10 +754,14 @@ class SafetyCaseStore:
                 item['answered_at'] = utc_now()
                 item['answer_kind'] = kind
                 item['answered_against'] = self.p.revisions()
+                # 收到的是什么，**照实记下来**——不只是格式不符的时候。
+                # 只记"这条答过"而记不下答案本身，下一轮回访就没有可复用的东西，
+                # 只能把同一件事重新查一遍。全文仍在 `history` 与调查的答案元素里，
+                # 这里是有界的摘要，够读、不重复存一份。
+                item['received_value'] = str(value or '')[:500]
                 if unsatisfied:
                     item['status'] = 'open'
                     item['unsatisfied_fields'] = list(unsatisfied)
-                    item['received_value'] = str(value or '')[:120]
                     continue
                 item.pop('unsatisfied_fields', None)
                 if answered_now:
@@ -1940,6 +1952,40 @@ def register_safety_routes(app, product, access, invoke, principal=None,
                 _wake_investigation(product, case_id, body.get('key'))
             return case_view(store, updated)
         return invoke(run)
+
+
+def _answer_part(item: dict[str, Any]) -> dict[str, Any] | None:
+    """这条请求收到的回答里，最实的那一部分。
+
+    优先 `answered_parts`（调查投影过来的答案元素，带来源与 assessment）；
+    没有就退回这次提交本身（`received_value` / `answer_ref`）。返回 `None`
+    表示**读不到**——调用方照实给 `None`，不编一个出来。
+    """
+    parts = [part for part in (item.get('answered_parts') or [])
+             if isinstance(part, dict)]
+    if parts:
+        return parts[-1]
+    if item.get('received_value') is not None or item.get('answer_ref'):
+        return {'value': item.get('received_value'), 'source': item.get('answer_kind'),
+                'assessment': None, 'source_ref': item.get('answer_ref')}
+    return None
+
+
+def _answer_value(item: dict[str, Any]) -> Any:
+    part = _answer_part(item)
+    return part.get('value') if part else None
+
+
+def _answer_source(item: dict[str, Any]) -> Any:
+    """答案的来源种类（用户报告 / 权威记录 / 证据…），不是来源的值。"""
+    part = _answer_part(item)
+    return part.get('source') if part else None
+
+
+def _answer_assessment(item: dict[str, Any]) -> Any:
+    """这条答案的可信性判定。读不到就是 `None`（未核实），不冒充已核实。"""
+    part = _answer_part(item)
+    return part.get('assessment') if part else None
 
 
 def _load_json(raw: Any) -> Any:

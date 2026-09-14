@@ -661,5 +661,50 @@ class SafetyCaseTests(unittest.TestCase):
                                       anchor='a', trigger={'kind': 'test'})
 
 
+class InvestigationContextAnswerTests(SafetyCaseTests):
+    """已回答的问题要带上**答案本身**，不只是"这条答过"。
+
+    只报一个 `answer_kind` 时，模型读得到"有人答过"，读不到"答的是什么、
+    依据是什么"——于是下一轮回访只能把同一件事重新查一遍。
+    """
+
+    def _answered_case(self):
+        case = self.observe(self.warn(
+            '合成药甲 × 合成药乙：出血风险升高。',
+            [self.add_drug('合成药甲', key='m1')['medication']['ref'],
+             self.add_drug('合成药乙', key='m2')['medication']['ref']], 'w1'), 'k1')
+        request_id = f"case:{case['id']}:q:dose"
+        self.cases.require_input(case['id'], request_id=request_id,
+                                 question='当前的剂量是多少？', fields=['dose'],
+                                 question_kind='patient_actual_state',
+                                 subject_refs=[case['related_medication_refs'][0]],
+                                 command_key='req-1')
+        self.cases.record_input(case['id'], request_id=request_id,
+                                answer_ref='answer-1', value='5mg',
+                                answer_kind=sc.ANSWER_PROVIDED, command_key='ans-1')
+        return self.cases.get(case['id']), request_id
+
+    def test_an_answered_question_carries_its_answer_and_source(self):
+        case, request_id = self._answered_case()
+        answered = self.cases.investigation_context(case)['questions']['answered']
+        item = next(entry for entry in answered if entry['request_id'] == request_id)
+        self.assertEqual('5mg', item['value'])
+        self.assertIsNotNone(item['source'])
+        self.assertIsNotNone(item['answered_against'])
+
+    def test_an_open_question_is_not_reported_as_answered(self):
+        case, _ = self._answered_case()
+        case = self.cases.get(case['id'])
+        open_id = f"case:{case['id']}:q:open"
+        self.cases.require_input(case['id'], request_id=open_id,
+                                 question='上次复查是什么时候？', fields=['start_at'],
+                                 command_key='req-2')
+        context = self.cases.investigation_context(self.cases.get(case['id']))
+        self.assertNotIn(open_id,
+                         {item['request_id'] for item in context['questions']['answered']})
+        self.assertIn(open_id,
+                      {item['request_id'] for item in context['questions']['open']})
+
+
 if __name__ == '__main__':
     unittest.main()
