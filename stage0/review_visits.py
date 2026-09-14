@@ -320,6 +320,104 @@ def status_from_task(task: dict[str, Any] | None) -> str | None:
     return None
 
 
+#: 回访目标里**允许**的下一步。程序限定可选项，模型选具体走哪一个——
+#: 代码不替它定"这位患者该问哪几题"。
+VISIT_NEXT_STEPS = ('直接复用已有结论交付结果', '向用户询问一个具体缺失事实',
+                    '读取相关材料或证据', '从用户描述中提出待确认变更',
+                    '根据新证据重新核对某个判断', '说明当前需要等待什么')
+
+REASON_LABELS = {REASON_DUE: '已确认的跟进安排到期', REASON_RECORD_CHANGE: '相关记录发生变化',
+                 REASON_INPUT_ARRIVED: '收到了新的补充', REASON_USER_STARTED: '您主动发起'}
+
+CASE_KIND_LABELS = {'interaction_risk': '药物相互作用风险', 'condition_risk': '患者个体风险',
+                    'evidence_gap': '依据缺口', 'discrepancy': '记录不一致',
+                    'source_invalidated': '来源失效'}
+
+
+def _sequence_of(product, case_id: str, visit: dict[str, Any]) -> int:
+    """这是这位患者这件事项的第几次回访。按记录顺序数，不按时间戳比大小。"""
+    ordered = ReviewVisitStore(product).for_case(case_id)
+    for index, item in enumerate(ordered):
+        if item['id'] == visit['id']:
+            return index + 1
+    return len(ordered) or 1
+
+
+def _previous_visit(product, visit: dict[str, Any]) -> dict[str, Any] | None:
+    previous_id = visit.get('previous_visit_id')
+    if not previous_id:
+        return None
+    try:
+        return ReviewVisitStore(product).get(previous_id)
+    except ProductError:
+        return None
+
+
+def visit_intent(product, case: dict[str, Any], visit: dict[str, Any], *,
+                 previous_task: dict[str, Any] | None = None) -> dict[str, Any]:
+    """本次回访的执行意图，由**四类事实**推导。
+
+    触发原因、上次未完成事项、上次之后的实际变化、已确认的跟进安排。
+
+    刻意不要求"重新证明原有风险成立"：那是把第一次重做一遍。只有原依据真的
+    失效、或上次之后出现了相关新证据时，才给出 ``recheck_reason``。
+    """
+    from . import followup_runtime as _follow_up
+    previous = _previous_visit(product, visit)
+    previous_result = (previous or {}).get('result') or {}
+    unfinished = [str(item.get('text')) for item in (previous_result.get('unresolved') or [])
+                  if isinstance(item, dict) and item.get('text')]
+    entries = list(case.get('history') or [])
+    start = int((visit.get('cursor') or {}).get('before') or 0)
+    fresh = [_history_line(entry)['text'] for entry in entries[start:]]
+    recheck = None
+    for entry in entries[start:]:
+        if entry.get('event') == 'resolution_basis_retired':
+            recheck = '原有处置依据已失效，需要按当前记录重新核对'
+        elif entry.get('event') == 'answer_retired' and recheck is None:
+            recheck = '记录变化使先前的一条依据不再适用，需要重新核对'
+    follow_up = _follow_up.project_follow_up(case.get('follow_up'))
+    intent = {
+        'visit_id': visit['id'],
+        'sequence': _sequence_of(product, case['id'], visit),
+        'reason': dict(visit['reason']),
+        'previous_visit_id': visit.get('previous_visit_id'),
+        'previous_unfinished': unfinished,
+        'new_since_last_visit': fresh,
+        'follow_up': _arrangement_view(follow_up, case),
+        'recheck_reason': recheck,
+        'allowed_next_steps': list(VISIT_NEXT_STEPS),
+    }
+    intent['goal'] = visit_goal(product, case, visit, intent=intent)
+    return intent
+
+
+def visit_goal(product, case: dict[str, Any], visit: dict[str, Any], *,
+               intent: dict[str, Any] | None = None) -> str:
+    """回访目标文本。上限 300 字，与 `_safety_case_goal` 同一口径。"""
+    intent = intent or visit_intent(product, case, visit)
+    kind = CASE_KIND_LABELS.get(case.get('case_type'), case.get('case_type'))
+    parts = [f"这是同一件{kind}安全事项的第 {intent['sequence']} 次回访。",
+             f"本次起因：{intent['reason']['detail']}。"]
+    if intent['previous_unfinished']:
+        parts.append('上次仍未完成：' + '；'.join(intent['previous_unfinished'][:3]) + '。')
+    if intent['new_since_last_visit']:
+        parts.append('上次之后新增：' + '；'.join(intent['new_since_last_visit'][:3]) + '。')
+    else:
+        parts.append(NO_NEW_RECORDS)
+    follow = intent['follow_up'] or {}
+    if follow.get('present'):
+        parts.append('已确认的跟进安排：'
+                     f"{follow.get('at') or follow.get('note') or '已登记'}"
+                     f"（{'已确认' if follow.get('confirmed') else '尚未确认'}）。")
+    if intent['recheck_reason']:
+        parts.append('需要重新核对：' + intent['recheck_reason'] + '。')
+    else:
+        parts.append('原有结论仍然有效时直接复用，不要为了重新得到同一结论重复检索。')
+    parts.append('请选择本次最值得执行的下一步：' + '／'.join(VISIT_NEXT_STEPS) + '。')
+    return ''.join(parts)[:300]
+
+
 def _reason_rank(kind: str) -> int:
     """理由的强弱。「到期」与「记录变化」是可指认的事实，压过"用户随手点进来"。"""
     return {REASON_DUE: 3, REASON_RECORD_CHANGE: 2, REASON_INPUT_ARRIVED: 1,
@@ -511,5 +609,6 @@ __all__ = [
     'CANDIDATE_CONFIRMED', 'CANDIDATE_DISMISSED', 'SOURCE_USER_DECLARED',
     'SOURCE_MODEL_PROPOSED', 'CANDIDATE_SOURCES', 'CANDIDATE_FIELDS',
     'NO_NEW_RECORDS', 'ReviewVisitStore', 'derive_reason', 'changed_scopes',
-    'render_result', 'status_from_task',
+    'render_result', 'status_from_task', 'visit_intent', 'visit_goal',
+    'VISIT_NEXT_STEPS', 'REASON_LABELS', 'CASE_KIND_LABELS',
 ]

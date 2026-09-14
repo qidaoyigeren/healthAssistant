@@ -535,5 +535,60 @@ class InvalidatedAnswerTests(unittest.TestCase):
         self.assertFalse(state.invalidate_answer('q:2', '记录变化'))
 
 
+class VisitIntentTests(_VisitFixture):
+    """回访目标由**事实**推导，不是每次都要求重新证明原有风险。"""
+
+    def _case(self, visit):
+        return self.cases.get(visit['case_id'])
+
+    def test_the_goal_states_the_reason_and_does_not_demand_reproof(self):
+        visit = self.start()
+        intent = rv.visit_intent(self.product, self._case(visit), visit)
+        self.assertIn(visit['reason']['detail'], intent['goal'])
+        self.assertNotIn('请核实该风险在当前记录下是否成立', intent['goal'])
+        self.assertLessEqual(len(intent['goal']), 300)
+
+    def test_the_goal_lists_the_next_steps_the_model_may_choose(self):
+        visit = self.start()
+        intent = rv.visit_intent(self.product, self._case(visit), visit)
+        self.assertTrue(intent['allowed_next_steps'])
+        for step in intent['allowed_next_steps']:
+            self.assertIn(step, intent['goal'])
+
+    def test_recheck_is_only_named_when_a_basis_actually_failed(self):
+        visit = self.start()
+        self.assertIsNone(
+            rv.visit_intent(self.product, self._case(visit), visit)['recheck_reason'])
+
+    def test_no_new_records_is_stated_as_an_information_state(self):
+        visit = self.start()
+        intent = rv.visit_intent(self.product, self._case(visit), visit)
+        self.assertEqual([], intent['new_since_last_visit'])
+        self.assertIn(rv.NO_NEW_RECORDS, intent['goal'])
+
+    def test_a_second_visit_says_which_number_it_is_and_carries_the_last_one(self):
+        first = self.start(key='visit-1')
+        case = self._case(first)
+        self.visits.set_status(first['id'], rv.STATUS_COMPLETED)
+        self.visits.save_result(first['id'],
+                                {'unresolved': [{'text': '仍需要补充：当前的剂量是多少？'}],
+                                 'next_step': '等待补充'}, cursor_after=0)
+
+        second = self.start(case=case, key='visit-2')
+        intent = rv.visit_intent(self.product, case, second)
+        self.assertEqual(2, intent['sequence'])
+        self.assertIn('仍需要补充：当前的剂量是多少？', intent['previous_unfinished'])
+        self.assertIn('仍需要补充：当前的剂量是多少？', intent['goal'])
+
+    def test_a_basis_that_fell_away_is_named_as_the_reason_to_recheck(self):
+        visit = self.start()
+        case = self._case(visit)
+        case['history'].append({'at': '2026-09-14T00:00:00Z', 'event': 'answer_retired',
+                                'request_id': 'case:x:q1', 'reason': '记录变化'})
+        self.product.save(sc.KIND, case)
+        intent = rv.visit_intent(self.product, self.cases.get(case['id']), visit)
+        self.assertIn('重新核对', intent['recheck_reason'])
+
+
 if __name__ == '__main__':
     unittest.main()
