@@ -144,21 +144,31 @@ def conclusions(first_items, questions, second, pending, rows, active, confirmed
              if pending or codes else
              {'passed': False, 'note': '没有产生待确认候选，无从确认'})
 
-    fake_times = [name for name, row in rows.items()
-                  if row['status'] == 'stopped' and not row.get('end_at')
-                  and row.get('end_at_basis') not in ('unknown', 'reported_vague')]
-    history = ({'passed': False, 'note': f'这些行停了却没有时间来源，属于伪造时间：{fake_times}'}
-               if fake_times else
-               {'passed': True,
-                'note': f'没有伪造的停药时间；阶段标识：'
-                        f'{ {name: row.get("episode_id") for name, row in rows.items()} }'})
-
-    checks = mainline.get('necessary_checks') or {}
-    continuity = ({'passed': case_view['status'] != 'resolved',
-                   'note': f"事项状态={case_view['status']}，必要检查 total={checks.get('total')} "
-                           f"open={checks.get('open')}；停药没有被当成整体风险解除"}
-                  if checks.get('available') else
-                  {'passed': False, 'note': '读不到必要检查队列的真实状态'})
+    # **空过的通过不是证据。** 一次记录都没改，就不能说"没有伪造停药时间"或
+    # "事项没有被自动清除"——那两句在什么都没发生时自动成立，读起来却像被验过。
+    exercised = any(row.get('source') == 'caregiver-confirmed' for row in rows.values())
+    if not exercised:
+        untouched = {'passed': False,
+                     'note': '这一轮没有发生任何记录变更，因此这一项**没有被走到**'
+                             '（空过的"通过"不算通过）'}
+        history = continuity = untouched
+    else:
+        fake_times = [name for name, row in rows.items()
+                      if row['status'] == 'stopped' and not row.get('end_at')
+                      and row.get('end_at_basis') not in ('unknown', 'reported_vague')]
+        history = ({'passed': False,
+                    'note': f'这些行停了却没有时间来源，属于伪造时间：{fake_times}'}
+                   if fake_times else
+                   {'passed': True,
+                    'note': f'没有伪造的停药时间；阶段标识：'
+                            f'{ {name: row.get("episode_id") for name, row in rows.items()} }'})
+        checks = mainline.get('necessary_checks') or {}
+        continuity = ({'passed': case_view['status'] != 'resolved',
+                       'note': f"事项状态={case_view['status']}，必要检查 "
+                               f"total={checks.get('total')} open={checks.get('open')}；"
+                               f"停药没有被当成整体风险解除"}
+                      if checks.get('available') else
+                      {'passed': False, 'note': '读不到必要检查队列的真实状态'})
     return {'understanding': understanding, 'write': write,
             'history': history, 'continuity': continuity}
 

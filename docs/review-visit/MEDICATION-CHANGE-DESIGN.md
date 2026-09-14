@@ -49,11 +49,15 @@
 
 | 列 | 取值 | 说明 |
 |---|---|---|
-| `episode_id` | `ep:<hex>` / `ep:legacy:<n>` | **服用阶段**身份。写入时定死，此后**永不重算** |
+| `episode_id` | INTEGER | **服用阶段**身份＝该阶段第一版的行 id。写入时定死，此后**永不重算** |
 | `operation` | `add`/`resume`/`dose_change`/`correction`/`legacy_unknown` | **产生这一行的那次操作**。`remove` 不产生行，所以不会覆盖它 |
 | `corrects_id` | INTEGER / NULL | 这一行纠正的是哪一条记录（纠错关联） |
 | `end_at_basis` | `reported`/`reported_vague`/`unknown`/`recorded_time`/`legacy_unknown` | 停药时间的来源 |
 | `time_text` | TEXT / NULL | 用户**原话里的时间表达**（如"上周"），原样保留 |
+
+`episode_id` 取**整数**是刻意的：它与历史 `incarnation_id()` 的返回值同域，所以迁移把
+历史行回填成**当时**那个算法的输出之后，重算出的 `episode_anchor` 与迁移前逐字节相同
+——存量事项的身份不漂移。
 
 `start_at_basis` 的取值集合同步加入 `reported_vague`。
 
@@ -69,8 +73,8 @@
 
 | 操作 | 新行的 `episode_id` | `predecessor_id` |
 |---|---|---|
-| 首次新增 | **新建** `ep:<hex>` | 该 key 的最后一行（若有） |
-| 真实停用后恢复（`resume`） | **新建** `ep:<hex>` | 指定的那条 **stopped** 行 |
+| 首次新增 | **新建**（= 该行自己的 id） | 该 key 的最后一行（若有） |
+| 真实停用后恢复（`resume`） | **新建**（= 该行自己的 id） | 指定的那条 **stopped** 行 |
 | 阶段内调整（`dose_change`） | **继承**前驱的 `episode_id` | 当前 active 行 |
 | 误登记停用的纠正（`correction`） | **继承**被纠正行的 `episode_id` | 被纠正行 |
 
