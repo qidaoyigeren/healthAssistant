@@ -70,6 +70,10 @@ cd frontend; npm install; npm run dev
 
 **停止**：两个终端各自 `Ctrl+C`；worker 是后端进程内的守护线程，随之退出。
 
+> 上面这条后端命令**本轮实际跑过一次**（指向一个隔离库，不碰默认库）：
+> `/v1/health` 返回 `status: ok`、`worker_thread: true`、`schema_version: 4-p2`。
+> 前端 `npm run dev` 与 `npm run build` 也在本轮验收里跑过。
+
 **模型（可选）**：在 `stage0/.env`（已被 gitignore）里配，并**显式**选端点：
 
 ```
