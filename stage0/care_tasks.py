@@ -142,10 +142,14 @@ CONTRACTS = {
                                   'submit_question', 'submit_finding', 'submit_assertion',
                                   'request_delivery'],
                         'max_steps': 24},
-    # safety-case@1: 从**一件具体的安全事项**出发的持续调查。与 evidence_review 的
+    # safety-case@2: 从**一件具体的安全事项**出发的持续调查。与 evidence_review 的
     # 区别不是引擎，而是起点：后者从一段自由目标重新规划全部任务，这里带着事项的
     # 触发原因、已有结论、已失效依据、未决问题与用户补充开工，跨会话回到同一件事。
-    'safety_case': {'version': 1, 'outputs': ['safety_case_report'],
+    #
+    # @2 起，回访任务显式绑定 ``visit_id`` 并且目标由**本次回访的意图**给出
+    # （见 `review_visits.visit_intent`），而不是套一段通用的"核实风险是否成立"。
+    # 契约版本显式记录、恢复时校验：@1 的旧任务不会被复活成一次回访的执行者。
+    'safety_case': {'version': 2, 'outputs': ['safety_case_report'],
                     'tools': ['memory_read', 'rag_search', 'read_evidence', 'ask_clarification',
                               'ddi_check', 'memory_write', 'answer_question',
                               # 回访用：把"用户那句话意味着记录该改了"记成**待确认**的
@@ -154,7 +158,7 @@ CONTRACTS = {
                     'max_steps': 16},
 }
 
-SAFETY_CASE_CONTRACT = 'safety-case@1'
+SAFETY_CASE_CONTRACT = 'safety-case@2'
 REVIEW_CONTRACT = 'material-review@2'
 
 
@@ -177,7 +181,7 @@ class CareTasks:
         return self._agent
 
     def create(self, key, goal_type, case_id=None, due_at=None, budget=None, goal=None,
-               requested=None):
+               requested=None, visit_id=None, visit_intent=None):
         if goal_type not in CONTRACTS:
             raise ProductError('请选择材料核对、当前药单、就诊摘要或证据核查')
         contract = CONTRACTS[goal_type]
@@ -217,9 +221,14 @@ class CareTasks:
                 # 一件事项同时只应有一次在跑的调查。否由服务端强制，而不是靠界面
                 # 记得先查一遍：两次点击会产生两个并发的调查，各自花预算，最后在
                 # 同一件事上互相覆盖状态。
+                #
+                # 判据带**回访维度**：一次新回访不是"同一件调查的重复创建"。
+                # 少了这一维，第二次回访会拿回第一件任务——它的目标、它的
+                # investigation 状态、它记着的结论，全都属于上一次回访。
                 running = [t for t in self.p.objects('care_task')
                            if t.get('goal_type') == 'safety_case'
                            and t.get('safety_case_id') == case_id
+                           and t.get('visit_id') == visit_id
                            and t['status'] not in ('completed', 'cancelled', 'failed')]
                 if running:
                     return running[0]
@@ -259,6 +268,14 @@ class CareTasks:
                 task['goal'] = goal
                 task['safety_case_contract'] = SAFETY_CASE_CONTRACT
                 task['safety_case_id'] = case_id
+                # 这次执行**属于哪一次回访**。绑定是双向的（回访也记着 care_task_id），
+                # 恢复时据此判断"这个任务还是不是那次回访的"——没有它，一件旧任务的
+                # 结果会写进另一回访。
+                task['visit_id'] = visit_id
+                # 本次执行意图随任务落盘：恢复后不必重算，也不会因为记录又变了
+                # 而把目标悄悄换掉。
+                task['visit_intent'] = ({'visit_id': visit_id, **dict(visit_intent)}
+                                        if visit_intent else None)
                 task['input_versions'] = self.p.revisions()
                 task['investigation'] = None
                 task['subgoals'] = []
@@ -267,7 +284,10 @@ class CareTasks:
             return task
         return self.p.command(key, {'type': 'care_task_create', 'goal_type': goal_type,
                                     'case_id': case_id, 'due_at': due_at, 'budget': budget,
-                                    'goal': goal, 'requested': _clean_requested(requested)}, execute)
+                                    'goal': goal, 'requested': _clean_requested(requested),
+                                    # 回访绑定进幂等载荷：同一个 key 换一次回访是
+                                    # **另一件请求**，不能命中上一条回执。
+                                    'visit_id': visit_id}, execute)
 
     def resume(self, task_id, key, revision, action='continue', *, enqueue=False):
         def execute():
@@ -868,6 +888,13 @@ class CareTasks:
         visits = visits_module.ReviewVisitStore(self.p)
         visit = visits.open_for_case(case['id'])
         if visit is None:
+            return
+        if task.get('visit_id') and task['visit_id'] != visit['id']:
+            # 这个任务服务的不是当前未结束的这次回访——它的结果不属于这里。
+            # 没有这道闸，另一个回访（或一件旧任务）的结果会覆盖当前回访。
+            return
+        if visit.get('care_task_id') not in (None, task['id']):
+            # 回访已经绑在别的任务上，同样不覆盖。
             return
         if visit.get('care_task_id') != task['id']:
             visit = visits.bind_task(visit['id'], task['id'])

@@ -1380,9 +1380,17 @@ def _ensure_visit_task(product, case: dict[str, Any], visit: dict[str, Any],
     没有新调度：用的就是 `care_task` + outbox + 租约 + 预算那一条。已经有等待中的
     任务就唤醒它（补充到了、继续走）；没有就按既有契约建一件。
     """
-    from .care_tasks import CareTasks
+    from .care_tasks import CONTRACTS, CareTasks
+    version = CONTRACTS['safety_case']['version']
     tasks = CareTasks(product)
     existing = _visit_task(product, case['id'], visit)
+    if existing is not None and (
+            existing.get('contract_version') != version
+            or existing.get('visit_id') != visit['id']):
+        # 契约升级，或者这件任务服务的是**别的**回访。两种都不能复活：
+        # 前者会拿着上一次语义下的中间状态当本次起点，而 resume 会因为版本
+        # 对不上直接抛 409——用户看到的是报错，不是回访。
+        existing = None
     if existing is not None and existing['status'] in ('queued', 'running'):
         return existing
     if existing is not None and existing['status'] == 'waiting_input':
@@ -1400,12 +1408,48 @@ def _ensure_visit_task(product, case: dict[str, Any], visit: dict[str, Any],
     running = [t for t in product.objects('care_task')
                if t.get('goal_type') == 'safety_case'
                and t.get('safety_case_id') == case['id']
+               # 收紧到**同一次回访**：同一事项上的另一次回访不是本次的载体，
+               # 拿它继续会把结果写错地方。
+               and t.get('visit_id') == visit['id']
+               and t.get('contract_version') == version
                and t['status'] not in ('completed', 'cancelled', 'failed')]
     if running:
-        # 同一事项上不得同时跑两件调查：它们各自花预算、最后互相改写状态。
+        # 同一次回访上不得同时跑两件调查：它们各自花预算、最后互相改写状态。
         return running[-1]
+
+    from . import review_visits as visits_module
+    intent = visits_module.visit_intent(product, case, visit)
+    # 事项上已经有一件**没绑回访**的在跑调查：这次回访就是它的继续，认领它，
+    # 而不是另起一件。另起会把已经问过、已经答上的问题留在旧任务里，新一轮
+    # 从空白开始——回访于是把同一件事重新问一遍，正是要消掉的那种行为。
+    # 认领的同时把目标换成**本次回访的意图**：任务没绑回访说明它此前没有回访
+    # 身份，它的目标本来就是通用的那一段。
+    adoptable = [t for t in product.objects('care_task')
+                 if t.get('goal_type') == 'safety_case'
+                 and t.get('safety_case_id') == case['id']
+                 and not t.get('visit_id')
+                 and t.get('contract_version') == version
+                 and t['status'] not in ('completed', 'cancelled', 'failed')]
+    if adoptable:
+        task = adoptable[-1]
+        with product.transaction():
+            fresh = product.get(task['id'], 'care_task')
+            fresh['visit_id'] = visit['id']
+            fresh['visit_intent'] = {'visit_id': visit['id'], **intent}
+            fresh['goal'] = intent['goal']
+            fresh['revision'] += 1
+            product.save('care_task', fresh)
+            task = fresh
+        if task['status'] in ('waiting_input', 'ready'):
+            return tasks.resume(task['id'], f"{key or task['id']}:visit-run",
+                                task['revision'], 'continue', enqueue=True)
+        # 已经在跑：它这一轮会读到刚换上的目标（执行时才读 `task['goal']`）。
+        return task
+
     created = tasks.create(f"visit:{visit['id']}:{len(visit.get('focus') or [])}",
-                           'safety_case', case['id'], due_at=None)
+                           'safety_case', case['id'], due_at=None,
+                           goal=intent['goal'], visit_id=visit['id'],
+                           visit_intent=intent)
     return tasks.resume(created['id'], f"{key or created['id']}:visit-run",
                         created['revision'], 'continue', enqueue=True)
 

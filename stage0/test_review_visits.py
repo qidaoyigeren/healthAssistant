@@ -590,5 +590,46 @@ class VisitIntentTests(_VisitFixture):
         self.assertIn('重新核对', intent['recheck_reason'])
 
 
+class VisitTaskBindingTests(_VisitFixture):
+    """回访任务绑定这次回访，并带着**本次意图**开工。"""
+
+    def test_a_visit_task_records_which_visit_it_serves(self):
+        from stage0.care_tasks import CareTasks, SAFETY_CASE_CONTRACT
+        visit = self.start()
+        case = self.cases.get(visit['case_id'])
+        intent = rv.visit_intent(self.product, case, visit)
+        task = CareTasks(self.product).create(
+            'visit-task-1', 'safety_case', visit['case_id'],
+            goal=intent['goal'], visit_id=visit['id'], visit_intent=intent)
+
+        self.assertEqual(visit['id'], task['visit_id'])
+        self.assertEqual(visit['id'], task['visit_intent']['visit_id'])
+        self.assertEqual(intent['goal'], task['goal'])
+        self.assertEqual(SAFETY_CASE_CONTRACT, task['safety_case_contract'])
+        self.assertNotIn('请核实该风险在当前记录下是否成立', task['goal'])
+
+    def test_a_direct_investigation_is_unchanged(self):
+        """没有回访的调查仍然拿到那段通用目标——回访不是唯一入口。"""
+        from stage0.care_tasks import CareTasks
+        visit = self.start()
+        task = CareTasks(self.product).create('direct-1', 'safety_case', visit['case_id'])
+        self.assertIsNone(task['visit_id'])
+        self.assertIn('请核实该风险在当前记录下是否成立', task['goal'])
+
+    def test_two_visits_do_not_collide_on_the_same_case(self):
+        """同一事项的两次回访各有各的任务；第二次不命中第一次的幂等回执。"""
+        from stage0.care_tasks import CareTasks
+        first = self.start(key='visit-1')
+        self.visits.set_status(first['id'], rv.STATUS_COMPLETED)
+        second = self.start(case=self.cases.get(first['case_id']), key='visit-2')
+        tasks = CareTasks(self.product)
+        a = tasks.create(f"visit:{first['id']}:0", 'safety_case', first['case_id'],
+                         visit_id=first['id'])
+        b = tasks.create(f"visit:{second['id']}:0", 'safety_case', second['case_id'],
+                         visit_id=second['id'])
+        self.assertNotEqual(a['id'], b['id'])
+        self.assertNotEqual(a['visit_id'], b['visit_id'])
+
+
 if __name__ == '__main__':
     unittest.main()
