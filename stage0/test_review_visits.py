@@ -631,5 +631,28 @@ class VisitTaskBindingTests(_VisitFixture):
         self.assertNotEqual(a['visit_id'], b['visit_id'])
 
 
+class ConsumableDeferralTests(unittest.TestCase):
+    """"还没做"带上可核对的新成分时，它就不再只是一句推迟。"""
+
+    def test_a_deferral_that_names_a_new_time_is_consumable(self):
+        for value in ('还没做，下周一开始', '没做，2026-09-20 之后再说',
+                      '还没去，9月20日去', '没吃，下个月再复查'):
+            self.assertTrue(sc.answer_carries_consumable_information(value), value)
+
+    def test_a_deferral_that_names_a_new_amount_is_consumable(self):
+        for value in ('已经减到5mg了还没复查', '改成3次了，还没复诊'):
+            self.assertTrue(sc.answer_carries_consumable_information(value), value)
+
+    def test_a_bare_deferral_carries_nothing(self):
+        """干巴巴的推迟没有可据以行动的新信息——不唤醒，也不重复追问。"""
+        for value in ('还没做', '暂时不想说', '还没有', '', None, '没顾上'):
+            self.assertFalse(sc.answer_carries_consumable_information(value), value)
+
+    def test_a_paraphrase_without_numbers_is_not_recognised(self):
+        """已知边界：改写过的说法认不出来。错误方向是**少唤醒**，与推迟类
+        原有的保守处理一致——所以这里断言的是"不唤醒"，不是"应当唤醒"。"""
+        self.assertFalse(sc.answer_carries_consumable_information('改成每天两次了，还没复查'))
+
+
 if __name__ == '__main__':
     unittest.main()

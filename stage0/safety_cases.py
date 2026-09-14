@@ -153,6 +153,33 @@ def _is_follow_up_action(item: dict[str, Any] | None) -> bool:
 _UNKNOWN_PHRASES = ('不知道', '不清楚', '不确定', '不记得', '记不清', '说不好',
                     '没有记录', '无法确认', '不了解', '没注意', '忘了')
 
+#: 推迟类回答里出现这些成分，说明用户**顺带给出了可核对的新信息**——那就不再是
+#: 一句纯推迟，值得跑一轮让 Agent 据此调整下一步。
+#:
+#: 这是一份**词法启发式**，不是语义判断：它只认日期、带单位的量值、相对时间词。
+#: 认不出的一律按"没有新信息"处理（见 `answer_carries_consumable_information`），
+#: 所以它的错误方向是**少唤醒**，与推迟类原有的处理一致。改写过的说法
+#: （"改成每天两次了"这种没有数字的）不会被认出来——这是已知的边界，不是漏做。
+_NEW_FACT_PATTERNS = (
+    re.compile(r'\d{4}\s*[-/年]\s*\d{1,2}'),                  # 2026-09 / 2026年9
+    re.compile(r'\d{1,2}\s*月\s*\d{1,2}\s*[日号]'),             # 9月14日
+    re.compile(r'\d+(?:\.\d+)?\s*(?:mg|毫克|片|次|天|周|个月)'),  # 5mg / 3次 / 2周
+    re.compile(r'下周|下个月|下月|明天|后天|周末|月初|月底'),
+)
+
+
+def answer_carries_consumable_information(value: Any) -> bool:
+    """"还没做"有没有顺带给出**能据以行动的新成分**。
+
+    推迟类回答一律不唤醒曾经是对的——唤醒后没有合法动作，那一轮必然熔断。
+    但"还没做，下周一开始"里有一个新时间，Agent 可以据此调整下一步；把它和
+    一句干巴巴的"还没做"同等对待，等于把用户提供的信息丢掉。
+
+    判不出来时返回 ``False``：保守方向与推迟类原有的处理一致。
+    """
+    text = str(value or '')
+    return any(pattern.search(text) for pattern in _NEW_FACT_PATTERNS)
+
 
 #: 结构化字段的**格式**要求。这里只有格式与取值范围，没有任何临床阈值：
 #: "开始时间要是个日期"是格式，"这个剂量是否安全"不是这里能回答的问题。
@@ -642,9 +669,9 @@ class SafetyCaseStore:
                               # 答案本身，不只是"这条答过"。缺了这三样，模型读得到
                               # "有人答过"、读不到"答的是什么、依据是什么"，下一轮
                               # 回访就只能把同一件事重新查一遍——复用无从谈起。
-                              'value': _answer_value(i),
-                              'source': _answer_source(i),
-                              'assessment': _answer_assessment(i),
+                              'value': answer_value(i),
+                              'source': answer_source(i),
+                              'assessment': answer_assessment(i),
                               'answered_against': i.get('answered_against'),
                               'answered_at': i.get('answered_at')}
                              for i in inputs if i.get('status') == 'answered'],
@@ -1992,7 +2019,8 @@ def register_safety_routes(app, product, access, invoke, principal=None,
             # 用户），又因为"有新信息没看过"而终止不了，最后以熔断收场——用户
             # 会看到"这次回访没有跑成"，而他其实只是说了一句"还没做"。
             kind = body.get('answer_kind')
-            if kind not in ANSWER_DEFERRED_KINDS:
+            if (kind not in ANSWER_DEFERRED_KINDS
+                    or answer_carries_consumable_information(body.get('value'))):
                 _wake_investigation(product, case_id, body.get('key'))
             return case_view(store, updated)
         return invoke(run)
@@ -2015,18 +2043,18 @@ def _answer_part(item: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-def _answer_value(item: dict[str, Any]) -> Any:
+def answer_value(item: dict[str, Any]) -> Any:
     part = _answer_part(item)
     return part.get('value') if part else None
 
 
-def _answer_source(item: dict[str, Any]) -> Any:
+def answer_source(item: dict[str, Any]) -> Any:
     """答案的来源种类（用户报告 / 权威记录 / 证据…），不是来源的值。"""
     part = _answer_part(item)
     return part.get('source') if part else None
 
 
-def _answer_assessment(item: dict[str, Any]) -> Any:
+def answer_assessment(item: dict[str, Any]) -> Any:
     """这条答案的可信性判定。读不到就是 `None`（未核实），不冒充已核实。"""
     part = _answer_part(item)
     return part.get('assessment') if part else None

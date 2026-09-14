@@ -532,6 +532,47 @@ class ScenarioCFollowUpNotDone(_VisitCase):
             f'/v1/safety-cases/{case_id}/closure-evidence').json()
         self.assertIn('req-action', evidence['blocking_inputs'])
 
+    def test_a_deferral_with_a_new_fact_moves_the_visit_on(self):
+        """带新成分的推迟**可以**继续；干巴巴的一句推迟只是等，不空转。
+
+        判据不是"唤醒/不唤醒"本身，而是**有没有可消费的信息和合法动作**：
+        前者给了 Agent 一个可以据以调整下一步的新时间，后者什么都没给。
+        """
+        case = self.api.seed_one_case()
+        case_id = case['case_id']
+        declared = _declare('两周后的复查做了吗？', field='schedule', strategy='ask_user')
+
+        def provider(payload):
+            inv = payload['investigation']
+            return declared if not (inv.get('questions') or []) else {'decision': 'respond'}
+
+        # rebuild 会关掉旧宿主：事项库要在这之后取。
+        self.api = self.api.rebuild(proposal_provider=provider)
+        store = sc.SafetyCaseStore(self.api.product)
+        self.api.start_visit(case_id, key='visit-defer')
+
+        def status():
+            task = next(t for t in self.api.product.objects('care_task')
+                        if t.get('goal_type') == 'safety_case' and t.get('visit_id'))
+            return task['status']
+
+        self.assertEqual('waiting_input', status(), '回访应当停在等补充上')
+
+        store.require_input(case_id, request_id='req-bare',
+                            question='两周后的复查做了吗？',
+                            question_kind=sc.QUESTION_KIND_FOLLOW_UP_ACTION)
+        self.api.answer(case_id, 'req-bare', '还没做', kind='not_done', key='a-bare')
+        self.assertEqual('waiting_input', status(),
+                         '一句没有任何新成分的推迟不该唤醒新一轮')
+
+        store.require_input(case_id, request_id='req-fact',
+                            question='复查安排在什么时候？',
+                            question_kind=sc.QUESTION_KIND_FOLLOW_UP_ACTION)
+        self.api.answer(case_id, 'req-fact', '还没做，下周一开始',
+                        kind='not_done', key='a-fact')
+        self.assertNotEqual('waiting_input', status(),
+                            '推迟里带了新时间，Agent 应当有机会据此调整下一步')
+
     def test_done_only_closes_a_follow_up_action_question(self):
         """「已完成」对**事实问题**不成立——那是在说一件跟问题无关的事。"""
         case = self.api.seed_one_case()
