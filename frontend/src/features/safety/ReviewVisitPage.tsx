@@ -369,7 +369,7 @@ function GroupStatements({ view }: { view: SafetyCaseDto }): React.ReactElement 
       ))}
       <p className="text-xs text-ink-muted">
         这里逐条说明每一项各自到哪一步了——「旧药已经停用」和「新药还没开始」是两件事，
-        不合并成一句"换药完成"或"换药只做了一半"。
+        各自如实说，不合并成一句总结论。
       </p>
     </section>
   );

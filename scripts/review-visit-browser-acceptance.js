@@ -238,6 +238,7 @@ async function main() {
     record('7a 含糊时原文仍然留在页面上', /合成药甲不吃了，换个新的/.test(afterVague));
 
     // 7b) 用户补一句，把对象说清楚 —— 这一次形成**一组**换药候选。
+    //     注意 quote 必须是**这一句原文**里的连续片段：核对不上的判定会被丢掉。
     await setReading({
       summary: '用户说把药甲换成合成药丙',
       items: [
@@ -251,7 +252,7 @@ async function main() {
       ],
       question: '',
     });
-    await submitNote('换成合成药丙，2mg');
+    await submitNote('合成药甲不吃了，换成合成药丙，2mg');
 
     const pending = page.locator('[data-pending-candidates] [data-candidate]');
     const pendingCount = await pending.count();
