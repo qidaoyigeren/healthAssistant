@@ -490,6 +490,58 @@ class AmbiguityTests(_ChangeFlow):
         self.assertTrue(note['questions'], '依据对不上时应当补问，而不是静默丢弃')
 
 
+class AmbiguityFlagTests(_ChangeFlow):
+    """歧义由**能不能唯一解析到权威记录**判定，不照抄模型的自评。
+
+    这一组是真实模型那一轮暴露出来的：它一边点名"合成药甲"、一边又把
+    `object_ambiguous` 标上，于是候选被挡下——用户明明点了名，却被告知"您说的是
+    哪一种药"。同一轮也确认了另一面：用"这个药"指代时，那个标记得留着。
+    """
+
+    def plan_reading(self, text, context):
+        return _reading()
+
+    def test_a_name_that_is_quoted_verbatim_is_not_ambiguous(self):
+        self.interpreter.plan = lambda text, context: _reading(_item(
+            'occurred', operation='remove', name='合成药甲', quote=text,
+            denies_quote='', uncertain=['object_ambiguous']))
+        # drug_quote 就是用户点名的那个词 —— 名称出现在依据里，不是指代。
+        self.interpreter.plan = lambda text, context: _reading(
+            {**_item('occurred', operation='remove', name='合成药甲', quote=text,
+                     uncertain=['object_ambiguous']),
+             'drug_quote': '合成药甲'})
+        self.submit('是合成药甲，上周就停了')
+        pending = self.pending()
+        self.assertEqual(1, len(pending), pending)
+        self.assertEqual('合成药甲', pending[0]['target']['name'])
+        self.assertEqual([], self.notes()[-1]['questions'],
+                         '点名说了是哪一个药，就不该再问"您说的是哪一种药"')
+
+    def test_a_pronoun_with_a_guessed_name_stays_ambiguous(self):
+        self.interpreter.plan = lambda text, context: _reading(
+            {**_item('occurred', operation='remove', name='合成药甲', quote=text,
+                     uncertain=['object_ambiguous']),
+             'drug_quote': '这个药'})
+        self.submit('这个药不吃了')
+        self.assertEqual([], self.pending(), '指代不明时不能拿模型猜的名字去写')
+        note = self.notes()[-1]
+        self.assertTrue(any('哪一种药' in entry['text'] for entry in note['questions']),
+                        note['questions'])
+
+    def test_a_vague_time_does_not_block_the_candidate(self):
+        """"上周"是可表达的（reported_vague），不是"说不清所以不能登记"。"""
+        self.interpreter.plan = lambda text, context: _reading(_item(
+            'occurred', operation='remove', name='合成药甲', quote=text,
+            time_text='上周', precision='week', uncertain=['time_vague']))
+        self.submit('合成药甲上周就停了')
+        pending = self.pending()
+        self.assertEqual(1, len(pending), pending)
+        self.assertEqual('reported_vague', pending[0]['occurred']['basis'])
+        self.assertIsNone(pending[0]['occurred']['value'])
+        self.assertEqual('上周', pending[0]['occurred']['text'])
+        self.assertEqual([], self.notes()[-1]['questions'])
+
+
 class ChineseNumberTests(_ChangeFlow):
     """中文数字与改写：没有阿拉伯数字不等于没有新信息。"""
 

@@ -66,8 +66,13 @@ UNCERTAINTIES = ('object_ambiguous', 'value_missing', 'time_vague', 'conflicting
 
 #: 一次理解的**硬上限**。它自成一个预算单元，不占用回访调查的额度。
 #: 一句话的理解不该需要第二次调用；重试只能由用户**显式**发起。
+#:
+#: ``accounting_version`` 必须跟着走：缺了它 `BudgetSession` 会把这次运行判成
+#: "记账口径不明"并**拒绝发起调用**——那是 fail closed，是对的，但这里我们要的是
+#: 一次正常记账的调用。
 INTERPRET_LIMITS = {'max_cycles': 1, 'wall_clock_seconds': 25.0,
-                    'token_budget': 8000, 'call_budget': 2}
+                    'token_budget': 8000, 'call_budget': 2,
+                    'accounting_version': 2}
 
 UNCERTAINTY_LABELS = {
     'object_ambiguous': '您指的是哪一种药还不确定',
@@ -366,11 +371,28 @@ class ChangeNoteInterpreter:
     # -- 调用 ---------------------------------------------------------------
     def read(self, *, text: str, context: dict[str, Any],
              hint: str | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
-        """跑一次理解，返回 ``(reading, usage)``。"""
+        """跑一次理解，返回 ``(reading, usage)``。
+
+        它有自己的**运行记录**：预算、尝试台账、用量都进既有那本账，与回访调查
+        同源。没有这条记录 `budget_scope` 会直接拒绝——这是好事，它逼着这次调用
+        留下可核对的痕迹，而不是一次没人记账的网络请求。
+        """
         from .turn_budget import budget_scope, completion_call
         client = self._client()
         run_id = f'change-note:{uuid.uuid4().hex}'
         payload = _reading_prompt(text, context, hint)
+        self.memory.workflow_run_start(
+            run_id=run_id, graph_version='change-note@1', state_schema_version='2',
+            model_id=(self.config() or {}).get('model'),
+            budget=dict(INTERPRET_LIMITS))
+        try:
+            return self._read_in_run(run_id, client, payload)
+        finally:
+            self.memory.workflow_run_update(run_id, status='succeeded')
+
+    def _read_in_run(self, run_id: str, client: Any,
+                     payload: str) -> tuple[dict[str, Any], dict[str, Any]]:
+        from .turn_budget import budget_scope, completion_call
         with budget_scope(self.memory, run_id, 1, dict(INTERPRET_LIMITS)) as session:
             response = completion_call(
                 'change_note_reader', client,
@@ -518,6 +540,8 @@ def validate_reading(reading: Any, *, text: str, product,
         name = str(raw.get('drug_name') or '').strip()
         denies = str(raw.get('denies_name') or '').strip()
         item = {'when': when, 'quote': quote, 'name': name, 'denies': denies,
+                # 名称的**依据片段**：用来判断用户是点名说的还是用指代说的。
+                'drug_quote': str(raw.get('drug_quote') or ''),
                 'denies_quote': str(raw.get('denies_quote') or ''),
                 'operation': str(raw.get('operation') or 'none'),
                 'field': str(raw.get('field') or 'none'),
@@ -554,6 +578,15 @@ def validate_reading(reading: Any, *, text: str, product,
             continue
         item['target'] = target
         item['matched_by'] = matched
+        # 歧义由**能不能唯一解析到一条权威记录**判定，不照抄模型的自评。
+        #
+        # 模型可能一边点名"合成药甲"、一边又把 object_ambiguous 标上（真实模型
+        # 跑出来就是这样）。它自己在同一句话里前后矛盾，这时用一个**可核对**的
+        # 规则解掉：`drug_quote` 是它给出的依据片段——名称**就出现在那段依据里**，
+        # 说明用户是点名说的，不是指代。指代（"这个药"）则不在其中，歧义保留。
+        if 'object_ambiguous' in item['uncertain'] and _names_explicitly(item, target):
+            item['uncertain'] = [flag for flag in item['uncertain']
+                                 if flag != 'object_ambiguous']
         items.append(item)
     raw_items = [entry for entry in (reading.get('items') or [])
                  if isinstance(entry, dict)] if isinstance(reading, dict) else []
@@ -562,14 +595,35 @@ def validate_reading(reading: Any, *, text: str, product,
         questions.append({'about': 'no_evidence', 'quote': None,
                           'text': '我没能从这句话里确认出具体的变化，'
                                   '能不能再说得具体一点（哪种药、改成了什么）？'})
-    # 需要补问的：判不出动作、对象不唯一、值缺失、时间说法含糊到无法核对。
+    # 需要补问的：判不出动作、对象不唯一、值缺失、前后矛盾。
+    # 时间含糊**不在其列**——它由候选的 `reported_vague` 如实表达。
     for item in items:
         if item['when'] in (WHEN_QUESTION, WHEN_MISSED_DOSE):
             continue
-        if item['uncertain']:
+        if _blocking_uncertainties(item):
             questions.append({'about': 'clarify', 'quote': item['quote'],
                               'text': _clarifying_question(item)})
     return items, questions
+
+
+def _names_explicitly(item: dict[str, Any], target: dict[str, Any]) -> bool:
+    """用户是不是**点名**说的这个药（而不是用"这个药""它"指代）。
+
+    依据是模型自己给出的那段原文片段：名称出现在里面，就是点名。
+    """
+    quote = _key(item.get('drug_quote'))
+    name = _key(target.get('name'))
+    return bool(quote and name and name in quote)
+
+
+def _blocking_uncertainties(item: dict[str, Any]) -> list[str]:
+    """哪些不确定**真的**挡住候选。
+
+    ``time_vague`` 不挡：时间含糊是**可表达**的——候选带 `reported_vague`、
+    原文照留、不解析成具体日期。把"上周"当成"说不清所以不能登记"，等于因为
+    时间说得不精确就拒绝记下这次变化。
+    """
+    return [flag for flag in item.get('uncertain') or [] if flag != 'time_vague']
 
 
 def _clarifying_question(item: dict[str, Any]) -> str:
@@ -681,7 +735,7 @@ def apply_reading(product, *, visit_id: str, note: dict[str, Any], reading: dict
         if when == WHEN_PLANNED:
             plans.append(plan_record(item, group_id=group_id))
             continue
-        if item.get('uncertain'):
+        if _blocking_uncertainties(item):
             continue                     # 判不实的不生成候选，转成问题
         denied = item.get('denies')
         if denied:
