@@ -1065,6 +1065,7 @@ class CareTasks:
                  for entry in visits_module.news_entries(case, start)]
         return {
             'visit_id': visit['id'],
+            'previous_visit_id': visit.get('previous_visit_id'),
             'sequence': visits_module.sequence_of(self.p, case['id'], visit),
             'reason': dict(visit['reason']),
             'started_from': start,

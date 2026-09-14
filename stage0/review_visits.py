@@ -91,7 +91,14 @@ class ReviewVisitStore:
         raise ProductError('回访记录不存在或不属于当前患者', 404)
 
     def for_case(self, case_id: str) -> list[dict[str, Any]]:
-        return [visit for visit in self.objects() if visit['case_id'] == case_id]
+        """这一事项上的全部回访，**按开始时间升序**。
+
+        顺序必须由这里定死：`objects()` 的返回顺序取决于存储，而"第几次回访"、
+        "上一次是哪一次"都按位置数。不定序的话，同一个库读两次可能给出不同的
+        "第二次"。同一微秒开的两访用 id 兜底，至少是**稳定**的。
+        """
+        return sorted((visit for visit in self.objects() if visit['case_id'] == case_id),
+                      key=lambda visit: (str(visit.get('opened_at') or ''), visit['id']))
 
     def open_for_case(self, case_id: str) -> dict[str, Any] | None:
         """这一事项上**还没结束**的那次回访。
