@@ -742,6 +742,24 @@ class FailureTests(_ChangeFlow):
         self.assertEqual(cn.NOTE_INTERPRETED, response.json()['status'])
         self.assertEqual(1, len(self.pending()))
 
+    def test_a_replayed_retry_does_not_call_the_model_again(self):
+        """重试是一次有人按下的动作；按下之后的重复请求不该变成第二次调用。"""
+        self.interpreter.mode = 'error'
+        self.submit('停了合成药甲')
+        note = self.notes()[-1]
+        self.assertEqual(cn.NOTE_FAILED, note['status'])
+
+        self.interpreter.mode = 'ok'
+        first = self.retry(note['id'], key='retry-x')
+        self.assertEqual(200, first.status_code, first.text)
+        self.assertEqual(cn.NOTE_INTERPRETED, first.json()['status'])
+        calls = len(self.interpreter.reads)
+
+        again = self.retry(note['id'], key='retry-x')
+        self.assertEqual(200, again.status_code, again.text)
+        self.assertEqual(calls, len(self.interpreter.reads),
+                         '同一个 key 的重放不该再花一次模型额度')
+
     def test_an_empty_submission_is_refused_without_touching_anything(self):
         response = self.api.client.post(
             f'/v1/safety-cases/{self.case_id}/visits/{self.visit_id}/notes',

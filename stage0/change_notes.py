@@ -27,7 +27,7 @@ import json
 import os
 import re
 import uuid
-from typing import Any, Callable, Sequence
+from typing import Any, Callable
 
 from . import review_visits as _visits
 from .memory import utc_now
@@ -698,8 +698,26 @@ def _iso_date(value: str) -> bool:
         return False
 
 
-def apply_reading(product, *, visit_id: str, note: dict[str, Any], reading: dict[str, Any],
-                  key: str | None = None) -> dict[str, Any]:
+def retry_note(product, *, note_id: str, interpreter: Any = None,
+               tz: str | None = None, key: str | None = None) -> dict[str, Any]:
+    """**显式**重试一次理解。
+
+    同一个 key 的重放**不再花一次模型额度**：重试是一次有人按下的动作，而按下之后
+    的重复请求（超时重发、双开）不该变成第二次调用。记录在命令回执里，与其它幂等
+    一样持久。
+    """
+    if key and product.receipt(f'{note_id}:retry:{key}') is not None:
+        return find_note(product, note_id)[0]
+    note = interpret_note(product, note_id=note_id, interpreter=interpreter, tz=tz)
+    if key:
+        product.command(f'{note_id}:retry:{key}',
+                        {'type': 'change_note_retry', 'note_id': note_id},
+                        lambda: {'retried': note_id})
+    return note
+
+
+def apply_reading(product, *, visit_id: str, note: dict[str, Any],
+                  reading: dict[str, Any]) -> dict[str, Any]:
     """把一次通过校验的理解落到候选/计划/问题上。
 
     顺序是刻意的：**先撤回被纠正的候选**，再生成新的。这样任何时候都不会同时存在
@@ -826,7 +844,7 @@ def _before_of(target: dict[str, Any], item: dict[str, Any]) -> dict[str, Any]:
 
 # ---- 编排 -------------------------------------------------------------------
 def interpret_note(product, *, note_id: str, interpreter: Any = None,
-                   tz: str | None = None, key: str | None = None) -> dict[str, Any]:
+                   tz: str | None = None) -> dict[str, Any]:
     """收录之后的一次理解。**不启动调查**：一句话的理解不该跑一整轮 Agent。"""
     note, visit = find_note(product, note_id)
     if note['status'] in (NOTE_INTERPRETED, NOTE_UNAVAILABLE):
@@ -968,15 +986,15 @@ def register_change_note_routes(app, product, access, invoke, principal=None):
         _visit_or_404(visit_id, case_id)
 
         def run():
-            note = interpret_note(product, note_id=note_id, interpreter=_interpreter(),
-                                  tz=body.get('tz'), key=body.get('key'))
+            note = retry_note(product, note_id=note_id, interpreter=_interpreter(),
+                              tz=body.get('tz'), key=body.get('key'))
             _refresh_visit_result(product, SafetyCaseStore(product), case_id, visit_id)
             return note
         return invoke(run)
 
 
 __all__ = [
-    'register_change_note_routes',
+    'register_change_note_routes', 'retry_note',
     'MAX_TEXT', 'NOTE_RECEIVED', 'NOTE_INTERPRETING', 'NOTE_INTERPRETED',
     'NOTE_UNAVAILABLE', 'NOTE_FAILED', 'NOTE_STATUSES',
     'WHEN_OCCURRED', 'WHEN_PLANNED', 'WHEN_QUESTION', 'WHEN_CORRECTION',
