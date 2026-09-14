@@ -647,8 +647,20 @@ class CareTasks:
         inv = result['investigation']
         task['investigation'] = inv
         resources = task.get('resource_budget')
-        if resources and result['run_id'] not in resources['child_run_ids']:
-            resources['child_run_ids'].append(result['run_id'])
+        if resources:
+            if result['run_id'] not in resources['child_run_ids']:
+                resources['child_run_ids'].append(result['run_id'])
+            # 与 evidence_review **同一口径**：从任务自己保存的 run 引用汇总，
+            # 不按 run_id 字符串去拼。少了这一步，safety_case 任务的
+            # calls_actual 永远是建任务时的初值 0——而调用确实发生过，
+            # 报告里于是出现"0 次调用"和"模型确实跑了"并存的自相矛盾。
+            owned = [self.p.memory.workflow_run_get(r) for r in resources['child_run_ids']]
+            resources['tokens_actual'] = sum(
+                (r or {}).get('budget', {}).get('tokens_actual', 0) for r in owned)
+            resources['calls_actual'] = sum(
+                (r or {}).get('budget', {}).get('calls_attempted', 0) for r in owned)
+            resources['usage_unknown'] = any(
+                (r or {}).get('budget', {}).get('usage_unknown', False) for r in owned)
         task['usage'] = self.usage(task)
 
         artifact = {'id': f'safety-case-report:{uuid.uuid4().hex}', 'created_at': utc_now(),

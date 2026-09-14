@@ -654,5 +654,17 @@ class ConsumableDeferralTests(unittest.TestCase):
         self.assertFalse(sc.answer_carries_consumable_information('改成每天两次了，还没复查'))
 
 
+class UsageReadingTests(_VisitFixture):
+    """读不到用量就是 unknown，**不是 0**。0 是一个测量结果。"""
+
+    def test_unreadable_usage_is_none_not_zero(self):
+        from stage0.care_tasks import CareTasks
+        measured = CareTasks(self.product).usage({'resource_budget': {'child_run_ids': []}})
+        self.assertIsNone(measured['calls'])
+        self.assertIsNone(measured['tokens'])
+        self.assertFalse(measured['measured'])
+        self.assertEqual('no_child_runs', measured['reason'])
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -343,6 +343,34 @@ class ReuseIsAnAction(_VisitCase):
         self.assertEqual([], list(inv.get('queries') or []))
 
 
+class UsageIsMeasuredOnTheVisit(_VisitCase):
+    """调用真的发生过，这一件回访的记账就不能读成 0。"""
+
+    def test_a_visit_that_ran_reports_its_own_usage(self):
+        from stage0.care_tasks import CareTasks
+        case = self.api.seed_one_case()
+        declared = _declare('合成药乙目前的服用频次是什么？', field='schedule',
+                            strategy='ask_user')
+
+        def provider(payload):
+            inv = payload['investigation']
+            return declared if not (inv.get('questions') or []) else {'decision': 'respond'}
+
+        self.api = self.api.rebuild(proposal_provider=provider)
+        self.api.start_visit(case['case_id'], key='usage-1')
+        task = [t for t in self.api.product.objects('care_task')
+                if t.get('visit_id')][-1]
+
+        measured = CareTasks(self.api.product).usage(task)
+        self.assertTrue(measured['measured'],
+                        f'这一件回访跑过，用量却读不到：{measured.get("reason")}')
+        self.assertGreater(measured['calls'] or 0, 0,
+                           '模型确实调用过，记账读成了 0——那不是一个测量结果')
+        # 任务自己的字段也要跟着一起重算，两处不能各说各话。
+        self.assertEqual(measured['calls'],
+                         (task.get('resource_budget') or {}).get('calls_actual'))
+
+
 class TheModelSeesTheVisit(_VisitCase):
     """回访摘要真的进到模型上下文里，而且只放引用。"""
 

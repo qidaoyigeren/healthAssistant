@@ -85,10 +85,25 @@ def _apply_budget(product, case_view, args):
         product.save('care_task', task)
 
 
-def _usage(task):
+def _usage(product, task):
+    """这一件回访**实际发生**的模型用量。
+
+    从任务自己保存的 run 引用汇总（`resource_budget.child_run_ids`），因此
+    **包含同一次回访的恢复运行**——恢复也是这次回访花的钱。读不到的键一律
+    ``None``（unknown），**不记 0**：0 是一个测量结果，"没测到"不是同一个意思。
+
+    上一版直接读 `resource_budget.calls_actual`，而那个字段在 safety_case 上
+    从来没被重算过，于是报告里出现"0 次调用"与"模型确实调用过"并存的自相矛盾。
+    """
+    from stage0.care_tasks import CareTasks
+    measured = CareTasks(product).usage(task)
     resources = task.get('resource_budget') or {}
-    return {'calls_actual': resources.get('calls_actual'),
-            'tokens_actual': resources.get('tokens_actual'),
+    return {'calls_actual': measured.get('calls'),
+            'tokens_actual': measured.get('tokens'),
+            'runs_actual': measured.get('runs'),
+            'refused_calls': measured.get('refused_calls'),
+            'measured': measured.get('measured'),
+            'unknown_reason': measured.get('reason'),
             'calls_reserved': resources.get('calls_reserved'),
             'token_limit': resources.get('token_limit'),
             'call_limit': resources.get('call_limit')}
@@ -277,7 +292,7 @@ def main() -> int:
                                encoding='utf-8')
                 return 1
             report['round_1'] = _planner_digest(task)
-            report['round_1']['usage'] = _usage(task)
+            report['round_1']['usage'] = _usage(product, task)
             report['round_1']['trace'] = _run_trace(memory, task)
 
             # 3) 它提问就**像用户一样**回答；等待期间不消费模型。
@@ -300,7 +315,7 @@ def main() -> int:
                 drain()
                 task_now = product.get(task_id, 'care_task')
                 report['round_2'] = _planner_digest(task_now)
-                report['round_2']['usage'] = _usage(task_now)
+                report['round_2']['usage'] = _usage(product, task_now)
                 report['round_2']['trace'] = _run_trace(memory, task_now)
                 report['round_2_state'] = _visit_snapshot(store, case_id)
                 # "下一步有没有变化"：这一轮的动作集合与上一轮是否不同。
