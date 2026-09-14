@@ -377,11 +377,37 @@ class AnswerAdoptionTests(unittest.TestCase):
         inv.assessments[claim_id] = {'ev-9': {'status': 'supported',
                                               'source_status': 'current',
                                               'support_status': 'supported_by_span'}}
+        # 判定说"被支持"，还要指得出**是哪一段文字**让它成立：那段文字是写答案
+        # 元素的材料，也是"已有依据"能报出自己来源的前提。真实路径里由
+        # `_read_evidence` 记下；这条用例直接构造 assessment，所以一并补上。
+        claim = next(c for c in inv.claims if c['claim_id'] == claim_id)
+        claim.setdefault('support_spans', {})['ev-9'] = '合成药甲的常用起始剂量为 5mg。'
         inv._assess()
         question = inv.question(qid)
         self.assertTrue(is_question_answered(question),
                         '有依据的支持必须回到问题上，否则问题永远停在未决')
         self.assertEqual(INFO_AVAILABLE, question['information_state'])
+        # 而且答案元素真的写下了：状态宣称完成，就得有东西支撑它。
+        self.assertTrue(question.get('answers'), 'available 却说不出是什么回答了它')
+        self.assertEqual('ev-9', question['answers'][-1].get('source_ref'))
+
+    def test_a_claim_that_cannot_name_its_span_does_not_close_the_question(self):
+        """判定说"被支持"，却指不出是哪一段——**不**把问题读成已有依据。
+
+        一条状态宣称完成了、背后却什么都没有的回答，正是要修的那类缺陷：
+        界面只能显示"已回答"，显示不出回答是什么。
+        """
+        inv = case_state()
+        qid = self._read_question(inv, target=TARGET_GENERAL_REFERENCE, field='dose',
+                                  strategy=STRATEGY_GENERAL_REFERENCE, subjects=('合成药甲',))
+        claim_id = 'claim:' + digest([qid])[:12]
+        inv.assessments[claim_id] = {'ev-9': {'status': 'supported',
+                                              'source_status': 'current',
+                                              'support_status': 'supported_by_span'}}
+        inv._assess()
+        question = inv.question(qid)
+        self.assertFalse(is_question_answered(question))
+        self.assertNotEqual(INFO_AVAILABLE, question['information_state'])
 
     def test_a_claim_that_was_read_but_not_supported_leaves_the_question_open(self):
         inv = case_state()
