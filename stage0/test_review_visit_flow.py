@@ -231,6 +231,64 @@ class ScenarioAReusesWhatIsKnown(_VisitCase):
         return self.api.case(case['case_id'])
 
 
+class TheModelSeesTheVisit(_VisitCase):
+    """回访摘要真的进到模型上下文里，而且只放引用。"""
+
+    def _context(self, case_id):
+        case = sc.SafetyCaseStore(self.api.product).get(case_id)
+        task = next(t for t in self.api.product.objects('care_task')
+                    if t.get('visit_id'))
+        tasks = CareTasks(self.api.product)
+        return tasks._safety_case_context(task, case, {'max_steps': 16}), task
+
+    def test_the_context_carries_the_visit_summary(self):
+        case = self.api.seed_one_case()
+        view = self.api.start_visit(case['case_id'], key='visit-ctx')
+        context, task = self._context(case['case_id'])
+
+        visit = context['visit']
+        self.assertIsNotNone(visit, '回访任务的上下文里没有回访摘要')
+        self.assertEqual(view['visit']['visit_id'], visit['visit_id'])
+        self.assertEqual(task['visit_id'], visit['visit_id'])
+        self.assertEqual(1, visit['sequence'])
+        self.assertEqual(view['visit']['reason'], visit['reason'])
+        for key in ('reusable_answers', 'retired_answers', 'pending_candidates',
+                    'confirmed_follow_up', 'open_questions', 'allowed_actions',
+                    'new_since_last_visit', 'previous_result'):
+            self.assertIn(key, visit)
+
+    def test_no_new_records_is_stated_as_an_information_state(self):
+        """没有新记录 ≠ 情况稳定。这一句是全项目唯一允许的写法。"""
+        from stage0 import review_visits as rv
+        case = self.api.seed_one_case()
+        view = self.api.start_visit(case['case_id'], key='visit-quiet')
+        visit_id = view['visit']['visit_id']
+        # 把游标推到当前历史末尾——此刻**确实**没有新记录，这条规则才有东西可判。
+        raw = sc.SafetyCaseStore(self.api.product).get(case['case_id'])
+        rv.ReviewVisitStore(self.api.product).save_result(
+            visit_id, {'unresolved': []}, cursor_after=len(raw.get('history') or []))
+
+        context, _ = self._context(case['case_id'])
+        new = context['visit']['new_since_last_visit']
+        self.assertEqual([], new['events'])
+        self.assertEqual([], new['changed_scopes'])
+        self.assertEqual(rv.NO_NEW_RECORDS, new['statement'])
+        # 系统的信息状态，不是一句没有人做过的判断。这句原话本身**否定**了
+        # "风险已经解除"，所以不能按关键词一刀切——要禁止的是**肯定**的那两种说法。
+        self.assertNotIn('情况稳定', new['statement'])
+        self.assertNotIn('风险已解除', new['statement'])
+
+    def test_the_summary_does_not_copy_patient_facts(self):
+        """只放引用：摘要里不得出现药名原文或证据正文。"""
+        import json
+        case = self.api.seed_one_case()
+        self.api.start_visit(case['case_id'], key='visit-copy')
+        context, _ = self._context(case['case_id'])
+        blob = json.dumps(context['visit'], ensure_ascii=False)
+        for medication in self.api.product.memory.current_medications():
+            self.assertNotIn(medication.get('display_name') or '\0', blob)
+
+
 class ScenarioBRelatedChange(_VisitCase):
     """"出现相关变化"：识别缺口 → 提问 → 确认变更 → 检查重排队 → 同一事项更新。"""
 

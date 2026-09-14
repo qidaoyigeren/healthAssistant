@@ -973,8 +973,92 @@ class CareTasks:
                 'remaining_task_steps': max(0, task['budget']['limit'] - task['budget']['spent']),
                 'model_runs_so_far': len(task.get('runs') or []),
             },
+            # 这次执行如果是一次**回访**，它另外带来一份引用式摘要。它不是第二个
+            # 真相源：每一样都从事项与回访记录现取，只是把"本次该看什么"收拢成
+            # 一处，省得模型自己从整段历史里翻。
+            'visit': self._visit_context(task, case),
         })
         return context
+
+    def _visit_context(self, task, case) -> dict[str, Any] | None:
+        """本次回访的摘要。没有回访就是 `None`，不凭空造一个。
+
+        **只放引用与状态**：答案给 request_id、值与它的可信性判定，候选给字段与
+        前后值，事件给一句可读的叙述。不复制患者事实、药单、证据正文或结论——
+        那些一律现取，摘要才不会和权威记录分叉（`review_visits` 的同一原则）。
+        """
+        from . import review_visits as visits_module
+        from .safety_cases import (ANSWER_UNKNOWN, answer_assessment, answer_source,
+                                   answer_value)
+        visit_id = task.get('visit_id')
+        if not visit_id:
+            return None
+        visits = visits_module.ReviewVisitStore(self.p)
+        try:
+            visit = visits.get(visit_id)
+        except ProductError:
+            return None
+        inputs = case.get('required_inputs') or []
+        entries = list(case.get('history') or [])
+        start = int((visit.get('cursor') or {}).get('before') or 0)
+        previous = None
+        if visit.get('previous_visit_id'):
+            try:
+                previous = visits.get(visit['previous_visit_id'])
+            except ProductError:
+                previous = None
+        previous_result = (previous or {}).get('result') or {}
+        fresh = [visits_module.history_line(entry)
+                 for entry in visits_module.news_entries(case, start)]
+        return {
+            'visit_id': visit['id'],
+            'sequence': visits_module.sequence_of(self.p, case['id'], visit),
+            'reason': dict(visit['reason']),
+            'started_from': start,
+            'previous_result': ({
+                'unresolved': previous_result.get('unresolved') or [],
+                'focus': list(previous.get('focus') or []),
+                'next_step': previous_result.get('next_step'),
+                'closed_at': previous.get('closed_at'),
+            } if previous else None),
+            'new_since_last_visit': {
+                'changed_scopes': visits_module.changed_scopes(self.p, case),
+                # 三种状态**分开表达**，不合流：范围变了是记录真的变了，
+                # 候选是用户说了但还没确认，两者都没有才是"系统尚未收到新记录"。
+                # 最后那句用 NO_NEW_RECORDS 原话，绝不定性成"情况稳定"。
+                'statement': (visits_module.NO_NEW_RECORDS if not fresh
+                              and not visits_module.changed_scopes(self.p, case) else None),
+                'events': [line['text'] for line in fresh],
+            },
+            'reusable_answers': [
+                {'request_id': item['request_id'], 'question': item.get('question'),
+                 'value': answer_value(item), 'source': answer_source(item),
+                 'assessment': answer_assessment(item),
+                 'answered_against': item.get('answered_against')}
+                for item in inputs if item.get('status') == 'answered'],
+            'retired_answers': [
+                {'request_id': item['request_id'], 'question': item.get('question'),
+                 'reason': item.get('reopened_reason'),
+                 'scopes': list(item.get('reopened_scopes') or [])}
+                for item in inputs if item.get('answer_invalidated')],
+            'pending_candidates': [
+                {'candidate_id': candidate['id'], 'name': candidate['name'],
+                 'field': candidate['field'], 'before': candidate.get('before'),
+                 'after': candidate.get('after'), 'source': candidate['source']}
+                for candidate in (visit.get('change_candidates') or [])
+                if candidate['status'] == visits_module.CANDIDATE_PENDING],
+            'confirmed_follow_up': visits_module.arrangement_view(case),
+            'open_questions': [
+                {'request_id': item['request_id'], 'question': item.get('question'),
+                 'why_needed': item.get('why_needed'),
+                 'for_professional': bool(item.get('for_professional'))}
+                for item in inputs if item.get('status') in ('open', ANSWER_UNKNOWN)],
+            'allowed_actions': list(visits_module.VISIT_NEXT_STEPS),
+            'budget': {
+                'remaining_task_steps': max(0, task['budget']['limit'] - task['budget']['spent']),
+                'runs_so_far': len(task.get('runs') or []),
+            },
+        }
 
     @staticmethod
     def _answerable_by_user(question: dict[str, Any]) -> bool:

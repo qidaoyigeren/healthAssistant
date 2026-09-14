@@ -59,6 +59,20 @@ CANDIDATE_FIELDS = ('dose', 'schedule', 'route', 'start_at')
 #: "没有新记录"的**唯一**允许写法。渲染函数从这里取，测试也断言这一句。
 NO_NEW_RECORDS = ('系统尚未收到新记录；这不等于情况没有变化，也不表示风险已经解除。')
 
+#: "上次之后发生了什么"里**算数**的事件：信息到达，或记录本身改变。
+#:
+#: 事项自身的生命周期事件（``status_changed`` / ``input_requested`` / ``opened`` /
+#: ``reopened``）**不算**。它们是上面这些事件的**后果**，混进来会把"系统刚刚做了
+#: 什么"报成"患者那里发生了什么"——一次刚建立的回访会立刻显示"上次之后有新情况"，
+#: 而实际上一个字的新信息都没有。取消回访、事项被复核推进这类系统动作也在此列。
+NEWS_EVENTS = ('input_recorded', 'answer_retired', 'resolution_basis_retired', 'disposition')
+
+
+def news_entries(case: dict[str, Any], start: int) -> list[dict[str, Any]]:
+    """游标之后**算数**的那些事件。定义只有这一处，读它的人共用同一口径。"""
+    return [entry for entry in (case.get('history') or ())[int(start or 0):]
+            if entry.get('event') in NEWS_EVENTS]
+
 
 class ReviewVisitStore:
     """回访记录的读写。只碰 `product_objects` 里的 `review_visit`，不碰任何真相源。"""
@@ -334,7 +348,7 @@ CASE_KIND_LABELS = {'interaction_risk': '药物相互作用风险', 'condition_r
                     'source_invalidated': '来源失效'}
 
 
-def _sequence_of(product, case_id: str, visit: dict[str, Any]) -> int:
+def sequence_of(product, case_id: str, visit: dict[str, Any]) -> int:
     """这是这位患者这件事项的第几次回访。按记录顺序数，不按时间戳比大小。"""
     ordered = ReviewVisitStore(product).for_case(case_id)
     for index, item in enumerate(ordered):
@@ -369,9 +383,9 @@ def visit_intent(product, case: dict[str, Any], visit: dict[str, Any], *,
                   if isinstance(item, dict) and item.get('text')]
     entries = list(case.get('history') or [])
     start = int((visit.get('cursor') or {}).get('before') or 0)
-    fresh = [_history_line(entry)['text'] for entry in entries[start:]]
+    fresh = [_history_line(entry)['text'] for entry in news_entries(case, start)]
     recheck = None
-    for entry in entries[start:]:
+    for entry in news_entries(case, start):
         if entry.get('event') == 'resolution_basis_retired':
             recheck = '原有处置依据已失效，需要按当前记录重新核对'
         elif entry.get('event') == 'answer_retired' and recheck is None:
@@ -379,7 +393,7 @@ def visit_intent(product, case: dict[str, Any], visit: dict[str, Any], *,
     follow_up = _follow_up.project_follow_up(case.get('follow_up'))
     intent = {
         'visit_id': visit['id'],
-        'sequence': _sequence_of(product, case['id'], visit),
+        'sequence': sequence_of(product, case['id'], visit),
         'reason': dict(visit['reason']),
         'previous_visit_id': visit.get('previous_visit_id'),
         'previous_unfinished': unfinished,
@@ -480,10 +494,15 @@ def render_result(product, case: dict[str, Any], visit: dict[str, Any], *,
     from . import followup_runtime as _follow_up
     from . import safety_cases as sc
 
-    entries = list(history if history is not None else (case.get('history') or []))
     cursor = visit.get('cursor') or {}
     start = int(cursor.get('before') or 0)
-    new_entries = entries[start:]
+    # 只把**信息到达或记录改变**当成"上次之后发生了什么"。事项自身的生命周期
+    # 转移不算——那是这些事件的后果，不是患者那里传来的消息。口径只有一处定义。
+    if history is None:
+        new_entries = news_entries(case, start)
+    else:
+        new_entries = [entry for entry in list(history)[start:]
+                       if entry.get('event') in NEWS_EVENTS]
     inputs = case.get('required_inputs') or []
     open_inputs = [i for i in inputs if i.get('status') == 'open']
     unknown_inputs = [i for i in inputs if i.get('status') == sc.ANSWER_UNKNOWN]
@@ -561,6 +580,17 @@ def render_result(product, case: dict[str, Any], visit: dict[str, Any], *,
         'rendered_at': utc_now(),
     }
     return result
+
+
+def history_line(entry: dict[str, Any]) -> dict[str, Any]:
+    """一条事项历史 → 一句可读的"上次之后发生了什么"。**公开入口**。"""
+    return _history_line(entry)
+
+
+def arrangement_view(case: dict[str, Any]) -> dict[str, Any] | None:
+    """这件事项的跟进安排及其**确认状态**。没有就是没有，不编一个出来。"""
+    from . import followup_runtime as _follow_up
+    return _arrangement_view(_follow_up.project_follow_up(case.get('follow_up')), case)
 
 
 def _history_line(entry: dict[str, Any]) -> dict[str, Any]:
