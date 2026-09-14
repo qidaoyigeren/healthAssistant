@@ -36,6 +36,17 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+class MedicationWriteConflict(RuntimeError):
+    """一次用药写入的前置条件不再成立：对象、版本或状态已经变了。
+
+    独立于 ``ProductError``——memory 层不依赖 product 层。它**必须**在写入事务里
+    抛出（整笔回滚，不留半组），由调用方在**另一个事务**里把冲突说明落盘，
+    再翻译成 409。冲突说明不能跟着被回滚的那笔一起消失。
+    """
+
+    status = 409
+
+
 def _as_utc(value: str | datetime | None) -> datetime:
     if value is None:
         return datetime.now(timezone.utc)
@@ -674,6 +685,91 @@ def _ensure_safety_schema(connection: sqlite3.Connection) -> bool:
     return "necessary_checks" not in existing or altered
 
 
+# ---- 服用阶段（episode）：稳定标识，不依赖可变 status -------------------------
+#:
+#: 三件事必须分开表达，谁也不从谁的 status 反推：
+#:
+#: * **记录版本关系** = ``predecessor_id`` 链（哪一版取代了哪一版）；
+#: * **真实服用阶段** = ``episode_id``（患者实际连续服用的那一段）；
+#: * **纠错关系** = ``corrects_id``（这一行在撤回哪一条记录）。
+#:
+#: ``episode_id`` 是**不可变**的：写入那一刻定死，此后永不重算。这一点是必须的，
+#: 因为 `safety_cases.episode_anchor` 的输出已经被持久化进事项的 ``dedup_key``——
+#: 任何"事后按可变状态重算阶段"的做法都不会回头修正那些 key，只会让新旧记录对不上。
+#:
+#: 取值是**该阶段第一版的行 id**（与历史 `incarnation_id` 的回溯结果同域），所以对
+#: 迁移前的行回填后，重算出的 anchor 与迁移前逐字节相同。
+MEDICATION_OPERATIONS = ('add', 'resume', 'dose_change', 'correction', 'legacy_unknown')
+
+#: 时间的**来源**。值本身说明"这个时间戳是什么"，而不是"它看起来像什么"。
+TIME_BASES = ('reported', 'reported_vague', 'unknown', 'recorded_time', 'legacy_unknown')
+
+
+def episode_walk(connection: sqlite3.Connection, medication_id: int) -> int:
+    """沿 ``predecessor_id`` 回溯到"本次连续服用"的第一版。
+
+    **这是历史口径，只用于迁移回填与既有测试。** 新写入一律由 ``episode_id``
+    直接决定，不再走这个依据可变 ``status`` 的回溯——见 ``MEDICATION_OPERATIONS``
+    上面的说明。
+    """
+    seen: set[int] = set()
+    cursor = int(medication_id)
+    while cursor not in seen:
+        seen.add(cursor)
+        row = connection.execute(
+            "SELECT id, predecessor_id, status FROM medications WHERE id=?", (cursor,)
+        ).fetchone()
+        if row is None:
+            return cursor
+        predecessor = row["predecessor_id"]
+        if predecessor is None:
+            return cursor
+        prior = connection.execute(
+            "SELECT status FROM medications WHERE id=?", (predecessor,)
+        ).fetchone()
+        if prior is None or prior["status"] != "superseded":
+            return cursor
+        cursor = int(predecessor)
+    return cursor
+
+
+def _ensure_episode_schema(connection: sqlite3.Connection) -> bool:
+    """服用阶段、操作来源与时间来源。Additive only — 不改任何既有值。
+
+    回填遵守两条**不许越界**的规矩：
+
+    * ``end_at_basis`` 只回填 ``legacy_unknown``。历史行有 ``end_at`` **不**证明
+      有人报告过那个停药时间，绝不回填成 ``reported``；
+    * ``episode_id`` 用**当时**的 ``episode_walk`` 结果回填。那个算法的输出已经
+      固化在事项 ``dedup_key`` 里，回填值必须与它逐字节一致，否则存量事项会被
+      重新认成新事项。
+    """
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(medications)")}
+    altered = False
+    for name, ddl in (
+        ("episode_id", "INTEGER"),
+        ("operation", "TEXT NOT NULL DEFAULT 'legacy_unknown'"),
+        ("corrects_id", "INTEGER"),
+        ("end_at_basis", "TEXT"),
+        ("time_text", "TEXT"),
+    ):
+        if name not in columns:
+            connection.execute(f"ALTER TABLE medications ADD COLUMN {name} {ddl}")
+            altered = True
+    pending = [int(row[0]) for row in connection.execute(
+        "SELECT id FROM medications WHERE episode_id IS NULL ORDER BY id")]
+    for medication_id in pending:
+        connection.execute("UPDATE medications SET episode_id=? WHERE id=?",
+                           (episode_walk(connection, medication_id), medication_id))
+        altered = True
+    altered = connection.execute(
+        "UPDATE medications SET end_at_basis='legacy_unknown' "
+        "WHERE end_at IS NOT NULL AND end_at_basis IS NULL").rowcount > 0 or altered
+    connection.execute(
+        "INSERT OR IGNORE INTO schema_meta(key,value) VALUES('medication_episode_version','1')")
+    return altered
+
+
 FOLLOW_UP_SCHEMA_VERSION = "6-follow-up"
 
 #: 长期跟进的**触发实例**队列。每一条安排版本 × 触发实例最多产生一行，因此
@@ -1119,7 +1215,8 @@ class MemoryStore:
         if 'start_at_basis' not in {r[1] for r in self.connection.execute('PRAGMA table_info(medications)')}:
             self.connection.execute("ALTER TABLE medications ADD COLUMN start_at_basis TEXT NOT NULL DEFAULT 'legacy_unknown'")
         self.connection.execute("INSERT OR IGNORE INTO schema_meta(key,value) VALUES('medication_time_provenance_version','1')")
-        migrated = _ensure_p0_columns(self.connection)
+        migrated = _ensure_episode_schema(self.connection)
+        migrated = _ensure_p0_columns(self.connection) or migrated
         migrated = _ensure_p1_schema(self.connection) or migrated
         migrated = _ensure_p2_schema(self.connection) or migrated
         migrated = _ensure_r0_schema(self.connection) or migrated
@@ -1783,12 +1880,16 @@ class MemoryStore:
         route: str | None = None,
         schedule: str | None = None,
         source_uri: str | None = None,
+        expect: dict[str, Any] | None = None,
+        time_basis: str | None = None,
+        time_text: str | None = None,
     ) -> dict[str, Any]:
         with self._lock, self.connection:
             return self._apply_medication_change_tx(
                 action=action, name=name, ingredients=ingredients, session_id=session_id,
                 turn_id=turn_id, source=source, occurred_at=occurred_at, dose=dose,
                 route=route, schedule=schedule, source_uri=source_uri,
+                expect=expect, time_basis=time_basis, time_text=time_text,
             )
 
     def _apply_medication_change_tx(
@@ -1805,11 +1906,29 @@ class MemoryStore:
         route: str | None = None,
         schedule: str | None = None,
         source_uri: str | None = None,
+        expect: dict[str, Any] | None = None,
+        time_basis: str | None = None,
+        time_text: str | None = None,
     ) -> dict[str, Any]:
-        """Domain projection within a caller-owned transaction and writer lock."""
+        """Domain projection within a caller-owned transaction and writer lock.
+
+        ``expect`` 是**候选确认路径**与既有受控输入路径的分界：
+
+        * **给了** ``expect``：这是"用户确认过的那一件事"。对象、版本、状态、
+          作用域在**同一事务内**核对，不符即 ``MedicationWriteConflict``——绝不
+          覆盖更新的记录。只比字段值不够：A→B→A 之后值回到原样，但记录已经换过
+          两版，旧候选必须判为过期。
+        * **没给**：沿用既有行为（照护输入 / 材料核对），一字不改。
+
+        服用阶段（``episode_id``）在写入这一刻定死，此后**永不重算**——它的输出
+        已经被持久化进事项的 ``dedup_key``，见 ``MEDICATION_OPERATIONS``。
+        """
         action = action.lower().strip()
-        if action not in {"add", "remove", "dose_change"}:
-            raise ValueError("medication action must be add, remove, or dose_change")
+        if action not in {"add", "remove", "dose_change", "resume", "correction"}:
+            raise ValueError(
+                "medication action must be add, remove, dose_change, resume, or correction")
+        if time_basis is not None and time_basis not in TIME_BASES:
+            raise ValueError("unknown medication time basis: %r" % (time_basis,))
         med_key = re.sub(r"\s+", "", name).lower()
         when = _iso(occurred_at)
         now = utc_now()
@@ -1818,7 +1937,23 @@ class MemoryStore:
             "SELECT * FROM medications WHERE medication_key=? AND status='active' ORDER BY version DESC LIMIT 1",
             (med_key,),
         ).fetchone()
-        if action == "add" and current:
+
+        # 候选确认路径的前置核对：在同一事务里，对**明确的引用**核对。
+        target = None
+        if expect is not None:
+            target = self._require_expected_medication_tx(action, med_key, expect)
+            # `add` / `resume` / `correction` 三者都以"这味药现在不在用"为前提。
+            # 已经有一条 active 行时再走其中任何一条，都会造出**第二条在用的记录**。
+            #
+            # 尤其是纠错：若那条被误登记的停药之后**已经有一次真实的恢复服用**，
+            # 纠错会与那段真实用药史冲突。这里拒绝写入、如实报冲突，而不是自动
+            # 作废那条真实恢复记录——那等于用一次历史纠错抹掉一段真实用药史。
+            if action in {"add", "resume", "correction"} and current is not None:
+                raise MedicationWriteConflict(
+                    f"{current['display_name']} 当前已经在用药记录里，"
+                    f"这条候选与它冲突，请刷新后重新核对")
+
+        if action == "add" and expect is None and current:
             same = (
                 current["dose"] == dose and current["route"] == route and current["schedule"] == schedule
                 and current["ingredients_json"] == _json(list(ingredients or []))
@@ -1841,30 +1976,77 @@ class MemoryStore:
             )
             return {"outcome": "unresolved", "medication": None, "event": event}
 
-        predecessor_id = current["id"] if current else None
-        if current:
+        # ---- 阶段、操作与起止时间 ------------------------------------------
+        predecessor = None
+        corrects_id = None
+        episode_id = None
+        start_at = when
+        start_basis = "reported" if occurred_at else "recorded_time"
+        operation = action
+        if action == "remove":
+            predecessor = current
+        elif action == "dose_change":
+            predecessor = current
+            episode_id = current["episode_id"]
+        elif action == "resume":
+            # 前驱由候选**指定的记录 ID + 版本**给出，不按名称挑。
+            predecessor = target
+        elif action == "correction":
+            # 误登记停用的纠正：回到**被纠正行所属的那个阶段**，不是新阶段。
+            # 依据是那一行自己携带的 episode_id——不是按可变 status 重算。
+            predecessor = target
+            corrects_id = int(target["id"])
+            episode_id = target["episode_id"]
+            start_at = target["start_at"]
+            start_basis = target["start_at_basis"] or "legacy_unknown"
+
+        if action == "remove":
+            # 未知的实际停药时间**不写 now**。登记时间由 created_at 与事件自带，
+            # 不冒充实际发生时间。
+            if expect is None:
+                end_at_value = when
+                end_basis = "reported" if occurred_at else "recorded_time"
+            else:
+                end_basis = time_basis or ("reported" if occurred_at else "unknown")
+                end_at_value = {"reported": when, "recorded_time": now}.get(end_basis)
             self.connection.execute(
-                "UPDATE medications SET status=?, end_at=? WHERE id=?",
-                ("stopped" if action == "remove" else "superseded", when, current["id"]),
-            )
-        medication = None
-        if action != "remove":
+                "UPDATE medications SET status='stopped', end_at=?, end_at_basis=?, "
+                "time_text=COALESCE(?, time_text) WHERE id=?",
+                (end_at_value, end_basis, time_text, current["id"]))
+            medication = self._medication_row(self.connection.execute(
+                "SELECT * FROM medications WHERE id=?", (current["id"],)).fetchone())
+            self._audit("remove", "medication", medication["id"],
+                        {"ref": medication["ref"], "name": name}, source)
+        else:
+            if predecessor is not None and action == "dose_change":
+                self.connection.execute(
+                    "UPDATE medications SET status='superseded', end_at=?, end_at_basis=? "
+                    "WHERE id=?",
+                    (when, "reported" if occurred_at else "recorded_time",
+                     predecessor["id"]))
             version = self.connection.execute(
                 "SELECT COALESCE(MAX(version),0)+1 FROM medications WHERE medication_key=?",
                 (med_key,),
             ).fetchone()[0]
             cursor = self.connection.execute(
-                """INSERT INTO medications(medication_key,display_name,ingredients_json,dose,route,schedule,status,start_at,end_at,source,source_uri,version,predecessor_id,created_at)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (med_key, name, _json(list(ingredients or [])), dose, route, schedule, "active", when, None, source, source_uri, version, predecessor_id, now),
+                """INSERT INTO medications(medication_key,display_name,ingredients_json,dose,route,schedule,status,start_at,end_at,source,source_uri,version,predecessor_id,created_at,start_at_basis,episode_id,operation,corrects_id)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (med_key, name, _json(list(ingredients or [])), dose, route, schedule, "active",
+                 start_at, None, source, source_uri, version,
+                 predecessor["id"] if predecessor is not None else None, now,
+                 start_basis, episode_id, operation, corrects_id),
             )
-            self.connection.execute('UPDATE medications SET start_at_basis=? WHERE id=?',
-                                    ('reported' if occurred_at else 'recorded_time', cursor.lastrowid))
-            medication = self._medication_row(self.connection.execute("SELECT * FROM medications WHERE id=?", (cursor.lastrowid,)).fetchone())
-            self._audit(action, "medication", medication["id"], {"ref": medication["ref"], "name": name}, source)
-        else:
-            medication = self._medication_row(current)
-            self._audit("remove", "medication", medication["id"], {"ref": medication["ref"], "name": name}, source)
+            new_id = int(cursor.lastrowid)
+            # 新阶段以**自己这一行的 id** 作为阶段标识，与历史口径同域。
+            if episode_id is None:
+                episode_id = new_id
+            self.connection.execute(
+                "UPDATE medications SET episode_id=?, time_text=? WHERE id=?",
+                (episode_id, time_text, new_id))
+            medication = self._medication_row(self.connection.execute(
+                "SELECT * FROM medications WHERE id=?", (new_id,)).fetchone())
+            self._audit(operation, "medication", medication["id"],
+                        {"ref": medication["ref"], "name": name}, source)
 
         self._invalidate_medication_dependents_tx(changed_name=name)
         # 必要安全检查：药单一变，就按**当前**药单重新检查一次相互作用。这一步不
@@ -1881,20 +2063,68 @@ class MemoryStore:
             f'{self._medication_set_hash_tx()}@{revision}',
             f'medication list changed via {action} {name!r} (revision {revision})')
 
-        event_type = {"add": "medication_add", "remove": "medication_remove", "dose_change": "medication_dose_change"}[action]
+        # 事件类型留在既有的三种里（下游按这三种取数据），真正的操作语义进 payload：
+        # 换实现就等于换结果，那是不能接受的。
+        event_type = {"add": "medication_add", "resume": "medication_add",
+                      "correction": "medication_add", "remove": "medication_remove",
+                      "dose_change": "medication_dose_change"}[action]
         payload = {
             "action": action,
+            "operation": operation,
             "name": name,
             "dose": dose,
             "route": route,
             "schedule": schedule,
             "medication_ref": medication["ref"],
+            "medication_id": medication["id"],
+            "episode_id": episode_id,
+            "corrects_id": corrects_id,
+            "time_text": time_text,
         }
         event = self._record_event_tx(
             EpisodicFact(event_type=event_type, subject_key=med_key, payload=payload, occurred_at=when, salience=0.9),
             session_id=session_id, turn_id=turn_id, source=source,
         )
         return {"outcome": action, "medication": medication, "event": event}
+
+    def _require_expected_medication_tx(self, action: str, med_key: str,
+                                        expect: dict[str, Any]) -> sqlite3.Row | None:
+        """候选确认路径的前置核对：**作用域、对象、版本、状态**，在同一事务内。
+
+        核对的是**具体记录引用**，不是名称，也不是单个字段的值。
+        """
+        from .product import SCOPE
+        scope_id = expect.get("scope_id")
+        if scope_id is not None and str(scope_id) != SCOPE:
+            raise MedicationWriteConflict("这条候选不属于当前患者，不能写入")
+        record_id = expect.get("record_id")
+        if record_id is None:
+            if action != "add":
+                raise MedicationWriteConflict("这条候选没有指向任何一条用药记录，不能执行")
+            return None
+        row = self.connection.execute(
+            "SELECT * FROM medications WHERE id=?", (int(record_id),)).fetchone()
+        if row is None:
+            raise MedicationWriteConflict("这条候选指向的用药记录已经不存在")
+        if row["medication_key"] != med_key:
+            raise MedicationWriteConflict(
+                f"这条候选指向的是另一种药（{row['display_name']}），不能写入")
+        expected_version = expect.get("record_version")
+        if expected_version is not None and int(row["version"]) != int(expected_version):
+            raise MedicationWriteConflict(
+                f"这条候选依据的是第 {expected_version} 版记录，当前已经是第 {row['version']} 版")
+        expected_status = expect.get("status")
+        if expected_status and row["status"] != expected_status:
+            raise MedicationWriteConflict(
+                f"这条候选依据的记录状态是 {expected_status}，当前是 {row['status']}")
+        # 每个操作对目标行状态有自己的前提：改不了状态的候选不是"已确认"，
+        # 是过期候选。这里再钉一次，不依赖调用方有没有把 status 填进 expect。
+        required = {"dose_change": "active", "remove": "active",
+                    "resume": "stopped", "correction": "stopped"}.get(action)
+        if required and row["status"] != required:
+            raise MedicationWriteConflict(
+                f"这个操作要求记录处于 {required} 状态，当前是 {row['status']}")
+        return row
 
     def create_conflict(
         self,
@@ -2329,6 +2559,7 @@ class MemoryStore:
         facts = {f"{item['namespace']}:{item['fact_key']}": item
                  for item in self.current_semantic()}
         reasons: list[str] = []
+        fired: set[str] = set()
         conclusive = False
         for row in rows:
             kind, key = row["dep_kind"], row["dep_key"]
@@ -2337,20 +2568,27 @@ class MemoryStore:
                 missing = [member for member in members if member not in active]
                 if missing:
                     conclusive = True
+                    fired.add(kind)
                     reasons.append(f"药物对的一方已不在当前用药中：{'、'.join(missing)}")
             elif kind == "medication":
                 if str(key) not in active:
                     conclusive = True
+                    fired.add(kind)
                     reasons.append(f"相关用药已不在当前用药中：{key}")
             elif kind == "semantic_fact":
                 item = facts.get(str(key))
                 if item is None:
                     conclusive = True
+                    fired.add(kind)
                     reasons.append(f"相关事实已不再有效：{key}")
         if conclusive:
-            return {'state': 'trigger_eliminated', 'reasons': reasons, 'note': None}
+            # ``kinds`` 让调用方分得开"这味药不在当前记录里了"与"那条事实不成立了"。
+            # 两者都让触发条件消失，但**都不是**"整体风险已经解除"。
+            return {'state': 'trigger_eliminated', 'reasons': reasons,
+                    'kinds': sorted(fired), 'note': None}
         return {'state': 'risk_present' if self._has_live_pair(rows, active) else 'unknown',
-                'reasons': [], 'note': '触发条件在当前记录下仍然成立或无法排除'}
+                'reasons': [], 'kinds': [],
+                'note': '触发条件在当前记录下仍然成立或无法排除'}
 
     @staticmethod
     def _has_live_pair(rows, active: set[str]) -> bool:

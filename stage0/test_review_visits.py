@@ -152,7 +152,8 @@ class CandidateTests(_VisitFixture):
         self.assertEqual(before, after, '候选未经确认就改了权威记录')
         pending = self.visits.pending_candidates(visit['id'])
         self.assertEqual(1, len(pending))
-        self.assertEqual('10mg', pending[0]['after'])
+        self.assertEqual({'dose': '10mg'}, pending[0]['changes'])
+        self.assertEqual(rv.CANDIDATE_DOSE_CHANGE, pending[0]['operation'])
 
     def test_the_two_sources_are_recorded_distinctly(self):
         """用户声明的和模型提议的必须分得开——确认的人要知道自己在确认什么。"""
@@ -181,7 +182,7 @@ class CandidateTests(_VisitFixture):
                                       basis={'kind': 'user_report', 'refs': []})
         pending = self.visits.pending_candidates(visit['id'])
         self.assertEqual(1, len(pending))
-        self.assertEqual('15mg', pending[0]['after'])
+        self.assertEqual({'dose': '15mg'}, pending[0]['changes'])
 
     def test_a_decided_candidate_cannot_be_decided_again(self):
         case = self.open_case()

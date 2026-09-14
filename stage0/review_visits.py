@@ -21,10 +21,13 @@
 """
 from __future__ import annotations
 
+import hashlib
+import json
+import re
 import uuid
 from typing import Any, Sequence
 
-from .product import ProductError, SCOPE
+from .product import ProductError, SCOPE, packed
 from .memory import utc_now
 
 KIND = 'review_visit'
@@ -47,6 +50,11 @@ VISIT_STATUSES = (STATUS_OPEN, STATUS_AWAITING, STATUS_COMPLETED, STATUS_BLOCKED
 CANDIDATE_PENDING = 'pending'
 CANDIDATE_CONFIRMED = 'confirmed'
 CANDIDATE_DISMISSED = 'dismissed'
+#: 被**另一条候选**取代（例如一次纠正撤回了先前那条）。与"用户放弃"分开：
+#: 前者是"这条不再代表用户的说法了"，后者是"用户看过并决定不要它"。
+CANDIDATE_SUPERSEDED = 'superseded'
+CANDIDATE_STATUSES = (CANDIDATE_PENDING, CANDIDATE_CONFIRMED, CANDIDATE_DISMISSED,
+                      CANDIDATE_SUPERSEDED)
 
 #: 候选的来源。必须在界面上可见——用户要能分出"这是你说的"和"这是模型猜的"。
 SOURCE_USER_DECLARED = 'user_declared'
@@ -55,6 +63,40 @@ CANDIDATE_SOURCES = (SOURCE_USER_DECLARED, SOURCE_MODEL_PROPOSED)
 
 #: 候选只能改的字段。与 `investigation.RECORD_COLUMNS` 同一组：能核对才谈得上确认。
 CANDIDATE_FIELDS = ('dose', 'schedule', 'route', 'start_at')
+
+#: 候选表达的**操作**。``changes`` 说改哪个字段，``operation`` 说这是哪一件事——
+#: "停用一个药"和"把剂量改成 0"在字段层面看着像，在业务上是两回事。
+CANDIDATE_ADD = 'add'
+CANDIDATE_STOP = 'remove'
+CANDIDATE_DOSE_CHANGE = 'dose_change'
+CANDIDATE_RESUME = 'resume'
+CANDIDATE_CORRECTION = 'correction'
+CANDIDATE_OPERATIONS = (CANDIDATE_ADD, CANDIDATE_STOP, CANDIDATE_DOSE_CHANGE,
+                        CANDIDATE_RESUME, CANDIDATE_CORRECTION)
+
+#: 必须**指向一条已存在的记录**的操作。``add`` 是唯一不需要的。
+OPERATIONS_NEEDING_TARGET = (CANDIDATE_STOP, CANDIDATE_DOSE_CHANGE,
+                             CANDIDATE_RESUME, CANDIDATE_CORRECTION)
+
+#: 该操作要求目标记录当前处于什么状态。确认时在写入事务内核对。
+OPERATION_REQUIRES_STATUS = {CANDIDATE_STOP: 'active', CANDIDATE_DOSE_CHANGE: 'active',
+                             CANDIDATE_RESUME: 'stopped', CANDIDATE_CORRECTION: 'stopped'}
+
+CANDIDATE_OPERATION_LABELS = {
+    CANDIDATE_ADD: '新增用药', CANDIDATE_STOP: '停用', CANDIDATE_DOSE_CHANGE: '调整用法',
+    CANDIDATE_RESUME: '恢复服用', CANDIDATE_CORRECTION: '纠正记录',
+}
+
+CANDIDATE_FIELD_LABELS = {'dose': '剂量', 'schedule': '服用频次',
+                          'route': '给药途径', 'start_at': '开始时间'}
+
+#: 换药：一组有关联的变更。两条各自说明自己发生了什么，不互相代言。
+GROUP_REPLACE_FROM = 'replace_from'
+GROUP_REPLACE_TO = 'replace_to'
+GROUP_ROLES = (GROUP_REPLACE_FROM, GROUP_REPLACE_TO)
+
+#: 时间表达的精度。``reported_vague`` 表示"用户说了个大概"，**不解析成具体日期**。
+TIME_PRECISIONS = ('exact', 'day', 'week', 'month', 'vague', 'unknown')
 
 #: "没有新记录"的**唯一**允许写法。渲染函数从这里取，测试也断言这一句。
 NO_NEW_RECORDS = ('系统尚未收到新记录；这不等于情况没有变化，也不表示风险已经解除。')
@@ -141,6 +183,11 @@ class ReviewVisitStore:
             previous = self.last_closed_for_case(case_id)
             visit = {
                 'id': f'review-visit:{uuid.uuid4().hex}', 'visit_id': None,
+                # **写死的序号**。不能用"按 opened_at 排序后的位置"当第几次：两次
+                # 回访落在同一秒里时（测试与真实操作都会），平局由随机 uuid 决定，
+                # 于是"第二次"可能被数成"第一次"，而这个数字会直接写进给模型的
+                # 目标文本。序号在创建这一刻定死，此后永不重算。
+                'sequence': len(self.for_case(case_id)) + 1,
                 'scope_id': SCOPE, 'case_id': case_id, 'care_task_id': None,
                 'opened_at': utc_now(), 'opened_by': actor, 'closed_at': None,
                 'reason': dict(reason), 'status': STATUS_OPEN,
@@ -243,53 +290,102 @@ class ReviewVisitStore:
     def add_candidate(self, visit_id: str, *, name: str, field: str, before: Any,
                       after: Any, source: str, basis: dict[str, Any],
                       command_key: str | None = None) -> dict[str, Any]:
-        """登记一条**待确认**的用药变更候选。**不写权威记录。**
+        """登记一条**待确认**的用药变更候选（字段形态，等价于一次"调整用法"）。
+
+        保留这个入口是为了既有的结构化声明路径不变；操作语义版见
+        ``add_change_candidate``。两者写的是**同一个队列**，不是两套候选。
+        """
+        if field not in CANDIDATE_FIELDS:
+            raise ProductError('候选只能针对可核对的用药字段')
+        target = self.resolve_target(name)
+        return self.add_change_candidate(
+            visit_id,
+            spec={'operation': CANDIDATE_DOSE_CHANGE, 'target': target,
+                  'changes': {field: after}, 'before': {field: before},
+                  'before_ref': target.get('record_ref'),
+                  'origin': {'kind': 'structured'}},
+            source=source,
+            basis=basis,
+            # 幂等键带**提议的值与提议时依据的那一版**：同一味药同一字段再提一个
+            # 新值是另一件请求；而"记录变了、用户按新基准重新声明同一个新值"也
+            # 必须是另一件请求——否则第二次声明会命中旧回执被静默丢弃（这个项目
+            # 已经在这类键上栽过三次）。
+            command_key=command_key or (
+                f'{visit_id}:candidate:{str(name).strip()}:{field}:{after}:{before}'),
+        )
+
+    def resolve_target(self, name: str, *, status: str = 'active') -> dict[str, Any]:
+        """把药名解析成**具体的记录引用**。
+
+        名称、别名只用于**解析与展示**——真正写进记录的是记录 ID + 版本。
+        解析不到就如实标 ``unmatched``，让上层去补问，而不是猜一个。
+        """
+        wanted = str(name or '').strip()
+        rows = self.p.memory.connection.execute(
+            "SELECT * FROM medications WHERE status=? ORDER BY version DESC",
+            (status,)).fetchall()
+        matches = [row for row in rows if row['display_name'] == wanted]
+        if not matches:
+            return {'name': wanted, 'matched_by': 'unmatched'}
+        item = matches[0]
+        return {'name': item['display_name'], 'matched_by': 'current',
+                'record_id': int(item['id']), 'record_version': int(item['version']),
+                'record_ref': f"memory:medication:{item['id']}@v{item['version']}",
+                'scope_id': SCOPE, 'episode_id': item['episode_id']}
+
+    def add_change_candidate(self, visit_id: str, *, spec: dict[str, Any], source: str,
+                             basis: dict[str, Any],
+                             command_key: str | None = None) -> dict[str, Any]:
+        """登记一条**待确认**的用药变更候选（操作语义）。**不写权威记录。**
 
         `source` 是 `user_declared` 还是 `model_proposed` 必须如实标出：两者的
         可信程度不同，界面必须让用户看得出来，确认的人才知道自己在确认什么。
         """
         if source not in CANDIDATE_SOURCES:
             raise ProductError('候选来源只能是用户声明或模型提议')
-        if field not in CANDIDATE_FIELDS:
-            raise ProductError('候选只能针对可核对的用药字段')
-        if not isinstance(name, str) or not name.strip():
-            raise ProductError('候选变更必须指明药名')
-        if after is None or (isinstance(after, str) and not after.strip()):
-            raise ProductError('候选变更必须给出新的值')
+        spec = normalise_candidate_spec(spec)
+        identity = candidate_identity(spec)
 
         def execute():
             visit = self.get(visit_id)
-            pending = [item for item in visit.get('change_candidates') or []
+            candidates = list(visit.get('change_candidates') or [])
+            pending = [item for item in candidates
                        if item['status'] == CANDIDATE_PENDING
-                       and item['name'] == name.strip() and item['field'] == field]
+                       and candidate_identity(item) == identity]
             if pending:
-                # 同一味药的同一字段已经有一条待确认的候选：更新它，不排队第二条。
+                # 同一味药上的同一件事已经有一条待确认的候选：更新它，不排队第二条。
                 # 两条并存会让用户确认一条之后记录与另一条对不上。
                 candidate = pending[0]
-                candidate['after'] = after
+                candidate.update({key: value for key, value in spec.items()
+                                  if key not in ('before',)})
+                candidate['before'] = spec.get('before') or candidate.get('before')
                 candidate['source'] = source
                 candidate['basis'] = dict(basis)
+                candidate['revision'] = int(candidate.get('revision') or 1) + 1
             else:
                 candidate = {
                     'id': f"change-candidate:{uuid.uuid4().hex}",
                     'visit_id': visit_id, 'case_id': visit['case_id'],
-                    'name': name.strip(), 'field': field, 'before': before,
-                    'after': after, 'source': source, 'basis': dict(basis),
+                    **{key: value for key, value in spec.items() if key != 'before'},
+                    'before': spec.get('before'),
+                    'source': source, 'basis': dict(basis),
                     'status': CANDIDATE_PENDING, 'recorded_at': utc_now(),
-                    'decided_at': None, 'decided_by': None, 'applied': None}
-                visit['change_candidates'] = [*(visit.get('change_candidates') or []),
-                                              candidate]
+                    'decided_at': None, 'decided_by': None, 'applied': None,
+                    'conflict': None, 'superseded_by': None, 'revision': 1}
+                candidates.append(candidate)
+            visit['change_candidates'] = candidates
             visit['updated_at'] = utc_now()
             visit['revision'] += 1
             self.p.save(KIND, visit)
             return self.get(visit_id)
 
-        # 幂等键带**提议的值**：同一味药同一字段再提一个新值是**另一件请求**
-        # （它替换掉上一条待确认的候选），而重放同一件请求仍然命中同一条回执。
+        # 幂等身份 = **来源**（哪条补充的哪次解释，或调用方的 key）+ 身份摘要。
+        # 只追加 `before` 不够：撤销后重新声明、同值不同版本、重新解释是三种不同的
+        # 请求，必须分得开。
         return self.p.command(
-            command_key or f'{visit_id}:candidate:{name.strip()}:{field}:{after}',
-            {'type': 'review_visit_candidate', 'visit_id': visit_id, 'name': name.strip(),
-             'field': field, 'after': after, 'source': source}, execute)
+            command_key or f'{visit_id}:candidate:{candidate_command_key(spec)}',
+            {'type': 'review_visit_candidate', 'visit_id': visit_id,
+             'operation': spec['operation'], 'identity': identity}, execute)
 
     def candidate(self, visit_id: str, candidate_id: str) -> dict[str, Any]:
         visit = self.get(visit_id)
@@ -313,6 +409,7 @@ class ReviewVisitStore:
                 candidate['status'] = status
                 candidate['decided_at'] = utc_now()
                 candidate['decided_by'] = actor
+                candidate['revision'] = int(candidate.get('revision') or 1) + 1
                 if applied is not None:
                     candidate['applied'] = dict(applied)
                 visit['updated_at'] = utc_now()
@@ -325,10 +422,328 @@ class ReviewVisitStore:
             {'type': 'review_visit_candidate_decision', 'visit_id': visit_id,
              'candidate_id': candidate_id, 'status': status}, execute)
 
+    def supersede_candidate(self, visit_id: str, candidate_id: str, *,
+                            superseded_by: str, reason: str,
+                            command_key: str | None = None) -> dict[str, Any]:
+        """把一条待确认候选**撤回**——它被另一条候选取代了（例如一次纠正）。
+
+        与"放弃"分开：放弃是用户看过并决定不要；撤回是"用户后来的说法不再支持
+        这一条"。两者都不写权威记录。撤回后它**不再是**待确认项，重新渲染、
+        刷新、重启都不会把它再弹出来。
+        """
+        def execute():
+            visit = self.get(visit_id)
+            for candidate in visit.get('change_candidates') or []:
+                if candidate['id'] != candidate_id:
+                    continue
+                if candidate['status'] != CANDIDATE_PENDING:
+                    return visit
+                candidate['status'] = CANDIDATE_SUPERSEDED
+                candidate['superseded_by'] = superseded_by
+                candidate['decided_at'] = utc_now()
+                candidate['supersede_reason'] = reason
+                candidate['revision'] = int(candidate.get('revision') or 1) + 1
+                visit['updated_at'] = utc_now()
+                visit['revision'] += 1
+                self.p.save(KIND, visit)
+                return visit
+            raise ProductError('这条变更候选不存在', 404)
+        return self.p.command(
+            command_key or f'{visit_id}:candidate:{candidate_id}:supersede:{superseded_by}',
+            {'type': 'review_visit_candidate_supersede', 'visit_id': visit_id,
+             'candidate_id': candidate_id, 'superseded_by': superseded_by}, execute)
+
+    def record_conflict(self, visit_id: str, candidate_id: str, *, conflict: dict[str, Any],
+                        expected_revision: int | None = None,
+                        command_key: str | None = None) -> dict[str, Any]:
+        """把一条冲突记在候选上。
+
+        **必须由自己的事务完成。** 触发冲突的那笔药物写入已经整体回滚，冲突说明
+        不能跟着它一起消失——否则用户拿到一个 409，却看不到任何解释，刷新之后
+        更是连痕迹都没有。
+        """
+        def execute():
+            visit = self.get(visit_id)
+            for candidate in visit.get('change_candidates') or []:
+                if candidate['id'] != candidate_id:
+                    continue
+                current = int(candidate.get('revision') or 1)
+                if expected_revision is not None and current != int(expected_revision):
+                    # 候选在预检之后被改过：不覆盖更新的那一条。
+                    raise ProductError('这条候选已经更新过，请刷新后重新核对', 409)
+                if candidate['status'] != CANDIDATE_PENDING:
+                    raise ProductError('这条候选已经处理过了', 409)
+                candidate['conflict'] = {**dict(conflict), 'detected_at': utc_now()}
+                candidate['revision'] = current + 1
+                visit['updated_at'] = utc_now()
+                visit['revision'] += 1
+                self.p.save(KIND, visit)
+                return visit
+            raise ProductError('这条变更候选不存在', 404)
+        return self.p.command(
+            command_key or f'{visit_id}:candidate:{candidate_id}:conflict:'
+                           f'{expected_revision if expected_revision is not None else "-"}',
+            {'type': 'review_visit_candidate_conflict', 'visit_id': visit_id,
+             'candidate_id': candidate_id, 'conflict': dict(conflict)}, execute)
+
+    def clear_conflict(self, visit_id: str, candidate_id: str) -> None:
+        """候选被重新声明之后，旧的冲突说明不再适用。"""
+        def execute():
+            visit = self.get(visit_id)
+            for candidate in visit.get('change_candidates') or []:
+                if candidate['id'] == candidate_id and candidate.get('conflict'):
+                    candidate['conflict'] = None
+                    visit['revision'] += 1
+                    self.p.save(KIND, visit)
+                    return visit
+            return visit
+        self.p.command(f'{visit_id}:candidate:{candidate_id}:conflict-clear',
+                       {'type': 'review_visit_candidate_conflict_clear',
+                        'visit_id': visit_id, 'candidate_id': candidate_id}, execute)
+
     def pending_candidates(self, visit_id: str) -> list[dict[str, Any]]:
         visit = self.get(visit_id)
         return [item for item in visit.get('change_candidates') or []
                 if item['status'] == CANDIDATE_PENDING]
+
+    def group_members(self, visit_id: str, group_id: str) -> list[dict[str, Any]]:
+        visit = self.get(visit_id)
+        return [item for item in visit.get('change_candidates') or []
+                if (item.get('group') or {}).get('id') == group_id]
+
+
+def _name_key(name: Any) -> str:
+    """药名的归一化形式，与 `memory` 的 `medication_key` 同一口径。"""
+    return re.sub(r'\s+', '', str(name or '')).lower()
+
+
+def normalise_candidate_spec(spec: dict[str, Any]) -> dict[str, Any]:
+    """把一条操作语义的候选规范化；表达不完整就拒绝，不替它猜。"""
+    if not isinstance(spec, dict):
+        raise ProductError('变更候选必须是结构化描述')
+    operation = str(spec.get('operation') or '').strip()
+    if operation not in CANDIDATE_OPERATIONS:
+        raise ProductError('不支持的用药变更操作')
+    target = spec.get('target')
+    if not isinstance(target, dict):
+        raise ProductError('变更候选的目标必须是结构化描述')
+    name = str(target.get('name') or '').strip()
+    if not name:
+        raise ProductError('候选变更必须指明药名')
+    if operation in OPERATIONS_NEEDING_TARGET and not target.get('record_id'):
+        # 名称、别名只用于**解析与展示**。真正写进记录的是记录 ID + 版本，
+        # 所以没有这两样的候选根本执行不了——现在拒绝，而不是写入时才发现。
+        raise ProductError('这个操作必须指向一条具体的用药记录，不能只给药名')
+    changes = spec.get('changes') or {}
+    if not isinstance(changes, dict):
+        raise ProductError('变更内容必须是结构化描述')
+    if [field for field in changes if field not in CANDIDATE_FIELDS]:
+        raise ProductError('候选只能针对可核对的用药字段')
+    if operation != CANDIDATE_STOP and operation != CANDIDATE_CORRECTION:
+        if not any(str(value or '').strip() for value in changes.values()):
+            raise ProductError('这个操作必须给出新的值')
+    group = spec.get('group')
+    if group is not None:
+        if not isinstance(group, dict) or not str(group.get('id') or '').strip():
+            raise ProductError('换药组必须有标识')
+        if str(group.get('role') or '') not in GROUP_ROLES:
+            raise ProductError('换药组里的角色只能是换出或换入')
+        group = {'id': str(group['id']).strip(), 'role': str(group['role'])}
+    occurred = spec.get('occurred') or {}
+    if not isinstance(occurred, dict):
+        raise ProductError('发生时间必须是结构化描述')
+    precision = str(occurred.get('precision') or 'unknown')
+    if precision not in TIME_PRECISIONS:
+        raise ProductError('不支持的时间精度')
+    basis = str(occurred.get('basis') or 'unknown')
+    if basis not in ('reported', 'reported_vague', 'unknown', 'recorded_time'):
+        raise ProductError('不支持的用药时间来源')
+    value = occurred.get('value')
+    if basis == 'reported_vague' or precision in ('week', 'month', 'vague'):
+        # "上周"不是一个时间戳。保留原话与精度，**不任意挑一天**。
+        basis, value = 'reported_vague', None
+    elif basis == 'reported' and not value:
+        basis = 'unknown'
+    origin = spec.get('origin') or {'kind': 'manual'}
+    if not isinstance(origin, dict):
+        raise ProductError('候选来源必须是结构化描述')
+    return {
+        'operation': operation,
+        'target': {
+            'name': name,
+            'matched_by': str(target.get('matched_by') or 'unmatched'),
+            'record_id': target.get('record_id'),
+            'record_version': target.get('record_version'),
+            'record_ref': target.get('record_ref'),
+            'scope_id': target.get('scope_id') or SCOPE,
+            'episode_id': target.get('episode_id'),
+        },
+        'changes': {str(k): v for k, v in changes.items()},
+        'before': spec.get('before') or {},
+        'before_ref': spec.get('before_ref'),
+        'occurred': {'text': occurred.get('text'), 'value': value,
+                     'precision': precision, 'basis': basis,
+                     'tz': occurred.get('tz')},
+        'group': group,
+        'reported_overlap': spec.get('reported_overlap'),
+        'origin': {'kind': str(origin.get('kind') or 'manual'),
+                   'note_id': origin.get('note_id'),
+                   'key': origin.get('key'),
+                   'interpretation_revision': origin.get('interpretation_revision')},
+    }
+
+
+def candidate_identity(item: dict[str, Any]) -> str:
+    """同一味药上的**同一件事**的合并身份：操作 + 药。
+
+    刻意**不含**提议的值，也不含依据的记录版本：用户改口说同一件事的另一个值，
+    是"更新那条待确认的候选"，不是"再排一条"。两条并存的候选在界面上互相矛盾，
+    确认其中一条之后另一条必然对不上记录。
+
+    版本进的是**命令身份**（`candidate_command_key`），不是合并身份。
+    """
+    target = item.get('target') or {}
+    drug = _name_key(target.get('name')) or str(target.get('record_ref') or '')
+    return f"{item.get('operation')}:{drug}"
+
+
+def candidate_command_key(spec: dict[str, Any]) -> str:
+    """创建候选的命令身份：**来源 + 解释版本 + 依据的记录版本 + 内容摘要**。
+
+    只追加 `before` 值不够——撤销后重新声明、同值不同版本、重新解释是三种不同的
+    请求，必须分得开，否则第二次声明会静默命中第一次的回执，用户的第二句话被丢掉。
+    """
+    origin = spec.get('origin') or {}
+    target = spec.get('target') or {}
+    occurred = spec.get('occurred') or {}
+    payload = {
+        'origin': str(origin.get('key') or origin.get('note_id') or 'manual'),
+        'interpretation': str(origin.get('interpretation_revision') or ''),
+        'operation': str(spec.get('operation') or ''),
+        'target': str(target.get('record_ref') or _name_key(target.get('name'))),
+        'changes': {str(k): str(v) for k, v in sorted((spec.get('changes') or {}).items())},
+        'occurred': str(occurred.get('value') or occurred.get('text') or ''),
+        'group': str((spec.get('group') or {}).get('id') or ''),
+        'identity': candidate_identity(spec),
+    }
+    return hashlib.sha256(packed(payload).encode('utf-8')).hexdigest()[:32]
+
+
+def medication_write_plan(candidate: dict[str, Any], memory) -> dict[str, Any]:
+    """一条候选 → 一次受控写入的参数。
+
+    每一个值要么来自候选本身（用户说过的话），要么来自**权威记录**（目标行现在的
+    值）。没有第三个来源："自报的原来是 X" 不参与，未提及的字段继承目标行的当前
+    值——否则一次只改频次的候选会把剂量一起抹掉。
+
+    ``expect`` 里带的是**具体记录 ID + 版本 + 状态 + 作用域**，写入原语在同一事务
+    内核对它。
+    """
+    from .memory import MedicationWriteConflict
+    operation = candidate['operation']
+    target = candidate.get('target') or {}
+    changes = dict(candidate.get('changes') or {})
+    occurred = candidate.get('occurred') or {}
+    record_id = target.get('record_id')
+    row = None
+    if record_id is not None:
+        row = memory.connection.execute(
+            "SELECT * FROM medications WHERE id=?", (int(record_id),)).fetchone()
+    if operation in OPERATIONS_NEEDING_TARGET and row is None:
+        raise MedicationWriteConflict('这条候选指向的用药记录已经不存在')
+    reported = occurred.get('basis') == 'reported'
+    occurred_at = occurred.get('value') if reported else None
+    plan: dict[str, Any] = {
+        'action': operation,
+        'name': target.get('name'),
+        'ingredients': json.loads((row['ingredients_json'] if row else None) or '[]'),
+        'occurred_at': occurred_at,
+        'time_basis': occurred.get('basis'),
+        'time_text': occurred.get('text'),
+        'dose': None, 'route': None, 'schedule': None,
+        'expect': {'record_id': record_id, 'record_version': target.get('record_version'),
+                   'status': OPERATION_REQUIRES_STATUS.get(operation),
+                   'scope_id': target.get('scope_id')},
+    }
+    if operation == CANDIDATE_ADD:
+        for field in ('dose', 'route', 'schedule'):
+            plan[field] = changes.get(field)
+        if changes.get('start_at'):
+            # 新增时的"开始时间"就是这次发生的时间——同一件事的两种说法。
+            plan['occurred_at'] = str(changes['start_at'])
+            plan['time_basis'] = 'reported'
+    elif operation == CANDIDATE_DOSE_CHANGE:
+        for field in ('dose', 'route', 'schedule'):
+            plan[field] = changes.get(field) or (row[field] if row else None)
+        if changes.get('start_at'):
+            plan['occurred_at'] = str(changes['start_at'])
+            plan['time_basis'] = 'reported'
+    return plan
+
+
+def candidate_change_text(candidate: dict[str, Any]) -> str:
+    """一句话说清这条候选要改什么：操作 + 药 + 值 + 时间及其不确定性。"""
+    drug = (candidate.get('target') or {}).get('name') or ''
+    operation = candidate.get('operation')
+    label = CANDIDATE_OPERATION_LABELS.get(operation, str(operation))
+    parts = [f'{drug} · {label}']
+    before = candidate.get('before') or {}
+    rendered: list[str] = []
+    for field, value in sorted((candidate.get('changes') or {}).items()):
+        old = before.get(field) if isinstance(before, dict) else None
+        rendered.append(f'{CANDIDATE_FIELD_LABELS.get(field, field)} '
+                        f'{old if old is not None else "（未记录）"} → {value}')
+    if rendered:
+        parts.append('；'.join(rendered))
+    occurred = candidate.get('occurred') or {}
+    if occurred.get('basis') == 'reported_vague' and occurred.get('text'):
+        # 原话保留，**不**解析成一个精确日期。
+        parts.append(f'时间：{occurred["text"]}（未确定到具体日期）')
+    elif occurred.get('value'):
+        parts.append(f'时间：{occurred["value"]}')
+    elif occurred.get('basis') == 'unknown':
+        parts.append('时间未提供')
+    return '，'.join(parts)
+
+
+def group_statements(visit: dict[str, Any], group_id: str) -> list[dict[str, Any]]:
+    """一组换药的**逐条**陈述。由各成员的状态**派生**，不是数两条是否 confirmed。
+
+    这一条很重要：旧药已停、新药仍在计划中时，正确的话是
+    「旧药停用已记录，新药开始尚未确认发生」——而不是"换药只登记了一半"。
+    后半句来自那条**计划**，它根本不是候选（计划不进入可执行的确认列表）。
+    """
+    statements: list[dict[str, Any]] = []
+    for candidate in visit.get('change_candidates') or []:
+        if (candidate.get('group') or {}).get('id') != group_id:
+            continue
+        label = CANDIDATE_OPERATION_LABELS.get(candidate['operation'], candidate['operation'])
+        drug = (candidate.get('target') or {}).get('name') or ''
+        status = candidate['status']
+        if status == CANDIDATE_CONFIRMED:
+            text = f'{drug}的{label}已经登记进记录'
+        elif status == CANDIDATE_SUPERSEDED:
+            text = f'{drug}的{label}已被您后来的说法撤回，记录未变'
+        elif status == CANDIDATE_DISMISSED:
+            text = f'{drug}的{label}已放弃，记录未变'
+        else:
+            text = f'{drug}的{label}仍待您确认，记录未变'
+        statements.append({'candidate_id': candidate['id'],
+                           'role': (candidate.get('group') or {}).get('role'),
+                           'status': status, 'text': text})
+    for note in visit.get('change_notes') or []:
+        for plan in note.get('plans') or []:
+            if (plan.get('group') or {}).get('id') != group_id:
+                continue
+            label = CANDIDATE_OPERATION_LABELS.get(plan.get('operation'), plan.get('operation'))
+            drug = (plan.get('target') or {}).get('name') or ''
+            statements.append({
+                'candidate_id': None,
+                'role': (plan.get('group') or {}).get('role'),
+                'status': 'planned',
+                'text': f'{drug}的{label}仍在计划中，尚未确认发生',
+            })
+    return statements
 
 
 def status_from_task(task: dict[str, Any] | None) -> str | None:
@@ -366,7 +781,15 @@ CASE_KIND_LABELS = {'interaction_risk': '药物相互作用风险', 'condition_r
 
 
 def sequence_of(product, case_id: str, visit: dict[str, Any]) -> int:
-    """这是这位患者这件事项的第几次回访。按记录顺序数，不按时间戳比大小。"""
+    """这是这位患者这件事项的第几次回访。
+
+    优先读记录里**写死的** `sequence`。回退到按顺序数只对旧记录有效——那个数法在
+    两次回访落在同一秒时是不对的（平局由随机 uuid 决定），所以它不是口径，只是
+    存量兼容。
+    """
+    stored = visit.get('sequence')
+    if isinstance(stored, int) and stored > 0:
+        return stored
     ordered = ReviewVisitStore(product).for_case(case_id)
     for index, item in enumerate(ordered):
         if item['id'] == visit['id']:
@@ -540,12 +963,8 @@ def render_result(product, case: dict[str, Any], visit: dict[str, Any], *,
     actions: list[dict[str, Any]] = []
     for candidate in visit.get('change_candidates') or []:
         if candidate['status'] == CANDIDATE_CONFIRMED:
-            # 原本没有记录时如实说"未记录"，不写成 `None`，也不假装原来是别的值。
-            was = (f"由 {candidate['before']} 改为" if candidate.get('before') is not None
-                   else "原先没有记录，现记为")
             actions.append({
-                'text': f"{candidate['name']} 的{candidate['field']} {was} "
-                        f"{candidate['after']}（已确认）",
+                'text': f'{candidate_change_text(candidate)}（已确认）',
                 'basis': {'kind': 'record',
                           'refs': list((candidate.get('basis') or {}).get('refs') or [])}})
     if task:
@@ -565,13 +984,29 @@ def render_result(product, case: dict[str, Any], visit: dict[str, Any], *,
                            'basis': {'kind': 'user_report',
                                      'refs': [item.get('request_id')]}})
     for candidate in visit.get('change_candidates') or []:
-        if candidate['status'] == CANDIDATE_PENDING:
-            unresolved.append({
-                'text': (f"待您确认的变更：{candidate['name']} 的{candidate['field']} "
-                         f"{candidate['before']} → {candidate['after']}"),
-                'basis': {'kind': 'user_report' if candidate['source'] == SOURCE_USER_DECLARED
-                          else 'model_explanation',
-                          'refs': list((candidate.get('basis') or {}).get('refs') or [])}})
+        if candidate['status'] != CANDIDATE_PENDING:
+            continue
+        text = f'待您确认的变更：{candidate_change_text(candidate)}'
+        if candidate.get('conflict'):
+            text += f"（记录已变化：{candidate['conflict'].get('detail') or '请重新核对'}）"
+        unresolved.append({
+            'text': text,
+            'basis': {'kind': 'user_report' if candidate['source'] == SOURCE_USER_DECLARED
+                      else 'model_explanation',
+                      'refs': list((candidate.get('basis') or {}).get('refs') or [])}})
+    # 换药是**一组有关联的**变更：逐条陈述，不合并成一个"换药完成/未完成"。
+    seen_groups: list[str] = []
+    for candidate in visit.get('change_candidates') or []:
+        group_id = (candidate.get('group') or {}).get('id')
+        if group_id and group_id not in seen_groups:
+            seen_groups.append(group_id)
+    for note in visit.get('change_notes') or []:
+        for plan in note.get('plans') or []:
+            group_id = (plan.get('group') or {}).get('id')
+            if group_id and group_id not in seen_groups:
+                seen_groups.append(group_id)
+    groups = [{'group_id': group_id, 'statements': group_statements(visit, group_id)}
+              for group_id in seen_groups]
     if follow_up and follow_up.get('schedule_state') == 'blocked':
         unresolved.append({'text': '跟进安排被阻塞：' + str(follow_up.get('blocked_reason')),
                            'basis': {'kind': 'program_check', 'refs': [case.get('id')]}})
@@ -610,6 +1045,9 @@ def render_result(product, case: dict[str, Any], visit: dict[str, Any], *,
         'since_last': since_last,
         'actions': actions,
         'unresolved': unresolved,
+        # 换药组的逐条陈述。**没有**一个"换药完成"的总结论——那会把"旧药停了、
+        # 新药还没开始"渲染成"换药做完了"。
+        'groups': groups,
         'reused': reused,
         'recheck': recheck,
         'end_reason': _end_reason(visit, task, open_inputs, unknown_inputs, new_entries),

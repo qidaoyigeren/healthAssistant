@@ -288,42 +288,40 @@ def _normalise_follow_up(raw: dict[str, Any] | None) -> dict[str, Any]:
 def incarnation_id(connection, medication_id: int) -> int:
     """一条用药的**本次生效链**标识。
 
-    "不同用药阶段不得因药名相同被错误合并"——剂量变更会把旧版本置为
-    ``superseded`` 而药名不变，那仍是同一次用药；停药（``stopped``）则切断了链。
-    这里沿 ``predecessor_id`` 回溯到最近一次 ``stopped`` 边界之后的第一个版本，
-    用它当分期锚点。
+    **这是历史口径**：它沿 ``predecessor_id`` 回溯到最近一次 ``stopped`` 边界之后
+    的第一个版本，读的是**可变** ``status``。留着它只为迁移回填与既有测试。
+
+    新的写入一律由行自己携带的 ``episode_id`` 决定分期（写入时定死、永不重算），
+    见 ``memory.MEDICATION_OPERATIONS``。原因：这个函数的输出已经被持久化进事项的
+    ``dedup_key``，事后按可变状态重算**不会回头修正那些 key**。
     """
-    seen: set[int] = set()
-    cursor = int(medication_id)
-    while cursor not in seen:
-        seen.add(cursor)
-        row = connection.execute(
-            "SELECT id, predecessor_id, status FROM medications WHERE id=?", (cursor,)
-        ).fetchone()
-        if row is None:
-            return cursor
-        predecessor = row["predecessor_id"]
-        if predecessor is None:
-            return cursor
-        prior = connection.execute(
-            "SELECT status FROM medications WHERE id=?", (predecessor,)
-        ).fetchone()
-        if prior is None or prior["status"] != "superseded":
-            # 前一个版本不是"被剂量变更取代"——它是一次停用/争议，分期从此断开。
-            return cursor
-        cursor = int(predecessor)
-    return cursor
+    from .memory import episode_walk
+    return int(episode_walk(connection, int(medication_id)))
 
 
 def episode_anchor(store, medication_refs: Sequence[str]) -> str:
-    """由相关用药的**分期**推出锚点；没有用药引用的类型锚定在事项对象上。"""
+    """由相关用药的**分期**推出锚点；没有用药引用的类型锚定在事项对象上。
+
+    读的是行自己携带的 ``episode_id``（不可变），不是按当前状态回溯算出来的值。
+    迁移回填把 ``episode_id`` 填成**当时** ``incarnation_id`` 的输出，所以对存量
+    行，这个函数给出的字符串与迁移前逐字节相同——存量事项的身份不会漂移。
+    """
     connection = store.memory.connection
     anchors: list[str] = []
     for ref in medication_refs or ():
         match = re.fullmatch(r"memory:medication:(\d+)(?:@v\d+)?", str(ref))
         if not match:
             continue
-        anchors.append(str(incarnation_id(connection, int(match.group(1)))))
+        medication_id = int(match.group(1))
+        row = connection.execute(
+            "SELECT episode_id FROM medications WHERE id=?", (medication_id,)).fetchone()
+        if row is None:
+            continue
+        episode = row["episode_id"]
+        if episode is None:
+            # 迁移总会回填；真出现 NULL 时退回历史口径，而不是编一个值出来。
+            episode = incarnation_id(connection, medication_id)
+        anchors.append(str(episode))
     return "+".join(sorted(set(anchors)))
 
 
@@ -996,9 +994,13 @@ class SafetyCaseStore:
             # 但**不确定性没有消失**，所以同样阻止关闭。
             'blocking_inputs': [item['request_id'] for item in case.get('required_inputs') or ()
                                 if item.get('status') in ('open', ANSWER_UNKNOWN)],
+            'nature': {'evaluated': False, 'trigger_absent_from_current_record': False,
+                       'basis': [], 'overall_risk_resolved': False,
+                       'note': CLOSURE_NATURE_NOTE},
         }
         if not refs:
             return {**evidence, 'ok': False, 'reason': '该事项还没有可依据的检查结论'}
+        eliminated_kinds: set[str] = set()
         current = self.p.revisions()
         for ref in refs:
             match = re.fullmatch(r"memory:conclusion:(\d+)(?:@v\d+)?", str(ref))
@@ -1022,11 +1024,14 @@ class SafetyCaseStore:
                                       f'旧结论不能批准当前状态'}
             verdict = self.memory.evaluate_trigger(conclusion_id)
             evidence['checked'].append({'ref': ref, 'state': verdict['state'],
-                                        'reasons': verdict['reasons']})
+                                        'reasons': verdict['reasons'],
+                                        'kinds': list(verdict.get('kinds') or [])})
             if verdict['state'] == 'trigger_eliminated':
                 evidence['eliminated'].append(ref)
+                eliminated_kinds.update(verdict.get('kinds') or [])
             elif verdict['state'] == 'risk_present':
                 evidence['still_present'].append(ref)
+        evidence['nature'] = _closure_nature(eliminated_kinds)
         if evidence['still_present']:
             return {**evidence, 'ok': False,
                     'reason': '关联结论仍显示风险存在，不能关闭；'
@@ -1481,30 +1486,128 @@ def _ensure_visit_task(product, case: dict[str, Any], visit: dict[str, Any],
                         created['revision'], 'continue', enqueue=True)
 
 
-def _apply_candidate(product, store, case_id: str, candidate: dict[str, Any],
-                     task_id: str | None, key: str | None) -> dict[str, Any]:
-    """把一条**已确认**的候选沿既有权威入口写入。
+def candidate_conflict(product, candidate: dict[str, Any]) -> dict[str, Any] | None:
+    """确认前对**权威记录**做一次只读核对：对象、状态、版本。
 
-    只有一条写路径：`CareTasks.record_input(medications=…)`——它自己会校验、写
-    权威表、留下前后值，并让必要安全检查按既有路径重新排队。这里不另开一条。
+    只比字段值是不够的：A→B→A 之后值回到原样，但记录已经换过两版，这条候选依据
+    的那一版早就不在了。所以核对的是**记录引用**（ID + 版本）与状态，不是值。
+
+    返回冲突描述或 ``None``。这是**预检**——它自己的事务会把结果落盘并提交，
+    所以 409 之后用户仍然看得到"为什么没写成"。
+    """
+    from . import review_visits as _visits
+    target = candidate.get('target') or {}
+    operation = candidate['operation']
+    name = target.get('name')
+    if operation == _visits.CANDIDATE_ADD:
+        existing = [item for item in product.memory.current_medications()
+                    if _drug_key(item['display_name']) == _drug_key(name)]
+        if existing:
+            return {'kind': 'already_active',
+                    'detail': f'{name} 已经在当前用药记录里',
+                    'current': _record_view(existing[0]),
+                    'recorded_before': candidate.get('before'),
+                    'action': '请刷新后重新核对；如果它确实是另一段服用，请说明是恢复服用。'}
+        return None
+    record_id = target.get('record_id')
+    row = None
+    if record_id is not None:
+        row = product.memory.connection.execute(
+            'SELECT * FROM medications WHERE id=?', (int(record_id),)).fetchone()
+    if row is None:
+        return {'kind': 'record_missing',
+                'detail': f'{name} 这条候选指向的用药记录已经不存在',
+                'current': None, 'recorded_before': candidate.get('before'),
+                'action': '请刷新后重新核对。'}
+    required = _visits.OPERATION_REQUIRES_STATUS.get(operation)
+    if required and row['status'] != required:
+        return {'kind': 'status_changed',
+                'detail': f"{row['display_name']} 当前状态是「{row['status']}」，"
+                          f"不是这条候选依据的「{required}」",
+                'current': _record_view(row), 'recorded_before': candidate.get('before'),
+                'action': '请刷新后重新核对；记录已经不是这条候选做依据时的样子了。'}
+    expected_version = target.get('record_version')
+    if expected_version is not None and int(row['version']) != int(expected_version):
+        return {'kind': 'version_changed',
+                'detail': f"这条候选依据的是第 {expected_version} 版记录，"
+                          f"当前已经是第 {row['version']} 版",
+                'current': _record_view(row), 'recorded_before': candidate.get('before'),
+                'action': '请刷新后重新核对；不能拿旧版本的候选覆盖较新的记录。'}
+    return None
+
+
+def _record_view(row) -> dict[str, Any]:
+    """一条用药记录当前状态的只读视图——冲突说明里给用户看的就是它。"""
+    return {'medication_id': int(row['id']), 'version': int(row['version']),
+            'name': row['display_name'], 'status': row['status'],
+            'dose': row['dose'], 'schedule': row['schedule'], 'route': row['route'],
+            'start_at': row['start_at'], 'end_at': row['end_at'],
+            'end_at_basis': row['end_at_basis'] if 'end_at_basis' in row.keys() else None}
+
+
+def confirm_candidate(product, store, case_id: str, visit_id: str, candidate_id: str, *,
+                      key: str | None, actor: str) -> dict[str, Any]:
+    """确认一条候选 → 沿**既有权威入口**写入。
+
+    顺序是刻意的，也是这一轮修掉的那个矛盾：
+
+    1. **预检**（自己的事务）：核对对象、状态、版本。不符就把冲突写进候选并提交，
+       然后返回 409。冲突说明**不会**被后面任何回滚带走；
+    2. **写入**（一个事务）：药物写入 + 必要检查登记 + 候选落定 + 成功回执；
+    3. 写入事务若仍失败（并发、``unresolved``），整笔回滚 → **再跑一次预检**把
+       冲突落盘 → 返回 409。HTTP 409 不会让刚保存的冲突说明消失。
     """
     from .care_tasks import CareTasks
+    from .memory import MedicationWriteConflict
+    from . import review_visits as _visits
+    visits = _visits.ReviewVisitStore(product)
+    visit = visits.get(visit_id)
+    if visit['case_id'] != case_id:
+        raise ProductError('这条变更候选不属于该事项', 404)
+    candidate = visits.candidate(visit_id, candidate_id)
+    if candidate['status'] != _visits.CANDIDATE_PENDING:
+        # 同一个 key 的重放会先在命令回执那一层命中并返回**原有成功回执**，
+        # 走不到这里。走到这里说明是**另一个请求**在用过期的候选——那是冲突，
+        # 不是"重复提交"，两者必须分开。
+        raise ProductError('这条候选已经处理过了，请刷新查看当前状态', 409)
+    task_id = visit.get('care_task_id')
     if not task_id:
         raise ProductError('这次回访还没有可以承载写入的任务，请先开始回访', 409)
+
+    conflict = candidate_conflict(product, candidate)
+    if conflict is not None:
+        _persist_conflict(visits, visit_id, candidate_id, candidate, conflict)
+        raise ProductError(conflict['detail'] + '。' + conflict['action'], 409)
+
     task = product.get(task_id, 'care_task')
-    if task['status'] not in ('ready', 'waiting_input'):
-        raise ProductError('本次回访正在处理中，请稍候再确认这条变更', 409)
-    field = candidate['field']
-    change = {'name': candidate['name'], 'action': 'dose_change'}
-    if field == 'start_at':
-        change['start_at'] = candidate['after']
-    else:
-        change[field] = candidate['after']
-    tasks = CareTasks(product)
-    tasks.record_input(task_id, f"{key or candidate['id']}:confirm", task['revision'],
-                       medications=[change])
-    return {'name': candidate['name'], 'field': field, 'value': candidate['after'],
-            'before': candidate['before']}
+    try:
+        result = CareTasks(product).apply_confirmed_medication_candidates(
+            task_id, key or candidate_id, task['revision'], [candidate],
+            visit_id=visit_id, actor=actor)
+    except MedicationWriteConflict as exc:
+        _persist_conflict(visits, visit_id, candidate_id, candidate,
+                          {'kind': 'write_conflict', 'detail': str(exc),
+                           'current': None,
+                           'recorded_before': candidate.get('before'),
+                           'action': '请刷新后重新核对。'})
+        raise ProductError(str(exc), 409)
+
+    _refresh_visit_result(product, store, case_id, visit_id)
+    # **确认之后才唤醒**：这一刻记录真的变了，模型有了可以据以行动的新事实。
+    _wake_investigation(product, case_id, key)
+    return {'visit': visits.get(visit_id), 'applied': result.get('applied') or []}
+
+
+def _persist_conflict(visits, visit_id: str, candidate_id: str, candidate: dict[str, Any],
+                      conflict: dict[str, Any]) -> None:
+    """把冲突落盘。**必须**在被回滚的那笔写入之外单独提交。"""
+    try:
+        visits.record_conflict(visit_id, candidate_id, conflict=conflict,
+                               expected_revision=candidate.get('revision'))
+    except ProductError:
+        # 候选在这中间被改过（例如用户刚放弃它）。不覆盖更新的那一条；
+        # 应答照旧返回冲突，只是不写。
+        pass
 
 
 def _refresh_visit_result(product, store, case_id: str, visit_id: str) -> None:
@@ -1637,6 +1740,32 @@ def case_view(store: SafetyCaseStore, case: dict[str, Any]) -> dict[str, Any]:
         'created_at': case['created_at'],
         'updated_at': case['updated_at'],
         'history': list(case.get('history') or []),
+    }
+
+
+#: 关闭依据的**性质**说明。这一句是必须的：``evaluate_trigger`` 只回答"本事项的
+#: 触发条件在当前记录下还在不在"，它**不**回答"整体用药是否安全"。把前者渲染成
+#: 后者，等于让一次停药看起来像一次风险解除——那是系统没有做过的判断。
+CLOSURE_NATURE_NOTE = (
+    '这里只说明本事项的触发条件在当前记录下不再出现；'
+    '它不等于整体用药风险已经解除，也不表示不需要继续跟进。')
+
+
+def _closure_nature(kinds: Iterable[str]) -> dict[str, Any]:
+    """把"触发条件为什么消失"如实分类，并明确它**不是**什么。"""
+    kinds = {str(kind) for kind in kinds or ()}
+    basis: list[str] = []
+    if kinds & {'medication_pair', 'medication'}:
+        basis.append('medication_no_longer_in_current_record')
+    if 'semantic_fact' in kinds:
+        basis.append('fact_no_longer_holds')
+    return {
+        'evaluated': True,
+        'trigger_absent_from_current_record': bool(basis),
+        'basis': sorted(basis),
+        # 本系统**从不**做这个判断，所以它是常量 False，不是"算出来是 False"。
+        'overall_risk_resolved': False,
+        'note': CLOSURE_NATURE_NOTE,
     }
 
 
@@ -1947,21 +2076,66 @@ def register_safety_routes(app, product, access, invoke, principal=None,
         store = SafetyCaseStore(product)
 
         def run():
+            confirm_candidate(product, store, case_id, visit_id, candidate_id,
+                              key=body.get('key'), actor=actor)
+            return case_view(store, store.get(case_id))
+
+        return invoke(run)
+
+    @app.post('/v1/safety-cases/{case_id}/visits/{visit_id}/candidates/'
+              '{candidate_id}/confirm-group')
+    def confirm_change_group(case_id: str, visit_id: str, candidate_id: str,
+                             request: Request, body: dict):
+        """确认**整组**换药变更——一次事务原子写入。
+
+        组状态由各成员派生，这里不做"是否完成"的判断：只把用户明确确认的那些
+        成员一起写进去。成员各自的发生时间与不确定性保持不变。
+        """
+        from . import review_visits as _visits
+        from .care_tasks import CareTasks
+        from .memory import MedicationWriteConflict
+        access(request, True)
+        actor, _roles = _actor(request)
+        visits = _visits.ReviewVisitStore(product)
+        store = SafetyCaseStore(product)
+
+        def run():
             visit = visits.get(visit_id)
             if visit['case_id'] != case_id:
                 raise ProductError('这条变更候选不属于该事项', 404)
-            candidate = visits.candidate(visit_id, candidate_id)
-            if candidate['status'] != _visits.CANDIDATE_PENDING:
-                raise ProductError('这条候选已经处理过了', 409)
+            anchor = visits.candidate(visit_id, candidate_id)
+            group_id = (anchor.get('group') or {}).get('id')
+            if not group_id:
+                raise ProductError('这条候选不属于任何一组换药变更')
+            members = [item for item in visits.group_members(visit_id, group_id)
+                       if item['status'] == _visits.CANDIDATE_PENDING]
+            if not members:
+                raise ProductError('这一组变更已经处理过了', 409)
             task_id = visit.get('care_task_id')
-            applied = _apply_candidate(product, store, case_id, candidate, task_id,
-                                       body.get('key'))
-            visits.decide_candidate(visit_id, candidate_id, status=_visits.CANDIDATE_CONFIRMED,
-                                    actor=actor, applied=applied, command_key=body.get('key'))
+            if not task_id:
+                raise ProductError('这次回访还没有可以承载写入的任务，请先开始回访', 409)
+            conflicts = [candidate_conflict(product, item) for item in members]
+            blocking = [item for item in conflicts if item is not None]
+            if blocking:
+                for item, conflict in zip(members, conflicts):
+                    if conflict is not None:
+                        _persist_conflict(visits, visit_id, item['id'], item, conflict)
+                return {'conflict': blocking[0]}
+            task = product.get(task_id, 'care_task')
+            try:
+                CareTasks(product).apply_confirmed_medication_candidates(
+                    task_id, body.get('key') or f'{group_id}:group', task['revision'],
+                    members, visit_id=visit_id, actor=actor)
+            except MedicationWriteConflict as exc:
+                # 整组已经回滚。冲突说明在**另一个事务**里落盘。
+                for item in members:
+                    _persist_conflict(visits, visit_id, item['id'], item,
+                                      {'kind': 'write_conflict', 'detail': str(exc),
+                                       'current': None,
+                                       'recorded_before': item.get('before'),
+                                       'action': '请刷新后重新核对。'})
+                raise ProductError(str(exc), 409)
             _refresh_visit_result(product, store, case_id, visit_id)
-            # **确认之后才唤醒**：这一刻记录真的变了，模型有了可以据以行动的新事实
-            # （"根据新结果继续或调整回访重点"）。在候选还没确认时唤醒，它面对的
-            # 是一句没有落地的话，什么也做不了。
             _wake_investigation(product, case_id, body.get('key'))
             return case_view(store, store.get(case_id))
 

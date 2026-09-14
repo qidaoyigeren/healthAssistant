@@ -1588,6 +1588,94 @@ class CareTasks:
             'medications': medications, 'semantic': semantic, 'additional_questions': additional_questions,
             'answers': answers}, execute)
 
+    def apply_confirmed_medication_candidates(self, task_id, key, revision, candidates, *,
+                                              visit_id=None, actor='caregiver'):
+        """**唯一**接受"用户已确认的候选"的用药写入入口。
+
+        为什么不直接把 `remove` 加进 `record_input` 的白名单：那样任何一次普通
+        补充回答只要多带一个 `action='remove'`，就能绕过"候选 → 确认"这一步直接
+        停掉一个药。确认是一个**有人做过**的动作，它必须由候选对象、记录版本、
+        目标状态与作用域共同证明，不能由请求体的一个字段自称。
+
+        请求体里的 `confirmed` 一律不读。
+
+        四件事在**同一个事务**里完成，因此"药改了但候选还显示待确认"这种半截状态
+        不存在：药物写入、必要检查登记、候选落定、成功回执。任一条失败，整组回滚。
+        """
+        from . import review_visits as _visits
+        from .investigation import MAX_CLAIMS
+        from .memory import MedicationWriteConflict
+        if not isinstance(candidates, list) or not candidates:
+            raise ProductError('没有要写入的变更候选')
+        if len(candidates) > MAX_CLAIMS:
+            raise ProductError('一次确认的变更数量超出范围')
+
+        def execute():
+            task = self.p.get(task_id, 'care_task')
+            if task['revision'] != revision:
+                raise ProductError('待办已被其他操作更新，请刷新', 409)
+            if task['goal_type'] not in REVIEW_GOAL_TYPES:
+                raise ProductError('此待办不支持确认用药变更')
+            if task['status'] not in ('ready', 'waiting_input'):
+                raise ProductError('本次回访正在处理中，请稍候再确认这条变更', 409)
+            visit = None
+            pending: dict[str, dict] = {}
+            if visit_id is not None:
+                visit = self.p.get(visit_id, _visits.KIND)
+                for item in visit.get('change_candidates') or []:
+                    pending[item['id']] = item
+                for candidate in candidates:
+                    item = pending.get(candidate['id'])
+                    if item is None:
+                        raise ProductError('这条变更候选不存在', 404)
+                    if item['status'] != _visits.CANDIDATE_PENDING:
+                        raise ProductError('这条候选已经处理过了', 409)
+            applied = []
+            unresolved: list[str] = []
+            for candidate in candidates:
+                plan = _visits.medication_write_plan(candidate, self.p.memory)
+                expect = plan.pop('expect')
+                outcome = self.p.memory._apply_medication_change_tx(
+                    session_id=task_id, turn_id=key, source='caregiver-confirmed',
+                    expect=expect, **plan)
+                if outcome.get('outcome') == 'unresolved':
+                    # 没有匹配的在用记录——**不能**当成"确认成功"。整组回滚，由
+                    # 调用方把它落成冲突。
+                    unresolved.append(str(plan.get('name')))
+                    continue
+                medication = outcome.get('medication') or {}
+                entry = {
+                    'candidate_id': candidate.get('id'),
+                    'operation': candidate['operation'],
+                    'name': plan.get('name'),
+                    'medication_id': medication.get('id'),
+                    'medication_ref': medication.get('ref'),
+                    'episode_id': medication.get('episode_id'),
+                    'before': candidate.get('before'),
+                    'after': candidate.get('changes'),
+                }
+                applied.append(entry)
+                if visit is not None:
+                    item = pending[candidate['id']]
+                    item['status'] = _visits.CANDIDATE_CONFIRMED
+                    item['decided_at'] = utc_now()
+                    item['decided_by'] = actor
+                    item['applied'] = dict(entry)
+                    item['conflict'] = None
+                    item['revision'] = int(item.get('revision') or 1) + 1
+            if unresolved:
+                raise MedicationWriteConflict(
+                    '这些药当前不在用，停用或调整没有可写入的记录：' + '、'.join(unresolved))
+            if visit is not None:
+                visit['updated_at'] = utc_now()
+                visit['revision'] += 1
+                self.p.save(_visits.KIND, visit)
+            return {'applied': applied, 'count': len(applied)}
+        return self.p.command(
+            f'{key}:medication-candidates',
+            {'type': 'medication_candidate_confirm', 'task_id': task_id,
+             'candidate_ids': [str(c.get('id')) for c in candidates]}, execute)
+
     def summary_tx(self):
         def safe(value):
             # Escape raw HTML and Markdown link syntax from user material.

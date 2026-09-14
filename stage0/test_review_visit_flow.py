@@ -480,11 +480,13 @@ class ScenarioBRelatedChange(_VisitCase):
         proposed = self.api.client.post(
             f'/v1/safety-cases/{case_id}/visits/{visit_id}/candidates',
             json={'key': 'candidate-1', 'name': '合成药乙', 'field': 'dose',
-                  'value': '10mg'})
+                  'value': '10mg',
+                  # 调用方自报一个"原来是 99mg"——它**不得**被采信。
+                  'before': '99mg'})
         self.assertEqual(200, proposed.status_code, proposed.text)
         pending = proposed.json()['visit']['pending_candidates']
         self.assertEqual(1, len(pending), pending)
-        self.assertEqual(before['合成药乙'], pending[0]['before'],
+        self.assertEqual(before['合成药乙'], pending[0]['before']['dose'],
                          'before 必须取自当前权威记录，不采信调用方自报')
         self.assertEqual('user_declared', pending[0]['source'])
         self.assertEqual(before, {m['display_name']: m['dose']
