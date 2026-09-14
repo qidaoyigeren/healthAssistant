@@ -43,8 +43,11 @@
 ## 2. 快速启动步骤
 
 **唯一推荐运行目录**：`D:\py\HealthAssistant.worktrees\integration`（分支
-`feat/medication-change`）。主工作区 `D:\py\HealthAssistant` 停在更早的提交上，
-**没有本轮的功能**——在旧目录里启动会看不到「补充情况」。
+`feat/medication-change`）。
+
+主工作区 `D:\py\HealthAssistant` 现在**也已经包含**本轮功能（`master` 已快进合并到
+同一个提交），两个目录都能跑。之所以仍然推荐上面那个：它是本次验收实际跑过的那一份，
+验收记录里的路径指的都是它。
 
 ```powershell
 cd D:\py\HealthAssistant.worktrees\integration
@@ -218,7 +221,8 @@ python -m stage0.backup --restore stage0/backups/memory-<时间戳>.db --to stag
 - **分支**：`feat/medication-change`
 - **源码版本（闸门与流程验收校验过的）**：`64252c6`
 - **本文件的提交**：见该分支最后一次提交（`FINAL-DELIVERY.md`）
-- **未合并到 `master`**：主工作区保持原样，没有覆盖、没有重置分支
+- **已合并到 `master` 并推送 `origin`**：快进合并（fast-forward，没有 force、没有改写
+  历史），主工作区 `D:\py\HealthAssistant` 现在也包含本轮功能
 
 **遇到问题时最小可复现信息**：在哪个页面、点了什么、页面原话（服务端消息会原样显示）、
 `http://127.0.0.1:8000/v1/health` 的输出、以及当时 `stage0/memory.db` 的**备份**
