@@ -287,6 +287,62 @@ class CursorConsumptionTests(_VisitCase):
             self.assertEqual(9, consumed_cursor(7, 12, termination, 9))
 
 
+class ReuseIsAnAction(_VisitCase):
+    """有效答案可以直接结束当前事实问题，不强制先规划、再搜索、再提问。"""
+
+    @staticmethod
+    def always_respond(payload):
+        """"复用已有结论并交付"——模型第一轮就选它。"""
+        return {'decision': 'respond'}
+
+    def _declare_then_answer(self, case_id):
+        declared = _declare('合成药乙目前的服用频次是什么？', field='schedule',
+                            strategy='ask_user')
+        first = self._run_with([declared], case_id)
+        request = first['required_inputs'][0]['request_id']
+        self.api.answer(case_id, request, '每日一次')
+        return request
+
+    def _run_with(self, declarations, case_id):
+        case = self.api.cases()
+
+        def provider(payload):
+            inv = payload['investigation']
+            if not (inv.get('questions') or []):
+                for declaration in declarations:
+                    return declaration
+            return {'decision': 'respond'}
+
+        self.api = self.api.rebuild(proposal_provider=provider)
+        tasks = CareTasks(self.api.product)
+        task = tasks.create('reuse-seed', 'safety_case', case_id)
+        tasks.resume(task['id'], 'reuse-seed-run', task['revision'], 'continue',
+                     enqueue=True)
+        self.api.pump()
+        return self.api.case(case_id)
+
+    def test_the_model_may_choose_to_reuse_rather_than_search(self):
+        case = self.api.seed_one_case()
+        case_id = case['case_id']
+        self._declare_then_answer(case_id)
+
+        # 第二次进来：这一次模型什么都不做，直接交付。
+        self.api = self.api.rebuild(proposal_provider=self.always_respond)
+        self.api.start_visit(case_id, key='reuse-visit')
+        task = [t for t in self.api.product.objects('care_task')
+                if t.get('visit_id')][-1]
+        inv = task.get('investigation') or {}
+
+        # 交付里**有模型的一次选择**——不是代码在它开口前就收尾了。
+        self.assertGreaterEqual(inv.get('model_decisions') or 0, 1,
+                                '全程没有发生模型决策，这不是 Agent 的决定')
+        self.assertEqual('checks_completed', inv.get('termination_reason'),
+                         f'无事可做的回访被记成了 {inv.get("termination_reason")!r}')
+        self.assertEqual('completed', task['status'])
+        # 也没有为了"重新得到同一结论"去检索。
+        self.assertEqual([], list(inv.get('queries') or []))
+
+
 class TheModelSeesTheVisit(_VisitCase):
     """回访摘要真的进到模型上下文里，而且只放引用。"""
 

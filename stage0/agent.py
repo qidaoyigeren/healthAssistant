@@ -1895,7 +1895,11 @@ class LLMPlanner:
         if investigation is not None:
             from .investigation import allowed_tools
             permitted = [name for name in allowed_tools(investigation) if name != 'respond']
-            respond_available = bool(investigation.termination_reason)
+            # 代码设了终止原因时可以交付；此外，一次**无事可做的回访**也允许
+            # 模型直接选择"复用已有结论并交付"——否则它只能先规划、再搜索、
+            # 再提问，而那三件事在这时都没有必要做。
+            respond_available = (bool(investigation.termination_reason)
+                                 or investigation.visit_ready_to_deliver())
             meta = {
                 'gap_id': {'type': 'string', 'description': '本提案针对的 open gap_id'},
                 'expected_observation': {'type': 'string', 'description': '本步预期观察到的结果'},
@@ -1975,7 +1979,9 @@ class LLMPlanner:
             from .investigation import allowed_tools
             permitted = allowed_tools(state.investigation)
             parameters['properties']['tool']['enum'] = [t for t in permitted if t != 'respond'] or ['memory_read']
-            parameters['properties']['decision']['enum'] = ['respond'] if state.investigation.termination_reason else ['tool']
+            deliverable = (bool(state.investigation.termination_reason)
+                           or state.investigation.visit_ready_to_deliver())
+            parameters['properties']['decision']['enum'] = ['respond'] if deliverable else ['tool']
             if not state.investigation.termination_reason:
                 # Providers need concrete nested argument properties, not just
                 # an opaque object plus a separate prose catalog.
@@ -3423,6 +3429,10 @@ class MedicationCoordinatorAgent:
             inv.forced_stop()
             if inv.termination_reason:
                 return None
+        # 到这里就是**真的要去问模型**了。计数器据此区分"模型选择了交付"与
+        # "代码在模型开口前就收尾了"——后者不是 Agent 的决定。
+        if inv:
+            inv.model_decisions += 1
         return self.planner.decide(state)
 
     # A3: wrap-up (record/verify/deliver) tools may still run inside the
@@ -3628,7 +3638,12 @@ class MedicationCoordinatorAgent:
                     if state.degraded_reason and not inv.termination_reason:
                         break
                 if inv.termination_reason is None:
-                    inv.finish(state.degraded_reason or 'max_cycles')
+                    if inv.visit_ready_to_deliver() and inv.model_decisions >= 1:
+                        # 模型明确选择了交付，而代码没有设终止原因：这是一次正常的
+                        # "无事可做"，不是 max_cycles。记成后者会把成功当失败。
+                        inv.termination_reason = 'checks_completed'
+                    else:
+                        inv.finish(state.degraded_reason or 'max_cycles')
         except BudgetExceeded:
             state.degraded_reason = 'budget_exhausted:open_review'
             inv.finish(state.degraded_reason)

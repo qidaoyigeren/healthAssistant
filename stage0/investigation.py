@@ -502,6 +502,9 @@ class InvestigationState:
     #: 在它被消费之前不能判定"只剩等人"：那样回答就永远用不上，
     #: 用户补了一句、系统却立刻回到等待。
     new_information_pending: bool = False
+    #: 模型真正做过多少次决策。用来区分"模型选择了交付"与"代码在模型开口前
+    #: 就收尾了"——后者交付里没有模型的选择，不能记成"Agent 决定了下一步"。
+    model_decisions: int = 0
     # `memory` / `evidence_store` 是**实例属性，不是 dataclass 字段**：它们由
     # sync_authority / validate_sources 在运行期绑定，只用于按作用域核对对象引用
     # 是否真实存在。写成字段会被 ``asdict`` 带进持久化状态（序列化一个数据库
@@ -956,6 +959,31 @@ class InvestigationState:
         if question.get('information_target') == TARGET_GENERAL_REFERENCE:
             self._new_claim(question['statement'], list(question['subject_refs']),
                             'model', question_id=question['question_id'])
+
+    def visit_ready_to_deliver(self) -> bool:
+        """这次回访是不是已经无事可做——可以复用已有结论直接交付。
+
+        五个条件缺一不可，任何一项不成立都还要继续做：
+
+        * 这**是**一次回访（不是别的调查）；
+        * 有仍有效的答案可以复用；
+        * 上次之后没有真正的新事件；
+        * 没有未决问题；
+        * 没有需要重核的依据。
+
+        这是"允许有效答案直接结束当前事实问题"的判据：满足时 `respond` 对模型
+        开放，它不必先规划、再搜索、再提问，就可以选择复用并交付。
+        """
+        visit = (self.case_context or {}).get('visit') or {}
+        if not visit:
+            return False
+        if not visit.get('reusable_answers'):
+            return False
+        if (visit.get('new_since_last_visit') or {}).get('events'):
+            return False
+        if visit.get('open_questions'):
+            return False
+        return not any(item.get('reason') for item in (visit.get('retired_answers') or []))
 
     def invalidate_answer(self, question_id: str, reason: str) -> bool:
         """一条已有答案不再适用于当前记录：标成 ``stale`` 并重开问题。
@@ -2086,6 +2114,15 @@ class InvestigationState:
         终止原因按**实际发生了什么**给：没有检索动作，就不会得到
         "检索后资料不可得"。预算不足不代表现实中不存在资料。
         """
+        if self.visit_ready_to_deliver() and self.model_decisions >= 1:
+            # 这次回访无事可做：模型已经看过摘要并选择了交付，可以收尾。
+            #
+            # `model_decisions >= 1` 不能省。循环在**规划之前**还会检查一次停止
+            # 条件（`agent.run_open_review`），那里直接 break 的话整个 run 一次
+            # 模型调用都不会发生——交付沦为代码渲染，也就没有"Agent 选择了
+            # 下一步"这回事。
+            self.termination_reason = 'checks_completed'
+            return self.termination_reason
         if not self.questions_settled or self.new_information_pending:
             # 还没轮到模型开口（问题集未定），或有**它还没看过的新信息**。
             # 此刻判定"没有未决问题"或"只剩等人"都是把机会吃掉。
