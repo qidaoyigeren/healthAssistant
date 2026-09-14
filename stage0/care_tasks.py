@@ -161,6 +161,24 @@ CONTRACTS = {
 SAFETY_CASE_CONTRACT = 'safety-case@2'
 REVIEW_CONTRACT = 'material-review@2'
 
+#: 只有这些收尾方式算"这一轮把交给它的事件处理完了"。
+#: 失败、取消、降级、`no_progress` 都不是——把没看过的事件标成看过了，
+#: 下一轮回访就再也看不到它们。
+CONSUMED_TERMINATIONS = ('checks_completed', 'waiting_input', 'waiting_review')
+
+
+def consumed_cursor(current: int, consumed_at: int, termination: str | None,
+                    history_length: int) -> int:
+    """这一轮结束后消费游标停在哪。**规则只在这里**。
+
+    * 没跑成（失败 / 取消 / 降级 / no_progress）→ **不动**：那些事件没被处理过，
+      推进等于把它们从下一轮的新增里抹掉。
+    * 跑成了 → 停在**建上下文时**那个位置，不越过运行期间新增的事件。
+    """
+    if termination not in CONSUMED_TERMINATIONS:
+        return int(current or 0)
+    return min(int(consumed_at), int(history_length))
+
 
 class CareTasks:
     def __init__(self, product, agent_factory=None):
@@ -606,6 +624,10 @@ class CareTasks:
         contract = CONTRACTS['safety_case']
         store = SafetyCaseStore(self.p)
         case = store.get(task['safety_case_id'])
+        # 消费游标在**建上下文那一刻**取：这一轮真正交给模型的就是此前的事件。
+        # 运行期间新增的那些（重开请求写的 answer_retired 等）不在快照里，
+        # 因此也不会被误标成"已消费"。
+        consumed_at = len(case.get('history') or [])
         versions = self.p.revisions()
         previous = task.get('input_versions') or versions
         if versions != previous:
@@ -760,7 +782,13 @@ class CareTasks:
                     self.p.save('safety_case', current)
         task['input_versions'] = versions
         # 推进游标：本轮已经把这些事件交给过 Agent，下一轮不该再把它们当"新增"。
-        task['case_history_cursor'] = len(store.get(case['id']).get('history') or [])
+        #
+        # **只在成功消费时推进**，而且只推到建上下文时那个位置：失败、取消、降级、
+        # no_progress 都没把事件处理完，推进等于把没看过的变化标成看过了——下一轮
+        # 回访就再也看不到它们。取 min 是为了让本轮运行期间新增的事件留在游标之后。
+        task['case_history_cursor'] = consumed_cursor(
+            task.get('case_history_cursor') or 0, consumed_at, termination,
+            len(store.get(case['id']).get('history') or []))
 
     def _sync_answers_to_investigation(self, task, request_ids, by_request, answers, key) -> None:
         """把用户刚给的回答写回 investigation 里对应的那条问题。

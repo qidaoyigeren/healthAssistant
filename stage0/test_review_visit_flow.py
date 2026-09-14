@@ -231,6 +231,62 @@ class ScenarioAReusesWhatIsKnown(_VisitCase):
         return self.api.case(case['case_id'])
 
 
+class CursorConsumptionTests(_VisitCase):
+    """游标只在**成功消费**时推进，且只推到手交给模型的那个位置。"""
+
+    @staticmethod
+    def always_invalid(payload):
+        """每一轮都提一个不允许的动作：这一轮**必然跑不成**。"""
+        return {'decision': 'tool', 'tool': 'memory_read', 'gap_id': 'no_such_gap',
+                'expected_observation': 'x', 'arguments': {'query': 'snapshot'}}
+
+    def test_a_run_that_failed_leaves_its_events_unconsumed(self):
+        """真跑一轮**没跑成**的调查：游标不能动，而历史确实长过。
+
+        这一条是对照旧行为写的——旧代码无条件把游标推到当时的长度，
+        于是失败那轮没看过的事件下一轮再也不会被当成"新增"。
+        """
+        case = self.api.seed_one_case()
+        self.api = self.api.rebuild(proposal_provider=self.always_invalid)
+        self.api.start_visit(case['case_id'], key='cursor-fail')
+
+        task = [t for t in self.api.product.objects('care_task') if t.get('visit_id')][-1]
+        raw = sc.SafetyCaseStore(self.api.product).get(case['case_id'])
+        self.assertNotIn(task.get('investigation', {}).get('termination_reason'),
+                         ('checks_completed', 'waiting_input', 'waiting_review'))
+        self.assertTrue(raw['history'], '事项应当有历史')
+        self.assertEqual(0, task.get('case_history_cursor') or 0,
+                         '这一轮没跑成，却把没看过的事件标成了已消费')
+
+    def test_a_successful_run_consumes_only_what_it_was_handed(self):
+        case = self.api.seed_one_case()
+        self.api.start_visit(case['case_id'], key='cursor-1')
+        task = [t for t in self.api.product.objects('care_task') if t.get('visit_id')][-1]
+        raw = sc.SafetyCaseStore(self.api.product).get(case['case_id'])
+        self.assertIsNotNone(task.get('case_history_cursor'))
+        self.assertLessEqual(task['case_history_cursor'], len(raw['history']))
+
+    def test_a_failed_run_does_not_consume_the_events_it_never_read(self):
+        """一轮没跑成，它没看过的事件必须留在游标之后。
+
+        规则本身在 `consumed_cursor` 里，这里直接打它——失败的每一种收尾都要
+        原样返回，跑成的那一种也不能越过运行期间新增的事件。
+        """
+        from stage0.care_tasks import CONSUMED_TERMINATIONS, consumed_cursor
+        for termination in ('unrecoverable_failure', 'no_progress', 'cancelled',
+                            'budget_insufficient', 'evidence_unavailable', None):
+            self.assertNotIn(termination, CONSUMED_TERMINATIONS)
+            self.assertEqual(
+                7, consumed_cursor(7, 12, termination, 20),
+                f'{termination!r} 没跑成，却把没看过的事件标成了已消费')
+
+        for termination in CONSUMED_TERMINATIONS:
+            # 跑成了：停在**建上下文时**的位置，不越过运行期间新增的事件。
+            self.assertEqual(12, consumed_cursor(7, 12, termination, 20))
+            # 历史反而变短（回滚/清理）时也不越界。
+            self.assertEqual(9, consumed_cursor(7, 12, termination, 9))
+
+
 class TheModelSeesTheVisit(_VisitCase):
     """回访摘要真的进到模型上下文里，而且只放引用。"""
 
