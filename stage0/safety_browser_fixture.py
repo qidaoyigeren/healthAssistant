@@ -79,14 +79,42 @@ def scripted_agent(store):
         llm_planner_enabled=True, proposal_provider=plan_provider)
 
 
+class ScriptedReading:
+    """浏览器验收用的脚本化**理解器**。
+
+    屏幕上演的是"用户说一句话 → 系统理解 → 待确认候选"，真实的语义理解属于有限
+    真实验收。这里脚本化的是**措辞**：机制一步没省——收录、可核对性校验、歧义
+    降级、候选、确认、写入、必要检查、事项与回访的承接，走的全是产品路径。
+    """
+
+    def __init__(self) -> None:
+        self.reading: dict = {"summary": "脚本化理解", "items": [], "question": "",
+                              "unsupported": []}
+        self.calls = 0
+
+    def available(self):
+        return True, None
+
+    def config(self):
+        return {"provider": "scripted", "model": "browser-fixture"}
+
+    def read(self, *, text, context, hint=None):
+        self.calls += 1
+        return dict(self.reading), {"calls": 1, "tokens": 80,
+                                    "usage_unknown": False, "quality": "actual"}
+
+
 def build_app(db_path: Path):
     import stage0.server as server
 
+    reading = ScriptedReading()
     app = server.create_app(
         db_path=db_path, worker_thread=False,
         # worker 与同步路径必须用**同一个**脚本化 agent：否则"恢复那一轮"会
         # 退回降级路径，浏览器看到的就不是同一条链路。
-        agent_factory=lambda: scripted_agent(app.state.store))
+        agent_factory=lambda: scripted_agent(app.state.store),
+        change_note_interpreter=reading)
+    app.state.scripted_reading = reading
 
     @app.post("/__fixture/drain")
     def _drain():
@@ -97,6 +125,12 @@ def build_app(db_path: Path):
         路由，产品路径不会多出一个"手动跑任务"的入口。
         """
         return {"drained": len(app.state.worker.drain_once(max_tasks=5))}
+
+    @app.post("/__fixture/reading")
+    def _reading(body: dict):
+        """下一次提交时理解器"读出"什么。措辞是脚本化的，机制不是。"""
+        reading.reading = dict(body)
+        return {"ok": True, "calls": reading.calls}
 
     return app
 

@@ -577,6 +577,22 @@ def medication_records(store: MemoryStore, *, status: str | None = None,
     return _page_envelope(items, total, next_cursor)
 
 
+#: 产生一行的那次操作 → 人能读的标签。
+MEDICATION_OPERATION_LABELS = {
+    "add": "开始服用", "resume": "恢复服用", "dose_change": "调整用法",
+    "correction": "纠正记录", "legacy_unknown": "来源未记录",
+}
+
+#: 时间戳的**来源** → 人能读的说明。"发生时间"与"登记时间"分开表达就靠它。
+MEDICATION_TIME_BASIS_LABELS = {
+    "reported": "用户报告的发生时间",
+    "reported_vague": "用户只说了一个大概（未确定到具体日期）",
+    "unknown": "未提供",
+    "recorded_time": "系统登记时间（不是用户报告的发生时间）",
+    "legacy_unknown": "来源未记录",
+}
+
+
 def medication_record_detail(store: MemoryStore, medication_id: int) -> dict[str, Any]:
     row = store.connection.execute(
         "SELECT * FROM medications WHERE id = ?", (medication_id,)).fetchone()
@@ -588,7 +604,75 @@ def medication_record_detail(store: MemoryStore, medication_id: int) -> dict[str
         "SELECT * FROM medications WHERE medication_key = ? ORDER BY version ASC",
         (row["medication_key"],)).fetchall()
     item["versions"] = [_medication_row(v) for v in versions]
+    item["episodes"] = _medication_episodes(item["versions"])
+    item["history"] = _medication_history(item["versions"])
     return item
+
+
+def _medication_episodes(versions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """按**服用阶段**分组：同一次连续服用是一段。
+
+    分段依据是行自己携带的 ``episode_id``（写入时定死），**不是**按当前 status
+    现算的——那样会在纠正一条历史记录时改变其它行的归属。见
+    ``memory.MEDICATION_OPERATIONS``。
+    """
+    grouped: dict[Any, list[dict[str, Any]]] = {}
+    for item in versions:
+        grouped.setdefault(item.get("episode_id") or item["id"], []).append(item)
+    episodes: list[dict[str, Any]] = []
+    for episode_id, rows in grouped.items():
+        first, last = rows[0], rows[-1]
+        still_active = last.get("status") == "active"
+        episodes.append({
+            "episode_id": episode_id,
+            "started_at": first.get("start_at"),
+            "started_basis": first.get("start_at_basis"),
+            "still_active": still_active,
+            # 没停就是还在用：这时"结束时间"是**没有**，不是空字符串。
+            "ended_at": None if still_active else last.get("end_at"),
+            "ended_basis": None if still_active else last.get("end_at_basis"),
+            "versions": [item["id"] for item in rows],
+            "resumed_from": (last.get("predecessor_id")
+                             if last.get("operation") == "resume" else None),
+        })
+    return episodes
+
+
+def _medication_history(versions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """逐条列出发生过什么：开始、调整、停止、恢复、纠错。
+
+    **发生时间与登记时间是两列。** ``end_at_basis`` 为 ``unknown`` 或
+    ``reported_vague`` 时 ``end_at`` 是 null——那表示"不知道什么时候停的"，
+    不表示"刚刚停的"。
+    """
+    history: list[dict[str, Any]] = []
+    for item in versions:
+        operation = item.get("operation") or "legacy_unknown"
+        entry = {
+            "version": item.get("version"),
+            "medication_id": item["id"],
+            "ref": item.get("ref"),
+            "operation": operation,
+            "operation_label": MEDICATION_OPERATION_LABELS.get(operation, operation),
+            # 登记时间：系统什么时候记下这一版的。
+            "recorded_at": item.get("created_at"),
+            # 发生时间：用户说的那一版是从什么时候开始的，以及这个时间来自哪里。
+            "started_at": item.get("start_at"),
+            "started_basis": item.get("start_at_basis"),
+            "started_basis_label": MEDICATION_TIME_BASIS_LABELS.get(
+                item.get("start_at_basis"), item.get("start_at_basis")),
+            "time_text": item.get("time_text"),
+            "status": item.get("status"),
+            "corrects_id": item.get("corrects_id"),
+            "predecessor_id": item.get("predecessor_id"),
+        }
+        if item.get("status") == "stopped":
+            entry["stopped_at"] = item.get("end_at")
+            entry["stopped_basis"] = item.get("end_at_basis")
+            entry["stopped_basis_label"] = MEDICATION_TIME_BASIS_LABELS.get(
+                item.get("end_at_basis"), item.get("end_at_basis"))
+        history.append(entry)
+    return history
 
 
 # ---------------------------------------------------------------------------

@@ -1612,12 +1612,20 @@ class CareTasks:
 
         def execute():
             task = self.p.get(task_id, 'care_task')
-            if task['revision'] != revision:
+            # revision 只在该由调用方定版本时核对。确认路径不传它：`_ensure_visit_task`
+            # 刚刚可能 resume 过这件任务（那会推进 revision），拿一个更早读到的数字来比
+            # 只会误报冲突。真正防并发改写的是候选自己的版本核对与整笔原子性。
+            if revision is not None and task['revision'] != revision:
                 raise ProductError('待办已被其他操作更新，请刷新', 409)
             if task['goal_type'] not in REVIEW_GOAL_TYPES:
                 raise ProductError('此待办不支持确认用药变更')
-            if task['status'] not in ('ready', 'waiting_input'):
-                raise ProductError('本次回访正在处理中，请稍候再确认这条变更', 409)
+            # 只挡**终态**：一次回访刚跑起来（queued/running）时用户就确认也是正常
+            # 顺序——写入是原子的、必要检查会重排队，这一轮调查下一拍就读到新记录。
+            # 真正防并发改写的是上面那道 revision 核对。
+            if task['status'] in ('completed', 'cancelled', 'failed'):
+                raise ProductError('这次回访的这一轮已经收尾，请重新开始本次跟进', 409)
+            if visit_id is not None and task.get('visit_id') != visit_id:
+                raise ProductError('这件任务不属于本次回访，不能把变更写进去', 409)
             visit = None
             pending: dict[str, dict] = {}
             if visit_id is not None:

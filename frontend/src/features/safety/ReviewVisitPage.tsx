@@ -24,15 +24,16 @@ import { api } from '../../api/client';
 import { newIdempotencyKey } from '../../api/http';
 import { qk } from '../../api/queryKeys';
 import type {
-  SafetyCaseDto, SafetyChangeCandidateDto, SafetyVisitStatementDto,
+  SafetyCaseDto, SafetyChangeCandidateDto, SafetyChangeNoteDto, SafetyVisitStatementDto,
 } from '../../api/types';
 import { Badge, Card, ErrorState, SkeletonList, TimeText } from '../../components/ui';
 import { inputClass, buttonClass } from '../materials/MaterialsPage';
 import { AnswerPanel } from './CaseCard';
 import { loadCase } from './fixtureBridge';
 import {
-  CANDIDATE_SOURCE_LABELS, CHANGE_FIELD_LABELS, basisKindLabel, candidateSourceLabel,
-  changeFieldLabel, serverMessage, visitReasonLabel, visitStatusLabel,
+  CANDIDATE_SOURCE_LABELS, CHANGE_FIELD_LABELS, basisKindLabel, candidateOperationLabel,
+  candidateSourceLabel, changeFieldLabel, noteStatusLabel,
+  serverMessage, timeBasisLabel, visitReasonLabel, visitStatusLabel,
 } from './labels';
 
 export function ReviewVisitPage(): React.ReactElement {
@@ -309,6 +310,7 @@ function StepFive({ view, busy, caseId, onAction }: {
               <StatementList title="需要重新核对" lines={result.recheck ?? []}
                 empty="没有依据需要重新核对。" />
             </section>
+            <GroupStatements view={view} />
             <StatementList title="仍未解决" lines={result.unresolved}
               empty="这次没有留下未解决的问题。" />
             <section data-visit-section="why-ended">
@@ -341,17 +343,232 @@ function StepFive({ view, busy, caseId, onAction }: {
         )
         : <p className="mt-1 text-sm text-ink-muted">这次回访还没有跑出结果。</p>}
 
-      <ChangeCandidates view={view} busy={busy} caseId={caseId} onAction={onAction} />
+      <SupplementSection view={view} busy={busy} caseId={caseId} onAction={onAction} />
     </Card>
   );
 }
 
+type NoteAction = (action: (key: string) => Promise<unknown>) => Promise<void>;
+
+/** 一组换药的**逐条**陈述。刻意没有"换药已完成"这样的总结论。 */
+function GroupStatements({ view }: { view: SafetyCaseDto }): React.ReactElement | null {
+  const groups = view.visit?.result?.groups ?? [];
+  if (groups.length === 0) return null;
+  return (
+    <section data-visit-section="groups" className="space-y-2">
+      <h3 className="text-sm font-medium">换药：一组有关联的变更</h3>
+      {groups.map((group) => (
+        <ul key={group.group_id} className="space-y-1">
+          {group.statements.map((line, index) => (
+            <li key={`${group.group_id}-${index}`} className="text-sm text-ink-secondary"
+              data-group-statement={line.status}>
+              · {line.text}
+            </li>
+          ))}
+        </ul>
+      ))}
+      <p className="text-xs text-ink-muted">
+        这里逐条说明每一项各自到哪一步了——「旧药已经停用」和「新药还没开始」是两件事，
+        不合并成一句"换药完成"或"换药只做了一半"。
+      </p>
+    </section>
+  );
+}
+
+/** 用户说了、但**还没发生**的事。它们不在可确认列表里。 */
+function Plans({ note }: { note: SafetyChangeNoteDto }): React.ReactElement | null {
+  const plans = note.plans ?? [];
+  if (plans.length === 0) return null;
+  return (
+    <div className="mt-2 rounded-md border border-line bg-surface-alt/40 p-2"
+      data-note-plans>
+      <p className="text-xs font-medium text-ink-secondary">您提到但还没发生的事</p>
+      <ul className="mt-1 space-y-1">
+        {plans.map((plan, index) => (
+          <li key={index} className="text-xs text-ink-secondary">
+            {plan.target?.name} · {candidateOperationLabel(plan.operation)}
+            {plan.time?.text ? `（${plan.time.text}）` : ''}
+            {plan.time?.basis === 'reported_vague'
+              ? '——只说了个大概，没有记成具体日期' : ''}
+            <span className="ml-1 text-ink-muted">· {plan.quote}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1 text-xs text-ink-muted">
+        计划**不会**被写成已经发生。等您回来说"已经开始了"，系统会关联到这条计划，
+        再按当时的记录重新核对一次。
+      </p>
+    </div>
+  );
+}
+
+function Questions({ note }: { note: SafetyChangeNoteDto }): React.ReactElement | null {
+  const questions = note.questions ?? [];
+  if (questions.length === 0) return null;
+  return (
+    <div className="mt-2 rounded-md border border-caution/40 bg-caution-soft/30 p-2"
+      data-note-questions>
+      <p className="text-xs font-medium">为了不猜，这里需要您补一句：</p>
+      <ul className="mt-1 space-y-1">
+        {questions.map((item, index) => (
+          <li key={index} className="text-sm text-ink-secondary" data-note-question>
+            {item.text}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1 text-xs text-ink-muted">
+        这一条**没有**变成待确认的变更——对象或信息还不确定时，系统宁可问，不猜。
+      </p>
+    </div>
+  );
+}
+
+function Unsupported({ note }: { note: SafetyChangeNoteDto }): React.ReactElement | null {
+  const items = note.unsupported ?? [];
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-2 rounded-md border border-line p-2" data-note-unsupported>
+      <p className="text-xs font-medium">这几件事系统还表达不了，没有静默丢掉：</p>
+      <ul className="mt-1 space-y-1">
+        {items.map((item, index) => (
+          <li key={index} className="text-xs text-ink-secondary">
+            {item.what}<span className="ml-1 text-ink-muted">（原话：{item.quote}）</span>
+            <span className="ml-1">{item.guidance}</span>
+          </li>
+        ))}
+      </ul>
+      <Link to="/medications" className="mt-1 inline-block text-xs text-primary underline">
+        去「用药记录」页登记
+      </Link>
+    </div>
+  );
+}
+
+/** 一条「补充情况」：原话 + 对它的理解。 */
+function NoteCard({ note, busy, onRetry }: {
+  note: SafetyChangeNoteDto; busy: boolean; onRetry: () => void;
+}): React.ReactElement {
+  const reading = note.reading ?? null;
+  return (
+    <li className="rounded-lg border border-line p-3" data-change-note={note.status}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge tone={note.status === 'failed' || note.status === 'unavailable' ? 'caution' : 'neutral'}>
+          {noteStatusLabel(note.status)}
+        </Badge>
+        <TimeText iso={note.received_at} />
+      </div>
+      <p className="mt-1 text-sm" data-note-text>「{note.text || '（只点了状态按钮）'}」</p>
+
+      {reading?.summary && note.status === 'interpreted' && (
+        <p className="mt-1 text-sm text-ink-secondary" data-note-summary>
+          系统理解到：{reading.summary}
+        </p>
+      )}
+      {note.error && (
+        <p className="mt-1 text-xs text-danger" data-note-error>{note.error}</p>
+      )}
+      {note.status === 'unavailable' && (
+        <p className="mt-1 text-xs text-ink-muted">
+          原文已经保存下来了。您可以在下面直接登记结构化变更，或者稍后再重试。
+        </p>
+      )}
+      {note.status === 'interpreted' && (
+        <p className="mt-1 text-xs text-ink-muted">
+          下面这些是**待确认的解释**，不是已经写进记录的事实。
+        </p>
+      )}
+      <Plans note={note} />
+      <Questions note={note} />
+      <Unsupported note={note} />
+      {(note.status === 'failed' || note.status === 'unavailable') && (
+        <button type="button" className="mt-2 text-xs text-ink-secondary underline"
+          disabled={busy} onClick={onRetry}>
+          {note.status === 'failed' ? '重试这次理解' : '重新尝试自动理解'}
+        </button>
+      )}
+      {note.usage && (
+        <p className="mt-1 text-xs text-ink-muted" data-note-usage>
+          本次理解调用了 {note.usage.calls ?? '未知'} 次模型
+          {note.usage.tokens === null || note.usage.tokens === undefined
+            ? '；用量未测到（不是 0）'
+            : `，用量 ${note.usage.tokens} tokens`}
+          {note.model?.model ? `（${note.model.model}）` : ''}
+        </p>
+      )}
+    </li>
+  );
+}
+
+/** 「补充情况」：一句自然语言 → 待确认候选。 */
+function SupplementSection({ view, busy, caseId, onAction }: {
+  view: SafetyCaseDto; busy: boolean; caseId: string; onAction: NoteAction;
+}): React.ReactElement {
+  const visit = view.visit!;
+  const notes = visit.change_notes ?? [];
+  const [text, setText] = useState('');
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="mt-4 border-t border-line pt-3">
+      <h3 className="text-sm font-medium">补充情况</h3>
+      <p className="mt-1 text-xs text-ink-muted">
+        直接用您自己的话说就行，不必先想清楚该填哪一格。系统的理解会先摆出来给您核对，
+        **确认之前当前药单一个字节都不会变**。
+      </p>
+
+      {notes.length > 0 && (
+        <ul className="mt-2 space-y-2" data-change-notes>
+          {notes.map((note) => (
+            <NoteCard key={note.id} note={note} busy={busy}
+              onRetry={() => void onAction((key) => api.safetyCaseRetryNote(
+                caseId, visit.visit_id, note.id, { key }))} />
+          ))}
+        </ul>
+      )}
+
+      <div className="mt-2 space-y-2">
+        <textarea className={`${inputClass} w-full`} rows={3} value={text}
+          data-note-input
+          placeholder="例如：这两天药乙改成每天两次了；药甲上周就停了"
+          onChange={(event) => { setText(event.target.value); setOpen(true); }} />
+        <div className="flex flex-wrap gap-2">
+          {['还没做', '暂不回答', '情况有变化'].map((label) => (
+            <button key={label} type="button"
+              className="rounded-md border border-line px-2 py-1 text-xs"
+              data-note-hint={label}
+              disabled={busy}
+              onClick={() => void onAction((key) => api.safetyCaseSubmitNote(
+                caseId, visit.visit_id, { key, text: '', speech_act: label }))}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <button type="button" className={buttonClass} data-note-submit
+            disabled={busy || !text.trim()}
+            onClick={() => void onAction((key) => api.safetyCaseSubmitNote(
+              caseId, visit.visit_id, { key, text }))
+              .then(() => { setText(''); setOpen(false); })}>
+            提交，让系统先理解一下
+          </button>
+          {open && (
+            <button type="button" className="text-sm text-ink-secondary underline"
+              onClick={() => { setText(''); setOpen(false); }}>清空</button>
+          )}
+        </div>
+      </div>
+
+      <ChangeCandidates view={view} busy={busy} caseId={caseId} onAction={onAction} />
+    </div>
+  );
+}
+
 function ChangeCandidates({ view, busy, caseId, onAction }: {
-  view: SafetyCaseDto; busy: boolean; caseId: string;
-  onAction: (action: (key: string) => Promise<unknown>) => Promise<void>;
+  view: SafetyCaseDto; busy: boolean; caseId: string; onAction: NoteAction;
 }): React.ReactElement {
   const visit = view.visit!;
   const pending = visit.pending_candidates ?? [];
+  const conflicting = pending.filter((item) => item.conflict).length;
   const [declaring, setDeclaring] = useState(false);
   const [form, setForm] = useState({ name: '', field: 'dose', value: '' });
   const meds = useMemo(() => view.medications
@@ -360,23 +577,43 @@ function ChangeCandidates({ view, busy, caseId, onAction }: {
 
   return (
     <div className="mt-4 border-t border-line pt-3">
-      <h3 className="text-sm font-medium">用药变更</h3>
+      <h3 className="text-sm font-medium">待确认的用药变更</h3>
 
-      {pending.length > 0 && (
-        <ul className="mt-2 space-y-2">
-          {pending.map((candidate) => (
-            <CandidateRow key={candidate.id} candidate={candidate} busy={busy}
-              onConfirm={() => void onAction((key) => api.safetyCaseConfirmChange(
-                caseId, visit.visit_id, candidate.id, { key }))}
-              onDismiss={() => void onAction((key) => api.safetyCaseDismissChange(
-                caseId, visit.visit_id, candidate.id, { key }))} />
-          ))}
-        </ul>
+      {pending.length === 0
+        ? <p className="mt-1 text-sm text-ink-muted">现在没有待确认的变更。</p>
+        : (
+          <ul className="mt-2 space-y-2" data-pending-candidates>
+            {pending.map((candidate) => (
+              <CandidateRow key={candidate.id} candidate={candidate} busy={busy}
+                onConfirm={() => void onAction((key) => api.safetyCaseConfirmChange(
+                  caseId, visit.visit_id, candidate.id, { key }))}
+                onConfirmGroup={() => void onAction((key) => api.safetyCaseConfirmGroup(
+                  caseId, visit.visit_id, candidate.id, { key }))}
+                onDismiss={() => void onAction((key) => api.safetyCaseDismissChange(
+                  caseId, visit.visit_id, candidate.id, { key }))}
+                onEdit={() => {
+                  const changes = candidate.changes ?? {};
+                  const field = Object.keys(changes)[0] ?? 'dose';
+                  setForm({
+                    name: candidate.target?.name ?? candidate.name ?? '',
+                    field,
+                    value: String(changes[field] ?? candidate.after ?? ''),
+                  });
+                  setDeclaring(true);
+                }} />
+            ))}
+          </ul>
+        )}
+      {conflicting > 0 && (
+        <p className="mt-2 text-xs text-danger" data-conflict-note>
+          有 {conflicting} 条候选依据的记录已经变了。**没有**任何东西被覆盖；
+          请按现在记录的样子重新核对一遍。
+        </p>
       )}
 
       <p className="mt-2 text-xs text-ink-muted">
-        变更在您确认之前**不会**改动当前药单。确认后走既有的用药变更入口写入，
-        必要安全检查按原有路径重新排队。
+        确认后走既有的用药变更入口写入，必要安全检查按原有路径重新排队。
+        未提及的字段保持原值，不会被清空。
       </p>
 
       {declaring
@@ -384,6 +621,7 @@ function ChangeCandidates({ view, busy, caseId, onAction }: {
           <div className="mt-2 space-y-2">
             <div className="flex flex-wrap gap-2">
               <select className={`${inputClass} md:w-48`} value={form.name}
+                data-structured-name
                 onChange={(event) => setForm({ ...form, name: event.target.value })}>
                 <option value="">选择药物…</option>
                 {meds.map((name) => <option key={name} value={name}>{name}</option>)}
@@ -395,11 +633,11 @@ function ChangeCandidates({ view, busy, caseId, onAction }: {
                 ))}
               </select>
               <input className={`${inputClass} md:w-40`} value={form.value}
-                placeholder="新值"
+                placeholder="新值" data-structured-value
                 onChange={(event) => setForm({ ...form, value: event.target.value })} />
             </div>
             <div className="flex gap-2">
-              <button type="button" className={buttonClass}
+              <button type="button" className={buttonClass} data-structured-submit
                 disabled={busy || !form.name || !form.value.trim()}
                 onClick={() => void onAction((key) => api.safetyCaseProposeChange(
                   caseId, visit.visit_id,
@@ -414,45 +652,114 @@ function ChangeCandidates({ view, busy, caseId, onAction }: {
         )
         : (
           <button type="button" className="mt-2 text-xs text-ink-secondary underline"
+            data-structured-open
             onClick={() => setDeclaring(true)}>
-            我这边用药有变化，登记一条待确认的变更
+            我这边用药有变化，直接填一条待确认的变更
           </button>
         )}
     </div>
   );
 }
 
-function CandidateRow({ candidate, busy, onConfirm, onDismiss }: {
+function CandidateRow({ candidate, busy, onConfirm, onConfirmGroup, onDismiss, onEdit }: {
   candidate: SafetyChangeCandidateDto; busy: boolean;
-  onConfirm: () => void; onDismiss: () => void;
+  onConfirm: () => void; onConfirmGroup: () => void;
+  onDismiss: () => void; onEdit: () => void;
 }): React.ReactElement {
+  // 新旧两种候选形状都能显示：字段形态的候选（结构化声明）没有 operation。
+  const operation = candidate.operation ?? 'dose_change';
+  const changes = candidate.changes ?? (
+    candidate.field ? { [candidate.field]: candidate.after } : {});
+  const before = typeof candidate.before === 'object' && candidate.before !== null
+    ? candidate.before as Record<string, unknown>
+    : (candidate.field ? { [candidate.field]: candidate.before } : {});
+  const occurred = candidate.occurred ?? null;
+  const grouped = Boolean(candidate.group?.id);
+
   return (
-    <li className="rounded-lg border border-line p-3">
+    <li className="rounded-lg border border-line p-3"
+      data-candidate={candidate.id} data-candidate-operation={operation}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium">
-          {candidate.name} · {changeFieldLabel(candidate.field)}
-        </span>
-        <span className="text-sm text-ink-secondary">
-          {candidate.before ?? '（无）'} → {candidate.after}
+        <span className="text-sm font-medium" data-candidate-title>
+          {candidate.target?.name ?? candidate.name} · {candidateOperationLabel(operation)}
         </span>
         <Badge tone={candidate.source === 'user_declared' ? 'neutral' : 'caution'}>
           {candidateSourceLabel(candidate.source)}
         </Badge>
+        {grouped && (
+          <Badge tone="neutral">
+            {candidate.group?.role === 'replace_from' ? '换出' : '换入'}
+          </Badge>
+        )}
       </div>
-      {candidate.basis?.note && (
-        <p className="mt-1 text-xs text-ink-muted">原话：{candidate.basis.note}</p>
+
+      <ul className="mt-1 space-y-0.5">
+        {Object.entries(changes).map(([field, value]) => (
+          <li key={field} className="text-sm text-ink-secondary" data-candidate-change={field}>
+            {changeFieldLabel(field)}：
+            <span className="text-ink-muted">
+              {before[field] === null || before[field] === undefined
+                ? '（未记录）' : String(before[field])}
+            </span>
+            {' → '}
+            <span className="font-medium">{String(value)}</span>
+          </li>
+        ))}
+      </ul>
+
+      <p className="mt-1 text-xs text-ink-muted" data-candidate-time>
+        发生时间：{occurred?.text ?? (occurred?.value ?? '未提供')}
+        （{timeBasisLabel(occurred?.basis)}）
+      </p>
+      {candidate.reported_overlap !== null && candidate.reported_overlap !== undefined && (
+        <p className="text-xs text-ink-muted">
+          {candidate.reported_overlap
+            ? '您报告过这两种药有一段时间同时服用。'
+            : '您报告过没有同时服用。'}
+        </p>
       )}
-      <div className="mt-2 flex gap-2">
-        <button type="button" className={buttonClass} disabled={busy} onClick={onConfirm}>
-          确认写入
-        </button>
+      {candidate.basis?.quote && (
+        <p className="mt-1 text-xs text-ink-muted">原话依据：{candidate.basis.quote}</p>
+      )}
+
+      {candidate.conflict && (
+        <div className="mt-2 rounded-md border border-danger/40 bg-danger-soft/40 p-2"
+          data-candidate-conflict>
+          <p className="text-xs text-danger">
+            记录已经变了，这一条**没有**被写进去：{candidate.conflict.detail}
+          </p>
+          {candidate.conflict.current && (
+            <p className="mt-1 text-xs text-ink-secondary">
+              现在记录里是：{Object.entries(candidate.conflict.current)
+                .filter(([key]) => ['name', 'status', 'dose', 'schedule', 'route'].includes(key))
+                .map(([key, value]) => `${key}=${String(value ?? '未记录')}`).join('，')}
+            </p>
+          )}
+          {candidate.conflict.action && (
+            <p className="mt-1 text-xs text-ink-muted">{candidate.conflict.action}</p>
+          )}
+        </div>
+      )}
+
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button type="button" className={buttonClass} data-candidate-confirm
+          disabled={busy} onClick={onConfirm}>确认写入</button>
+        {grouped && (
+          <button type="button" className={buttonClass} data-candidate-confirm-group
+            disabled={busy} onClick={onConfirmGroup}>
+            连同这一组一起确认
+          </button>
+        )}
         <button type="button" className="text-sm text-ink-secondary underline disabled:opacity-50"
-          disabled={busy} onClick={onDismiss}>放弃</button>
+          data-candidate-edit disabled={busy} onClick={onEdit}>修改</button>
+        <button type="button" className="text-sm text-ink-secondary underline disabled:opacity-50"
+          data-candidate-dismiss disabled={busy} onClick={onDismiss}>取消这条</button>
       </div>
       <p className="mt-1 text-xs text-ink-muted">
         {CANDIDATE_SOURCE_LABELS[candidate.source] ?? candidate.source}
         {candidate.source === 'model_proposed'
-          ? '：这条是模型从您的话里读出来的，写进去之前请核对一遍。' : '：这条是您自己登记的。'}
+          ? '：这条是模型从您的话里读出来的**待确认解释**，写进去之前请核对一遍。'
+          : '：这条是您自己登记的。'}
       </p>
     </li>
   );

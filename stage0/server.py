@@ -734,7 +734,8 @@ def create_app(*, db_path: str | Path | None = None,
                runner_factory: Callable[[], Any] | None = None,
                checkpoint_path: str | None = None,
                worker_thread: bool = True,
-               auth_mode: str | None = None) -> FastAPI:
+               auth_mode: str | None = None,
+               change_note_interpreter: Any = None) -> FastAPI:
     """Build the service app.  ``worker_thread=False`` keeps the worker
     unstarted so tests can drive ``worker.drain_once()`` deterministically.
 
@@ -784,6 +785,12 @@ def create_app(*, db_path: str | Path | None = None,
     app.state.worker = worker
     app.state.agent_factory = agent_factory or default_agent_factory
     app.state.auth_mode = resolved_auth_mode
+    # 「补充情况」的理解器。默认按环境配置构造；测试注入脚本化的那一个，
+    # 于是离线用例能覆盖全部歧义分支而**不调用模型**。
+    if change_note_interpreter is None:
+        from .change_notes import ChangeNoteInterpreter
+        change_note_interpreter = ChangeNoteInterpreter(memory=store)
+    app.state.change_note_interpreter = change_note_interpreter
     started_at = time.time()
 
     def _principal(request: Request) -> Principal:

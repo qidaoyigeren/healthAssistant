@@ -90,6 +90,22 @@ class ProductStore:
         with self.memory._lock:
             return [json.loads(row[0]) for row in self.db.execute('SELECT body_json FROM product_objects WHERE scope_id=? AND kind=? ORDER BY created_at DESC', (SCOPE, kind))]
 
+    def receipt(self, key):
+        """这个幂等键**已经成功**过的那次结果；没有就返回 ``None``。
+
+        调用方拿它区分两件本来会被混为一谈的事：**同一个请求的重放**（网络超时后
+        客户端重试——那是正常业务路径，应当原样返回成功回执）与**另一个请求撞上了
+        已经处理过的对象**（那才是冲突）。
+        """
+        if not isinstance(key, str) or not key.strip():
+            return None
+        operation_id = f'product:{key}'
+        with self.memory._lock:
+            row = self.db.execute(
+                'SELECT result_json FROM operation_receipts WHERE scope_id=? AND operation_id=?',
+                (SCOPE, operation_id)).fetchone()
+        return json.loads(row['result_json']) if row else None
+
     def command(self, key, payload, execute):
         if not isinstance(key, str) or not key.strip() or len(key) > 160:
             raise ProductError('请提供有效的提交标识')
@@ -494,6 +510,9 @@ def register_product_routes(app, store, principal, authorize_scope, require_role
     # 从认证上下文取，所以这里把 principal 传下去。
     from .safety_cases import register_safety_routes
     register_safety_routes(app, product, access, invoke, principal, require_role)
+    # 「补充情况」：把用户的一句自然语言变成这次回访上可核对的待确认候选。
+    from .change_notes import register_change_note_routes
+    register_change_note_routes(app, product, access, invoke, principal)
     from .document_parser import register_document_routes
     register_document_routes(app, product, access, invoke)
     from .evidence_quality import register_quality_routes

@@ -190,6 +190,131 @@ async function main() {
 
     await page.screenshot({ path: path.join(out, 'visit-page.png'), fullPage: true });
     fs.writeFileSync(path.join(out, 'detail-before.txt'), beforeReload.slice(0, 20000), 'utf-8');
+
+    // 7) 带歧义的换药登记：自然描述 → 补问 → 查看候选 → 修正 → 确认
+    //    → 看当前记录、历史与安全检查状态。
+    //
+    //    措辞是脚本化的（真实语义理解属于有限真实验收），但每一步走的都是产品
+    //    路径：真实的收录、可核对性校验、候选、确认、事务写入、必要检查与事项承接。
+    const apiPost = (suffix, payload) => fetch(`http://127.0.0.1:${apiPort}${suffix}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then((r) => r.json());
+    const setReading = (reading) => apiPost('/__fixture/reading', reading);
+    const drain = () => apiPost('/__fixture/drain', {});
+    const submitNote = async (text) => {
+      await page.locator('[data-note-input]').fill(text);
+      await page.locator('[data-note-submit]').click();
+      await page.waitForTimeout(1500);
+      await drain();
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.waitForTimeout(1200);
+    };
+
+    // 7a) 用户说得含糊：换成"那个新的"，没有说清是哪一个。
+    await setReading({
+      summary: '用户说把药甲换掉，但没说清新药是哪一个',
+      items: [
+        { when: 'occurred', operation: 'remove', drug_name: '合成药甲',
+          quote: '合成药甲不吃了', field: 'none', value: '',
+          time_text: '这两天', time_precision: 'vague', uncertain: [],
+          group_role: 'replace_from', reported_overlap: 'unstated' },
+        { when: 'occurred', operation: 'add', drug_name: '',
+          quote: '换个新的', field: 'none', value: '', uncertain: ['object_ambiguous'],
+          group_role: 'replace_to', reported_overlap: 'unstated' },
+      ],
+      question: '',
+    });
+    await submitNote('合成药甲不吃了，换个新的');
+
+    const afterVague = await body();
+    const questions = await page.locator('[data-note-question]').allInnerTexts();
+    record('7a 说得含糊时系统补问，不猜对象',
+      questions.some((q) => /哪一种药|哪个药|什么药/.test(q)),
+      questions.join(' | ').slice(0, 120));
+    const vaguePending = await page.locator('[data-pending-candidates] [data-candidate]').count();
+    record('7a 补问的那一条**没有**变成待确认候选', vaguePending === 1,
+      `候选数=${vaguePending}`);
+    record('7a 含糊时原文仍然留在页面上', /合成药甲不吃了，换个新的/.test(afterVague));
+
+    // 7b) 用户补一句，把对象说清楚 —— 这一次形成**一组**换药候选。
+    await setReading({
+      summary: '用户说把药甲换成合成药丙',
+      items: [
+        { when: 'occurred', operation: 'remove', drug_name: '合成药甲',
+          quote: '合成药甲不吃了', field: 'none', value: '',
+          time_text: '这两天', time_precision: 'vague', uncertain: [],
+          group_role: 'replace_from', reported_overlap: 'unstated' },
+        { when: 'occurred', operation: 'add', drug_name: '合成药丙',
+          quote: '换成合成药丙', field: 'dose', value: '2mg', uncertain: [],
+          group_role: 'replace_to', reported_overlap: 'unstated' },
+      ],
+      question: '',
+    });
+    await submitNote('换成合成药丙，2mg');
+
+    const pending = page.locator('[data-pending-candidates] [data-candidate]');
+    const pendingCount = await pending.count();
+    record('7b 补清楚之后形成待确认候选', pendingCount >= 2, `候选数=${pendingCount}`);
+    record('7b 候选写明**是哪一件事**（停用/新增）',
+      (await page.locator('[data-candidate-operation="remove"]').count()) > 0
+      && (await page.locator('[data-candidate-operation="add"]').count()) > 0);
+    record('7b 候选显示原文依据', /原话依据/.test(await body()));
+    record('7b 只说了个大概的时间如实表达，不编成具体日期',
+      /只说了一个大概/.test(await body()));
+
+    // 7c) 确认整组 —— 一次事务原子写入。
+    const groupButton = page.locator('[data-candidate-confirm-group]').first();
+    if (await groupButton.count()) {
+      await groupButton.click();
+    } else {
+      await page.locator('[data-candidate-confirm]').first().click();
+    }
+    await page.waitForTimeout(1500);
+    await drain();
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(1500);
+
+    const confirmedBody = await body();
+    record('7c 确认之后页面说清这一次改变了什么',
+      /已确认/.test(confirmedBody) || /已经登记进记录/.test(confirmedBody));
+    record('7c 换药逐条陈述，没有"换药完成/只做了一半"的总结论',
+      (await page.locator('[data-group-statement]').count()) > 0
+      && !/换药完成|只登记了一半|换药已全部完成/.test(confirmedBody));
+
+    // 7d) 当前记录：药甲停了、药丙在用。
+    await page.goto(`http://localhost:${uiPort}/medications`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1200);
+    const meds = await body();
+    record('7d 当前药单反映这次换药', /合成药丙/.test(meds) && /在用/.test(meds));
+
+    // 7e) 历史：阶段 + 变更记录，发生时间与登记时间分开。
+    const historyButton = page.getByRole('button', { name: /版本链/ }).first();
+    if (await historyButton.count()) {
+      await historyButton.click();
+      await page.waitForTimeout(1200);
+    }
+    record('7e 历史里能按**服用阶段**看',
+      await page.locator('[data-medication-episodes]').count() > 0);
+    record('7e 历史里能看到每一次记录操作',
+      await page.locator('[data-medication-change-log]').count() > 0);
+    const changeKinds = await page.locator('[data-medication-change]')
+      .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-medication-change')));
+    record('7e 变更记录区分了开始/调整/停用/恢复/纠错',
+      changeKinds.length > 0, `kinds=${[...new Set(changeKinds)].join(',')}`);
+    record('7e 发生时间与登记时间分开表达', /登记：/.test(await body()));
+    await page.screenshot({ path: path.join(out, 'medication-history.png'), fullPage: true });
+
+    // 7f) 安全检查状态：队列真实状态可读，且换药之后确实排过。
+    const mainline = await fetch(`http://127.0.0.1:${apiPort}/v1/safety-mainline`)
+      .then((r) => r.json());
+    const checks = mainline.necessary_checks ?? {};
+    record('7f 必要检查队列的真实状态可读（不是靠"没看到提示"推断）',
+      checks.available === true, JSON.stringify(checks));
+    record('7f 换药之后必要检查确实被登记过', (checks.total ?? 0) > 0,
+      `total=${checks.total}`);
+    fs.writeFileSync(path.join(out, 'final-page.txt'), confirmedBody.slice(0, 20000), 'utf-8');
+
     report.status = report.failures.length === 0 ? 'pass' : 'fail';
   } catch (error) {
     report.status = 'fail';

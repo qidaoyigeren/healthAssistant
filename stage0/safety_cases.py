@@ -1478,7 +1478,13 @@ def _ensure_visit_task(product, case: dict[str, Any], visit: dict[str, Any],
         # 已经在跑：它这一轮会读到刚换上的目标（执行时才读 `task['goal']`）。
         return task
 
-    created = tasks.create(f"visit:{visit['id']}:{len(visit.get('focus') or [])}",
+    # 幂等键必须把"这是这次回访的第几件任务"算进去。只用 focus 长度不行：焦点没变
+    # 而上一件已经收尾时，键与上一次**完全相同**，而 payload 里的 goal/intent 变了，
+    # 于是 `command` 判成"同一提交标识用于不同内容"直接 409——用户看到的是报错，
+    # 不是一次新的调查。
+    already = sum(1 for item in product.objects('care_task')
+                  if item.get('visit_id') == visit['id'])
+    created = tasks.create(f"visit:{visit['id']}:{already}",
                            'safety_case', case['id'], due_at=None,
                            goal=intent['goal'], visit_id=visit['id'],
                            visit_intent=intent)
@@ -1564,25 +1570,29 @@ def confirm_candidate(product, store, case_id: str, visit_id: str, candidate_id:
     visit = visits.get(visit_id)
     if visit['case_id'] != case_id:
         raise ProductError('这条变更候选不属于该事项', 404)
+    # 顺序很重要：**先认重放，再判冲突**。
+    #
+    # 网络超时之后客户端拿同一个 key 重试，是正常业务路径，必须原样返回上一次的
+    # 成功回执——这不叫"重复确认"。而另一个请求拿着已经处理过的候选来确认，才是
+    # 冲突。两者都会看到"候选已经不是待确认"，但成因完全不同，不能用同一句话打发。
+    if key:
+        replay = product.receipt(f'{key}:medication-candidates')
+        if replay is not None:
+            return {'visit': visits.get(visit_id),
+                    'applied': replay.get('applied') or [], 'replayed': True}
     candidate = visits.candidate(visit_id, candidate_id)
     if candidate['status'] != _visits.CANDIDATE_PENDING:
-        # 同一个 key 的重放会先在命令回执那一层命中并返回**原有成功回执**，
-        # 走不到这里。走到这里说明是**另一个请求**在用过期的候选——那是冲突，
-        # 不是"重复提交"，两者必须分开。
         raise ProductError('这条候选已经处理过了，请刷新查看当前状态', 409)
-    task_id = visit.get('care_task_id')
-    if not task_id:
-        raise ProductError('这次回访还没有可以承载写入的任务，请先开始回访', 409)
+    task_id, revision = _write_task(product, store, case_id, visit, key)
 
     conflict = candidate_conflict(product, candidate)
     if conflict is not None:
         _persist_conflict(visits, visit_id, candidate_id, candidate, conflict)
         raise ProductError(conflict['detail'] + '。' + conflict['action'], 409)
 
-    task = product.get(task_id, 'care_task')
     try:
         result = CareTasks(product).apply_confirmed_medication_candidates(
-            task_id, key or candidate_id, task['revision'], [candidate],
+            task_id, key or candidate_id, revision, [candidate],
             visit_id=visit_id, actor=actor)
     except MedicationWriteConflict as exc:
         _persist_conflict(visits, visit_id, candidate_id, candidate,
@@ -1593,9 +1603,32 @@ def confirm_candidate(product, store, case_id: str, visit_id: str, candidate_id:
         raise ProductError(str(exc), 409)
 
     _refresh_visit_result(product, store, case_id, visit_id)
-    # **确认之后才唤醒**：这一刻记录真的变了，模型有了可以据以行动的新事实。
+    # **确认之后才唤醒**：这一刻记录真的变了，模型有了可以据以行动的新事实
+    # （"根据新结果继续或调整回访重点"）。在候选还没确认时唤醒，它面对的是一句
+    # 没有落地的话，什么也做不了。
     _wake_investigation(product, case_id, key)
     return {'visit': visits.get(visit_id), 'applied': result.get('applied') or []}
+
+
+def _write_task(product, store, case_id: str, visit: dict[str, Any],
+                key: str | None) -> tuple[str, int]:
+    """确认时承载这次写入的任务。
+
+    **不能要求"已经有一件在等输入的调查"**：一次回访跑完之后任务就收尾了，用户
+    这时候才来说"其实上周就停了"是完全正常的顺序。那就为这次回访再开一件——
+    `_ensure_visit_task` 本来就是干这个的，确认之后它接着跑，回访于是继续。
+    """
+    case = store.get(case_id)
+    task = _ensure_visit_task(product, case, visit, key)
+    if task is None:
+        raise ProductError('这次回访还没有可以承载写入的任务，请先开始回访', 409)
+    _visits_bind(product, visit['id'], task['id'])
+    return task['id'], None
+
+
+def _visits_bind(product, visit_id: str, task_id: str) -> None:
+    from . import review_visits as _visits
+    _visits.ReviewVisitStore(product).bind_task(visit_id, task_id)
 
 
 def _persist_conflict(visits, visit_id: str, candidate_id: str, candidate: dict[str, Any],
@@ -1672,11 +1705,15 @@ def _visit_view(store: SafetyCaseStore, case: dict[str, Any]) -> dict[str, Any] 
         'visit_id': visit['id'],
         'status': status,
         'is_open': open_visit is not None,
+        'sequence': visit.get('sequence'),
         'opened_at': visit.get('opened_at'),
         'closed_at': visit.get('closed_at'),
         'opened_by': visit.get('opened_by'),
         'reason': dict(visit.get('reason') or {}),
         'focus': [dict(item) for item in visit.get('focus') or []],
+        # 这次回访上收到的「补充情况」以及它们的理解结果。**原文也在里面**——
+        # 模型失败时它仍然看得到、仍然可以编辑或显式重试。
+        'change_notes': [dict(item) for item in visit.get('change_notes') or []],
         'change_candidates': [dict(item) for item in visit.get('change_candidates') or []],
         'pending_candidates': [dict(item) for item in
                                visit.get('change_candidates') or []
@@ -2111,20 +2148,17 @@ def register_safety_routes(app, product, access, invoke, principal=None,
                        if item['status'] == _visits.CANDIDATE_PENDING]
             if not members:
                 raise ProductError('这一组变更已经处理过了', 409)
-            task_id = visit.get('care_task_id')
-            if not task_id:
-                raise ProductError('这次回访还没有可以承载写入的任务，请先开始回访', 409)
             conflicts = [candidate_conflict(product, item) for item in members]
             blocking = [item for item in conflicts if item is not None]
             if blocking:
                 for item, conflict in zip(members, conflicts):
                     if conflict is not None:
                         _persist_conflict(visits, visit_id, item['id'], item, conflict)
-                return {'conflict': blocking[0]}
-            task = product.get(task_id, 'care_task')
+                raise ProductError(blocking[0]['detail'] + '。' + blocking[0]['action'], 409)
+            task_id, revision = _write_task(product, store, case_id, visit, body.get('key'))
             try:
                 CareTasks(product).apply_confirmed_medication_candidates(
-                    task_id, body.get('key') or f'{group_id}:group', task['revision'],
+                    task_id, body.get('key') or f'{group_id}:group', revision,
                     members, visit_id=visit_id, actor=actor)
             except MedicationWriteConflict as exc:
                 # 整组已经回滚。冲突说明在**另一个事务**里落盘。

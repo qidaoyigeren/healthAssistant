@@ -825,6 +825,64 @@ export function changeFieldLabel(field: string): string {
   return CHANGE_FIELD_LABELS[field] ?? field;
 }
 
+/** 候选表达的**操作**。字段说"改哪儿"，这个说"这是哪件事"。 */
+export const CANDIDATE_OPERATION_LABELS: Record<string, string> = {
+  add: '新增用药',
+  remove: '停用',
+  dose_change: '调整用法',
+  resume: '恢复服用',
+  correction: '纠正记录',
+};
+
+export function candidateOperationLabel(operation?: string | null): string {
+  if (!operation) return '用药变更';
+  return CANDIDATE_OPERATION_LABELS[operation] ?? `未标明的操作（${operation}）`;
+}
+
+/** 用户报告的时间**是什么**。这是来源，不是格式。 */
+export const TIME_BASIS_LABELS: Record<string, string> = {
+  reported: '您报告的时间',
+  reported_vague: '您只说了一个大概',
+  unknown: '时间未提供',
+  recorded_time: '系统登记时间（不是您报告的发生时间）',
+  legacy_unknown: '来源未记录',
+};
+
+export function timeBasisLabel(basis?: string | null): string {
+  if (!basis) return '来源未记录';
+  return TIME_BASIS_LABELS[basis] ?? `来源未标明（${basis}）`;
+}
+
+/**
+ * 一条「补充情况」走到哪了。
+ *
+ * `unavailable` 与 `failed` 分开：前者是"没有可用的模型配置、**没有做**自动理解"，
+ * 后者是"做了没成"。把任何一个说成"已处理"，都是在骗用户。
+ */
+export const NOTE_STATUS_LABELS: Record<string, string> = {
+  received: '已收到，等待理解',
+  interpreting: '正在理解这句话…',
+  interpreted: '已理解（下面是待确认的解释）',
+  unavailable: '尚未完成自动理解（当前没有可用的模型配置）',
+  failed: '自动理解没有跑成，原文已经保存',
+};
+
+export function noteStatusLabel(status: string): string {
+  return NOTE_STATUS_LABELS[status] ?? `状态未标明（${status}）`;
+}
+
+/** 候选被处理之后的样子。`superseded` 与 `dismissed` 不是一回事。 */
+export const CANDIDATE_STATUS_LABELS: Record<string, string> = {
+  pending: '待您确认',
+  confirmed: '已确认写入',
+  dismissed: '已放弃',
+  superseded: '已被您后来的说法取代',
+};
+
+export function candidateStatusLabel(status: string): string {
+  return CANDIDATE_STATUS_LABELS[status] ?? status;
+}
+
 /** 候选的来源。**必须显示**：确认的人要知道自己在确认什么。 */
 export const CANDIDATE_SOURCE_LABELS: Record<string, string> = {
   user_declared: '您登记的',

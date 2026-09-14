@@ -539,9 +539,12 @@ def normalise_candidate_spec(spec: dict[str, Any]) -> dict[str, Any]:
         raise ProductError('变更内容必须是结构化描述')
     if [field for field in changes if field not in CANDIDATE_FIELDS]:
         raise ProductError('候选只能针对可核对的用药字段')
-    if operation != CANDIDATE_STOP and operation != CANDIDATE_CORRECTION:
+    if operation == CANDIDATE_DOSE_CHANGE:
+        # 只有"调整用法"必须说出改成什么——不说就改，那才是猜。
+        # 新增可以说"开始吃某药了"而不给剂量（用户没提供的信息保持未知）；
+        # 停用、恢复、纠错本来就不带值。
         if not any(str(value or '').strip() for value in changes.values()):
-            raise ProductError('这个操作必须给出新的值')
+            raise ProductError('调整用法必须给出新的值')
     group = spec.get('group')
     if group is not None:
         if not isinstance(group, dict) or not str(group.get('id') or '').strip():
@@ -665,19 +668,19 @@ def medication_write_plan(candidate: dict[str, Any], memory) -> dict[str, Any]:
                    'status': OPERATION_REQUIRES_STATUS.get(operation),
                    'scope_id': target.get('scope_id')},
     }
-    if operation == CANDIDATE_ADD:
+    if operation in (CANDIDATE_ADD, CANDIDATE_DOSE_CHANGE):
         for field in ('dose', 'route', 'schedule'):
-            plan[field] = changes.get(field)
+            plan[field] = changes.get(field) or (row[field] if row else None)
         if changes.get('start_at'):
             # 新增时的"开始时间"就是这次发生的时间——同一件事的两种说法。
             plan['occurred_at'] = str(changes['start_at'])
             plan['time_basis'] = 'reported'
-    elif operation == CANDIDATE_DOSE_CHANGE:
+    elif operation in (CANDIDATE_RESUME, CANDIDATE_CORRECTION):
+        # 恢复服用是"接着按原来的用法吃"；纠错是"那次停用根本不算数"。
+        # 两者都不是一次新的用法调整，所以继承目标行原来的剂量/途径/频次，
+        # 不把没提到的字段清空。
         for field in ('dose', 'route', 'schedule'):
             plan[field] = changes.get(field) or (row[field] if row else None)
-        if changes.get('start_at'):
-            plan['occurred_at'] = str(changes['start_at'])
-            plan['time_basis'] = 'reported'
     return plan
 
 

@@ -350,10 +350,90 @@ function MedicationHistoryList({ records }: {
                 ))}
               </ol>
             )}
+            {detailQuery.data && <MedicationEpisodes detail={detailQuery.data} />}
+            {detailQuery.data && <MedicationChangeLog detail={detailQuery.data} />}
           </div>
         </Card>
       )}
     </>
+  );
+}
+
+/** 每个**服用阶段**：开始、结束，以及它们各自的时间来源。 */
+function MedicationEpisodes({ detail }: {
+  detail: MedicationRecordDto;
+}): React.ReactElement | null {
+  const episodes = detail.episodes ?? [];
+  if (episodes.length === 0) return null;
+  return (
+    <section className="mt-4" data-medication-episodes>
+      <h4 className="text-sm font-medium">服用阶段</h4>
+      <p className="mt-1 text-xs text-ink-muted">
+        一次连续服用是一段。停药之后重新开始是**新的一段**，不会因为药名相同被并成一段；
+        把一次误登记的停用纠正掉，则回到原来那一段。
+      </p>
+      <ol className="mt-2 space-y-2">
+        {episodes.map((episode) => (
+          <li key={episode.episode_id} className="rounded-lg border border-border p-3 text-sm"
+            data-medication-episode={episode.episode_id}>
+            <p className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">第 {episode.episode_id} 段</span>
+              <Badge tone={episode.still_active ? 'primary' : 'neutral'}>
+                {episode.still_active ? '仍在服用' : '已结束'}
+              </Badge>
+              {episode.resumed_from != null && (
+                <span className="text-xs text-ink-muted">
+                  接续之前的停用记录 #{episode.resumed_from}
+                </span>
+              )}
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">
+              开始：{episode.started_at?.slice(0, 10) ?? '未记录'}
+              {episode.started_basis === 'recorded_time' ? '（系统登记时间）' : ''}
+              {' · '}
+              结束：{episode.still_active
+                ? '至今'
+                : (episode.ended_at?.slice(0, 10)
+                   ?? (episode.ended_basis === 'reported_vague'
+                     ? '用户只说了个大概，未解析成具体日期' : '未提供'))}
+            </p>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+/** 逐条记录操作。**发生时间与登记时间分开列**；纠错保留原记录并互相指向。 */
+function MedicationChangeLog({ detail }: {
+  detail: MedicationRecordDto;
+}): React.ReactElement | null {
+  const history = detail.history ?? [];
+  if (history.length === 0) return null;
+  return (
+    <section className="mt-4" data-medication-change-log>
+      <h4 className="text-sm font-medium">变更记录</h4>
+      <p className="mt-1 text-xs text-ink-muted">
+        发生时间是用户说的时间，登记时间是系统记下它的时间——两者不是一回事，
+        所以分开写。"来源未记录"就是不知道，不回填成"用户报告的"。
+      </p>
+      <ul className="mt-2 space-y-1.5">
+        {history.map((entry) => (
+          <li key={entry.ref} className="text-sm text-ink-secondary"
+            data-medication-change={entry.operation}>
+            <span className="font-medium">v{entry.version} · {entry.operation_label}</span>
+            {' — 发生：'}{entry.started_at?.slice(0, 10) ?? '未记录'}
+            {entry.time_text ? `（原话「${entry.time_text}」）` : ''}
+            {entry.stopped_at ? `，停止于 ${entry.stopped_at.slice(0, 10)}` : ''}
+            {entry.status === 'stopped' && !entry.stopped_at
+              ? `，停止时间：${entry.stopped_basis_label ?? '未记录'}` : ''}
+            {' · 登记：'}{entry.recorded_at?.slice(0, 10)}
+            {entry.corrects_id != null && ` · 纠正了记录 #${entry.corrects_id}`}
+            {entry.predecessor_id != null && ` · 前一版 #${entry.predecessor_id}`}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

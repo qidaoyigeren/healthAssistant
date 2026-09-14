@@ -41,6 +41,51 @@ export interface MedicationDto {
   predecessor_id: number | null;
   created_at: string;
   ref: string;
+  /** 产生这一行的那次操作：add / resume / dose_change / correction。
+   *  **停用是原地更新**，所以停用不会覆盖这里——"开始服用"和"后来停止"都查得到。 */
+  operation?: string | null;
+  /** 服用阶段。写入时定死，不按当前状态现算。 */
+  episode_id?: number | null;
+  /** 停药时间的**来源**。unknown / reported_vague 时 end_at 是 null。 */
+  end_at_basis?: string | null;
+  /** 用户原话里的时间表达（例如"上周"）。 */
+  time_text?: string | null;
+  /** 这一行纠正的是哪一条记录。 */
+  corrects_id?: number | null;
+  start_at_basis?: string | null;
+}
+
+/** 一段**连续服用**。停药后恢复是**新的一段**，不是把两段合成一段。 */
+export interface MedicationEpisodeDto {
+  episode_id: number;
+  started_at: string | null;
+  started_basis: string | null;
+  still_active: boolean;
+  ended_at: string | null;
+  ended_basis: string | null;
+  versions: number[];
+  /** 这一段是"恢复"出来的，指回它接续的那条停用记录。 */
+  resumed_from: number | null;
+}
+
+/** 一次记录操作：发生时间与**登记时间**分开，时间来源如实标出。 */
+export interface MedicationHistoryEntryDto {
+  version: number;
+  medication_id: number;
+  ref: string;
+  operation: string;
+  operation_label: string;
+  recorded_at: string;
+  started_at: string | null;
+  started_basis: string | null;
+  started_basis_label: string | null;
+  time_text: string | null;
+  status: string;
+  corrects_id: number | null;
+  predecessor_id: number | null;
+  stopped_at?: string | null;
+  stopped_basis?: string | null;
+  stopped_basis_label?: string | null;
 }
 
 export interface ConflictDto {
@@ -416,6 +461,10 @@ export interface EpisodicEventDto {
 
 export interface MedicationRecordDto extends MedicationDto {
   versions?: MedicationDto[];
+  /** 按**服用阶段**分的段。历史版本不是"当前在用的药"，阶段才是。 */
+  episodes?: MedicationEpisodeDto[];
+  /** 逐条记录操作：开始、调整、停止、恢复、纠错。 */
+  history?: MedicationHistoryEntryDto[];
 }
 
 export interface ConflictActionDto {
@@ -952,17 +1001,96 @@ export interface SafetyChangeCandidateDto {
   id: string;
   visit_id: string;
   case_id: string;
-  name: string;
-  /** dose / schedule / route / start_at —— 只有能**机械核对**的字段能被提议。 */
-  field: string;
-  before: string | null;
-  after: string;
+  /** add / remove / dose_change / resume / correction —— 这是**哪一件事**，
+   *  不是"改了哪个字段"。停一个药和把剂量改成 0 在字段层面看着像。 */
+  operation?: string;
+  /** 目标。名称只用于**展示**；真正写进记录的是 record_id + record_version。 */
+  target?: {
+    name?: string; matched_by?: string;
+    record_id?: number | null; record_version?: number | null;
+    record_ref?: string | null; scope_id?: string | null; episode_id?: number | null;
+  } | null;
+  /** 要改成什么。未提及的字段不会出现在这里——它们保持原值。 */
+  changes?: Record<string, unknown>;
+  /** 提议时**权威记录**里的值。不采信任何自报的"原来是 X"。 */
+  before?: Record<string, unknown> | string | null;
+  before_ref?: string | null;
+  /** 用户报告的发生时间与它的**来源**。basis 为 reported_vague 时 value 是 null：
+   *  "上周"不是一个时间戳，界面不能替它挑一天。 */
+  occurred?: {
+    text?: string | null; value?: string | null;
+    precision?: string; basis?: string; tz?: string | null;
+  } | null;
+  /** 换药组：两条互为 replace_from / replace_to。 */
+  group?: { id?: string; role?: string } | null;
+  /** 用户是否明确报告了两种药有一段时间同时服用。没说是 null，不是 false。 */
+  reported_overlap?: boolean | null;
+  /** 记录已经变了、这次确认写不进去。它在**另一个事务**里落盘，所以刷新后仍在。 */
+  conflict?: {
+    kind?: string; detail?: string; action?: string;
+    current?: Record<string, unknown> | null;
+    recorded_before?: unknown; detected_at?: string;
+  } | null;
+  /** 被后来的说法取代时，指向取代它的那条。 */
+  superseded_by?: string | null;
   source: 'user_declared' | 'model_proposed' | string;
-  basis?: { kind?: string; refs?: string[]; note?: string | null };
-  status: 'pending' | 'confirmed' | 'dismissed' | string;
+  basis?: { kind?: string; refs?: string[]; note?: string | null; quote?: string | null };
+  status: 'pending' | 'confirmed' | 'dismissed' | 'superseded' | string;
   recorded_at?: string | null;
   decided_at?: string | null;
-  applied?: { name?: string; field?: string; value?: unknown; before?: unknown } | null;
+  applied?: {
+    name?: string; operation?: string; value?: unknown; before?: unknown;
+    medication_ref?: string; episode_id?: number | null;
+  } | null;
+  /** 旧形状（结构化声明的单字段候选）。 */
+  name?: string;
+  field?: string;
+  after?: string;
+}
+
+/**
+ * 一次「补充情况」：用户原话 + 对它的**理解**。
+ *
+ * `unavailable` 与 `failed` 必须分开显示：前者是"没有可用的模型配置、没有做自动
+ * 理解"，后者是"做了没成"。两者都保留原文，都不伪装成已处理。
+ */
+export interface SafetyChangeNoteDto {
+  id: string;
+  visit_id: string;
+  case_id: string;
+  /** 用户的原话。模型失败时它仍然在这里，仍然可以编辑或重试。 */
+  text: string;
+  speech_act_hint?: string | null;
+  received_at: string;
+  received_tz?: string | null;
+  status: 'received' | 'interpreting' | 'interpreted' | 'unavailable' | 'failed' | string;
+  attempt?: number;
+  reading?: {
+    summary?: string; items?: Record<string, unknown>[];
+    question?: string; deterministic?: boolean; speech_act?: string;
+  } | null;
+  candidate_ids?: string[];
+  superseded_ids?: string[];
+  /** 用户说了、但还没发生的事。它们**不在**可确认列表里。 */
+  plans?: {
+    operation?: string | null; target?: { name?: string };
+    changes?: Record<string, unknown>; quote?: string;
+    time?: { text?: string | null; basis?: string };
+    group?: { id?: string; role?: string } | null; status?: string;
+  }[];
+  questions?: { about?: string; text?: string; quote?: string | null }[];
+  unsupported?: { what?: string; quote?: string; guidance?: string }[];
+  usage?: { calls?: number | null; tokens?: number | null; usage_unknown?: boolean } | null;
+  model?: { provider?: string | null; model?: string | null } | null;
+  error?: string | null;
+}
+
+/** 一组换药的**逐条**陈述。没有"换药完成/未完成"的总结论。 */
+export interface SafetyVisitGroupDto {
+  group_id: string;
+  statements: {
+    candidate_id?: string | null; role?: string | null; status: string; text: string;
+  }[];
 }
 
 /** 回访结果里的一条陈述:文字 + **它的依据是什么**。 */
@@ -994,6 +1122,8 @@ export interface SafetyVisitArrangementDto {
 export interface SafetyVisitResultDto {
   why: { kind?: string; detail?: string; refs?: string[] };
   since_last: SafetyVisitStatementDto[];
+  /** 换药组的逐条陈述。界面**不得**把它渲染成"换药已完成"的总结论。 */
+  groups?: SafetyVisitGroupDto[];
   actions: SafetyVisitStatementDto[];
   unresolved: SafetyVisitStatementDto[];
   /** 沿用下来的已有结论。与"又确认了一遍"是两回事。 */
@@ -1023,6 +1153,10 @@ export interface SafetyVisitDto {
   /** 本次为什么跟进:due / record_change / input_arrived / user_started —— 服务端按事实判定。 */
   reason: { kind?: string; detail?: string; refs?: string[] };
   focus: { request_id: string; question?: string | null }[];
+  /** 这是这件事项的第几次回访。服务端在创建时写死，不按时间戳数。 */
+  sequence?: number | null;
+  /** 这次回访上收到的「补充情况」。原文与理解结果都在里面。 */
+  change_notes?: SafetyChangeNoteDto[];
   change_candidates?: SafetyChangeCandidateDto[];
   pending_candidates?: SafetyChangeCandidateDto[];
   result: SafetyVisitResultDto | null;

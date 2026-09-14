@@ -11,7 +11,7 @@ import type {
   MemoryItemDto, MemoryStateDto, OverviewDto, Page, RecheckTasksDto,
   RunProgressDto, SafetyCaseDto, SafetyCaseListDto, SafetyClosureEvidenceDto,
   SafetyFollowUpConditionDto, SafetyFollowUpConfirmationDto, SafetyFollowUpInputDto,
-  SafetyMainlineDto, SafetyVisitDto,
+  SafetyChangeNoteDto, SafetyMainlineDto, SafetyVisitDto,
   SessionDto, SessionEventDto, TurnTraceDto, WarningDto,
 } from './types';
 
@@ -364,6 +364,50 @@ export const api = {
     return request<SafetyCaseDto>(
       `/v1/safety-cases/${encodeURIComponent(caseId)}/visits/${encodeURIComponent(visitId)}` +
       `/candidates/${encodeURIComponent(candidateId)}/dismiss`, { method: 'POST', body });
+  },
+
+  /**
+   * 提交一段**自由文本**的「补充情况」。
+   *
+   * 服务端把它收录下来（原文照留），再跑一次**有预算上限**的理解，产出待确认的
+   * 候选、需要补问的问题，以及**仍在计划中**的变更。调用方不必先把用户的话翻译
+   * 成结构化字段——但确认之前当前药单一个字节都不会变。
+   */
+  safetyCaseSubmitNote(caseId: string, visitId: string,
+                       body: { key: string; text: string; speech_act?: string; tz?: string }) {
+    return request<SafetyChangeNoteDto>(
+      `/v1/safety-cases/${encodeURIComponent(caseId)}/visits/${encodeURIComponent(visitId)}/notes`, {
+        method: 'POST', body,
+      });
+  },
+
+  /** 这次回访上收到过的补充及其理解结果（刷新后仍在）。 */
+  safetyCaseNotes(caseId: string, visitId: string, signal?: AbortSignal) {
+    return request<{ items: SafetyChangeNoteDto[] }>(
+      `/v1/safety-cases/${encodeURIComponent(caseId)}/visits/${encodeURIComponent(visitId)}/notes`,
+      { signal });
+  },
+
+  /**
+   * **显式**重试一次理解。不自动重试、不换模型、不扩大预算——
+   * 重试是一次有人按下的动作。
+   */
+  safetyCaseRetryNote(caseId: string, visitId: string, noteId: string,
+                      body: { key: string }) {
+    return request<SafetyChangeNoteDto>(
+      `/v1/safety-cases/${encodeURIComponent(caseId)}/visits/${encodeURIComponent(visitId)}` +
+      `/notes/${encodeURIComponent(noteId)}/retry`, { method: 'POST', body });
+  },
+
+  /**
+   * 确认**整组**换药变更——一次事务原子写入。
+   * 组状态由各成员派生，这里不判断"换药是否完成"。
+   */
+  safetyCaseConfirmGroup(caseId: string, visitId: string, candidateId: string,
+                         body: { key: string }) {
+    return request<SafetyCaseDto>(
+      `/v1/safety-cases/${encodeURIComponent(caseId)}/visits/${encodeURIComponent(visitId)}` +
+      `/candidates/${encodeURIComponent(candidateId)}/confirm-group`, { method: 'POST', body });
   },
 
   /** 围绕这一件事项发起一次有界调查。返回排队中的 care_task,进度另轮询。 */

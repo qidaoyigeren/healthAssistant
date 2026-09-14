@@ -48,7 +48,8 @@ def synthetic_detect(medications):
 class _Host:
     """最小产品宿主：真实服务 + 真实 worker + 隔离数据库。"""
 
-    def __init__(self, directory: Path, *, proposal_provider=None) -> None:
+    def __init__(self, directory: Path, *, proposal_provider=None,
+                 change_note_interpreter=None) -> None:
         import stage0.server as server
         directory.mkdir(parents=True, exist_ok=True)
         db_path = (directory / 'memory.db').resolve()
@@ -63,7 +64,8 @@ class _Host:
                 proposal_provider=proposal_provider)
 
         self.app = server.create_app(db_path=db_path, worker_thread=False,
-                                     agent_factory=factory)
+                                     agent_factory=factory,
+                                     change_note_interpreter=change_note_interpreter)
         holder['store'] = self.app.state.store
         self.store = self.app.state.store
         self.worker = self.app.state.worker
