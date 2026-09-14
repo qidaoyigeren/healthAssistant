@@ -957,6 +957,19 @@ class InvestigationState:
             self._new_claim(question['statement'], list(question['subject_refs']),
                             'model', question_id=question['question_id'])
 
+    def claim_target_field(self, claim_id: str) -> str | None:
+        """这条 claim 对应的问题问的是哪个字段。
+
+        支持判定要用它查属性词表：claim 与 question 是同一条问题的两面
+        （``claim_id`` 由 ``question_id`` 派生），但字段只记在 question 上。
+        """
+        for question in self.questions:
+            if not question.get('question_id'):
+                continue
+            if 'claim:' + digest([question['question_id']])[:12] == claim_id:
+                return question.get('target_field')
+        return None
+
     def question_view(self, question) -> dict:
         """一条问题给模型/界面看的样子——含**信息状态**与策略历史。"""
         return {
@@ -1437,7 +1450,8 @@ class InvestigationState:
                 # 不会因为口径升级而集体失效或自相矛盾。
                 support = assess_support(statement=claim['statement'], quote=text,
                                          entities=claim['entities'],
-                                         material_item=self.material_items.get(ref))
+                                         material_item=self.material_items.get(ref),
+                                         target_field=self.claim_target_field(claim['claim_id']))
                 assessment['support_status'] = support['status']
                 assessment['support_scope'] = support['scope']
                 assessment['support_reasons'] = support['reasons']

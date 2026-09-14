@@ -57,5 +57,52 @@ class ClaimSupportTest(unittest.TestCase):
         self.assertEqual(result['status'], 'supported_by_span')
 
 
+class PredicateTests(unittest.TestCase):
+    """只共享实体名，不足以支持一句断言（O-1）。
+
+    实体相同只说明"讲的是同一味药"，不说明"讲的是同一件事"。少了这一层，
+    一段讲出血风险的文字会把"服药频次是什么"读成已有依据。
+    """
+
+    def test_a_shared_entity_name_does_not_support_an_unrelated_attribute(self):
+        result = assess_support(statement='合成药甲目前的服药频次是什么？',
+                                quote='合成药甲和合成药乙存在出血风险。',
+                                entities=['合成药甲'], target_field='schedule')
+        self.assertEqual(result['status'], 'no_span')
+        self.assertIn('attribute_absent_from_span:schedule', result['reasons'])
+
+    def test_a_span_that_actually_states_the_attribute_still_supports(self):
+        """正对照：片段真的在讲这件事时必须能成立——否则这条判据只会惩罚
+        正确结论，而"修好了"与"再也不判支持"就分不开。"""
+        result = assess_support(statement='合成药甲目前的服药频次是什么？',
+                                quote='合成药甲的服药频次为每日两次。',
+                                entities=['合成药甲'], target_field='schedule')
+        self.assertEqual(result['status'], 'supported_by_span')
+
+    def test_without_a_known_field_it_falls_back_to_content_terms(self):
+        unrelated = assess_support(statement='合成药甲的服药频次是什么？',
+                                   quote='合成药甲和合成药乙存在出血风险。',
+                                   entities=['合成药甲'], target_field=None)
+        self.assertEqual(unrelated['status'], 'no_span')
+        self.assertIn('content_absent_from_span', unrelated['reasons'])
+
+    def test_the_content_fallback_still_accepts_a_matching_span(self):
+        result = assess_support(statement='合成药甲的服药频次是什么？',
+                                quote='合成药甲的服药频次为每日两次。',
+                                entities=['合成药甲'], target_field=None)
+        self.assertEqual(result['status'], 'supported_by_span')
+
+    def test_a_material_item_claim_is_judged_by_the_material_kind_not_by_words(self):
+        """材料路径不受新判据影响：那里判的是"材料与记录的关系"，
+        不是"这句话是不是落在片段里"——一句关于差异的元陈述本来就不会
+        逐字出现在片段中。"""
+        result = assess_support(statement='材料记录的剂量与当前记录相同',
+                                quote='氨氯地平 10mg 每日一次',
+                                entities=['氨氯地平'],
+                                material_item={'kind': 'same',
+                                               'fields': {'name': '氨氯地平', 'dose': '10'}})
+        self.assertEqual(result['status'], 'supported_by_span')
+
+
 if __name__ == '__main__':
     unittest.main()
