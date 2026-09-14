@@ -1063,6 +1063,11 @@ class CareTasks:
         previous_result = (previous or {}).get('result') or {}
         fresh = [visits_module.history_line(entry)
                  for entry in visits_module.news_entries(case, start)]
+        # 记录范围的变化要跟**上一次回访开始时**的版本比，不能跟事项自己的
+        # `input_versions` 比：后者会被"造成变化的那次改动"顺手刷新，于是正好把
+        # 要找的那个变化抹平——第二次回访会说"什么都没变"，而药单刚刚改过。
+        baseline = (previous.get('cursor') or {}).get('versions') if previous else None
+        changed = visits_module.changed_scopes(self.p, case, since=baseline)
         return {
             'visit_id': visit['id'],
             'previous_visit_id': visit.get('previous_visit_id'),
@@ -1076,12 +1081,12 @@ class CareTasks:
                 'closed_at': previous.get('closed_at'),
             } if previous else None),
             'new_since_last_visit': {
-                'changed_scopes': visits_module.changed_scopes(self.p, case),
+                'changed_scopes': changed,
                 # 三种状态**分开表达**，不合流：范围变了是记录真的变了，
                 # 候选是用户说了但还没确认，两者都没有才是"系统尚未收到新记录"。
                 # 最后那句用 NO_NEW_RECORDS 原话，绝不定性成"情况稳定"。
-                'statement': (visits_module.NO_NEW_RECORDS if not fresh
-                              and not visits_module.changed_scopes(self.p, case) else None),
+                'statement': (visits_module.NO_NEW_RECORDS
+                              if not fresh and not changed else None),
                 'events': [line['text'] for line in fresh],
             },
             'reusable_answers': [

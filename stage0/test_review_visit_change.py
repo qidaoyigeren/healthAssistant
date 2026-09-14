@@ -168,6 +168,60 @@ class SecondVisitDiffersTests(_TwoVisits):
         self.assertTrue(result['end_reason'])
 
 
+class BetweenVisitsChangeTests(_TwoVisits):
+    """两次回访**之间**发生的改动，第二次必须看得见。
+
+    这一条是真实模型那一轮暴露出来的：药单明明改过，第二次回访的摘要里
+    `changed_scopes` 与 `events` 都是空的——它看到的"上次之后"什么都没有。
+    """
+
+    def test_a_change_made_between_visits_is_visible_to_the_second(self):
+        case_id = self.case_id
+        self._run_first_visit(case_id)
+        first = self.visits().for_case(case_id)[-1]
+        self.visits().set_status(first['id'], rv.STATUS_COMPLETED)
+
+        # 第一次收尾之后、第二次开始之前，药单变了。
+        self.api.add_medication('between-1', '合成药丙')
+        self.api.pump()
+
+        self.api = self.api.rebuild(proposal_provider=lambda payload: {'decision': 'respond'})
+        self.api.start_visit(case_id, key='visit-after-change')
+        context = self._second_visit_context(case_id)['visit']
+
+        self.assertIn('用药记录', context['new_since_last_visit']['changed_scopes'],
+                      '两次回访之间改了药单，第二次却说没有范围变化')
+        self.assertIsNone(context['new_since_last_visit']['statement'],
+                          '有变化时不该报"系统尚未收到新记录"')
+
+    def test_a_visit_without_a_saved_end_position_does_not_reset_the_next_start(self):
+        """上一次没落 `after` 时，起点退回它开始的位置，**不是 0**。
+
+        这是**存储层**的契约，所以直接在存储层验：走 HTTP 的话，读一次事项视图
+        就会把结果重渲染一遍、顺手把 `after` 补回来，模拟不出这个状态。
+        """
+        case_id = self.case_id
+        self._run_first_visit(case_id)
+        first = self.visits().for_case(case_id)[-1]
+        raw = self.visits().get(first['id'])
+        raw['cursor'] = {**raw['cursor'], 'after': None}
+        # 裸 save 会留下一个未提交的隐式事务，后面的命令就开不了自己的事务。
+        with self.api.product.transaction():
+            self.api.product.save(rv.KIND, raw)
+
+        case = sc.SafetyCaseStore(self.api.product).get(case_id)
+        # `history_length=99`：起点若来自"现在有多少条历史"，一眼就能看出来。
+        second, created = self.visits().open_or_continue(
+            'store-level-2', case_id=case_id,
+            reason=rv.derive_reason(self.api.product, case),
+            actor='caregiver', history_length=99)
+
+        self.assertTrue(created, '第一次已收尾，第二次应当新开一访')
+        self.assertNotEqual(0, second['cursor']['before'],
+                            '起点退回了 0——整件事项的来龙去脉会被当成"上次之后"重报一遍')
+        self.assertEqual(first['cursor']['opened_at_history'], second['cursor']['before'])
+
+
 class UnfinishedCarriesForwardTests(_TwoVisits):
     """上次**没做完**的事，第二次要接着办，而不是从头问一遍。"""
 

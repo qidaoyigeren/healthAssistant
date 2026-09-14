@@ -150,10 +150,20 @@ class ReviewVisitStore:
                 # 开头。事项从建立起发生了什么属于"为什么现在跟进"（`reason`），
                 # 不属于"上次之后新增了什么"；混在一起，第一次回访会把整件事项的
                 # 来龙去脉当成"新变化"报一遍。
-                'cursor': {'before': int((previous or {}).get('cursor', {}).get('after')
-                                         or (history_length if previous is None else 0)),
-                           'opened_at_history': int(history_length),
-                           'after': None},
+                'cursor': {
+                    # 起点：上一次回访**结束**的位置。上一次没走到落结果那一步
+                    # （例如它被阻塞）时，`after` 是空的——那就退回**它开始的位置**，
+                    # 而不是 0：退回 0 会把整件事项的来龙去脉重报一遍，而它的起因
+                    # 已经写在 `reason` 里了。
+                    'before': int((previous or {}).get('cursor', {}).get('after')
+                                  or ((previous or {}).get('cursor', {}).get('opened_at_history')
+                                      if previous is not None else history_length)),
+                    'opened_at_history': int(history_length),
+                    'after': None,
+                    # 开始那一刻的记录版本。**必须在这里存**：事项自己的
+                    # `input_versions` 会被"造成变化的那次改动"顺手刷新，事后再看
+                    # 什么都比不出来；回访自己留一份，下一次才说得清"这中间变了什么"。
+                    'versions': dict(self.p.revisions())},
                 'previous_visit_id': (previous or {}).get('id'),
                 'focus': [], 'change_candidates': [],
                 'result': None, 'revision': 1, 'created_at': utc_now(),

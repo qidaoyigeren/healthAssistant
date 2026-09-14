@@ -1,19 +1,24 @@
-"""有限真实模型验收：一次**回访**。
+"""有限真实模型验收：一次**回访**，接着**同一事项的第二次回访**。
 
 范围在开跑**之前**就定死，并且打印出来——不是跑完再拿结果去解释标准：
 
-* 一个场景：**场景 B**（出现相关变化）——建事项、开始回访、真实模型接手、
-  它提出问题就由用户回答、再让它继续一次；
+* 一个场景：**场景 B + 第二次回访**——建事项、开始回访、真实模型接手、
+  它提出问题就由用户回答、再让它继续一次；第一次收尾，期间发生一次相关变化，
+  然后开始**第二次**回访；
 * 请求上限 `--max-calls`（默认 12）、时间上限 `--wall-seconds`（默认 300）、
   token 上限 `--max-tokens`（默认 150000）；
 * 停止条件：任一上限用尽 / 回访到达终态 / 异常，**先到先停**；
 * **等待用户输入期间不消费模型**：回访在 `waiting_input` 停下时，进程不发起任何调用，
   由调用方"像用户一样"回答之后再恢复。
 
+第二次回访是本轮的判据所在，所以它单独记一段：那一轮**看到了什么**
+（第一次的答案、第一次留下的未决、上次之后的事件）、**选了什么动作**、
+**有没有为了重新得到同一结论再查一遍**。
+
 它**不**回答"模型能不能自主回访"这种大问题。它只看四件事：
 
-1. 它选的关注点与**这位患者的历史**有没有关系（还是泛泛而谈）；
-2. 它有没有复用已有的信息（有没有把已经知道的事情再问一遍）；
+1. 它有没有**使用上次的结果**（第二次看到的与第一次留下的是不是同一件事）；
+2. 它有没有聚焦**实际变化**（还是泛泛而谈、或把整段历史重报一遍）；
 3. 用户回答之后，它的下一步有没有**变化**；
 4. 它交付的结果是不是具体、带来源（还是长篇泛化建议）。
 
@@ -216,9 +221,10 @@ def main() -> int:
     from stage0 import safety_checks as checks
     from stage0.safety_cases import SafetyCaseStore
 
-    limits = {'scenario': 'B_related_change', 'max_calls': args.max_calls,
-              'wall_seconds': args.wall_seconds, 'max_tokens': args.max_tokens,
-              'max_cycles': args.max_cycles, 'visits': 1}
+    limits = {'scenario': 'B_related_change_then_second_visit',
+              'max_calls': args.max_calls, 'wall_seconds': args.wall_seconds,
+              'max_tokens': args.max_tokens, 'max_cycles': args.max_cycles,
+              'visits': 2}
     print(json.dumps({'declared_limits': limits}, ensure_ascii=False), flush=True)
 
     report = {'declared_limits': limits,
@@ -329,14 +335,84 @@ def main() -> int:
                 report['changed_next_step'] = None
                 report['round_2'] = None
 
-            # 4) 交付了什么。
+            # 4) **第二次回访**：这才是本轮的判据所在。
+            #
+            # 第一次收尾 → 期间发生一次相关变化 → 再开始一次回访。要看的是：
+            # 它有没有把第一次的结论带过来、有没有聚焦那次变化、有没有为了
+            # 重新得到同一结论再检索一遍。
+            from stage0 import review_visits as visits_module
+            visits = visits_module.ReviewVisitStore(product)
+            first_visit = visits.open_for_case(case_id)
+            if first_visit is not None:
+                # 第一次收尾：只有收尾了，第二次才会有"上一次"。
+                visits.set_status(first_visit['id'], visits_module.STATUS_COMPLETED)
+
+            memory.apply_medication_change(
+                action='add', name='合成药丙', ingredients=[], session_id='synthetic',
+                turn_id='live-change-1', source='caregiver')
+            checks.run_necessary_checks(memory, detector=synthetic_detect,
+                                        product=product)
+            view2 = client.get(f'/v1/safety-cases/{case_id}').json()
+            response = client.post(f'/v1/safety-cases/{case_id}/visits',
+                                   json={'key': 'live-visit-2',
+                                         'expected_revision': view2['revision']})
+            report['second_visit_start_status'] = response.status_code
+            _apply_budget(product, client.get(f'/v1/safety-cases/{case_id}').json(),
+                          args)
+            drain()
+
+            second = client.get(f'/v1/safety-cases/{case_id}').json().get('visit') or {}
+            second_task_id = second.get('care_task_id')
+            second_task = product.get(second_task_id, 'care_task') if second_task_id else None
+            report['second_visit'] = {
+                'visit_id': second.get('visit_id'),
+                'status': second.get('status'),
+                'reason': second.get('reason'),
+                'first_visit': second.get('first_visit'),
+                'focus': second.get('focus'),
+            }
+            if second_task is not None:
+                # 它这一轮**看到了什么**：第一次的答案、第一次留下的未决、
+                # 上次之后的事件，逐个记下来，而不是只记一个结论。
+                from stage0.care_tasks import CareTasks
+                context = CareTasks(product)._safety_case_context(
+                    second_task, store.get(case_id), {'max_steps': args.max_cycles})
+                seen = context.get('visit') or {}
+                report['second_visit_context'] = {
+                    'sequence': seen.get('sequence'),
+                    'previous_visit_id': seen.get('previous_visit_id'),
+                    'reusable_answers': [
+                        {'question': item.get('question'), 'value': item.get('value'),
+                         'assessment': (item.get('assessment') or {}).get('status')}
+                        for item in seen.get('reusable_answers') or []],
+                    'retired_answers': [
+                        {'question': item.get('question'), 'reason': item.get('reason')}
+                        for item in seen.get('retired_answers') or []],
+                    'new_since_last_visit': {
+                        'changed_scopes': (seen.get('new_since_last_visit') or {}).get('changed_scopes'),
+                        'events': (seen.get('new_since_last_visit') or {}).get('events')},
+                    'previous_unfinished': (seen.get('previous_result') or {}).get('unresolved'),
+                }
+                report['second_visit_round'] = _planner_digest(second_task)
+                report['second_visit_round']['usage'] = _usage(product, second_task)
+                report['second_visit_round']['trace'] = _run_trace(memory, second_task)
+                # **有没有为了重新得到同一结论再查一遍。**
+                first_queries = (task.get('investigation') or {}).get('queries') or []
+                second_queries = (second_task.get('investigation') or {}).get('queries') or []
+                report['re_searched_the_same_conclusion'] = (
+                    bool(second_queries) and list(second_queries) == list(first_queries))
+
+            # 5) 交付了什么。
             final = client.get(f'/v1/safety-cases/{case_id}').json()
             visit = final.get('visit') or {}
             result = visit.get('result') or {}
             report['visit_result'] = {
                 'why': result.get('why'),
                 'since_last': [line['text'] for line in result.get('since_last') or []],
+                'reused': [line['text'] for line in result.get('reused') or []],
+                'recheck': [line['text'] for line in result.get('recheck') or []],
                 'unresolved': [line['text'] for line in result.get('unresolved') or []],
+                'end_reason': result.get('end_reason'),
                 'next_step': result.get('next_step'),
                 'next_arrangement': result.get('next_arrangement'),
                 'answered_count': result.get('answered_count'),
