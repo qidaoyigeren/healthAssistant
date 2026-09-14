@@ -74,7 +74,11 @@ async function main() {
     ? path.join(ROOT, '.venv', 'Scripts', 'python.exe') : 'python';
   const apiPort = arg('--api-port', '8100');
   let uiPort = null;
-  const backend = spawn(python, ['-m', 'stage0.safety_browser_fixture', '--port', apiPort],
+  // 库放在输出目录里而不是临时目录：**重启恢复**要拿同一个库再起一次，
+  // 而临时目录的名字只有那个进程自己知道。
+  const backendDb = path.join(out, 'fixture.db');
+  let backend = spawn(python,
+    ['-m', 'stage0.safety_browser_fixture', '--port', apiPort, '--db', backendDb],
     { cwd: ROOT, env: { ...process.env, MEMORY_ENABLE_LLM: '0', PYTHONIOENCODING: 'utf-8' } });
   backend.stderr.on('data', (c) => fs.appendFileSync(path.join(out, 'backend.log'), c));
   const vite = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx',
@@ -264,6 +268,21 @@ async function main() {
     record('7b 只说了个大概的时间如实表达，不编成具体日期',
       /只说了一个大概/.test(await body()));
 
+    // 最终流程第 5 步：**确认之前**当前药单一个字节都不动。
+    //
+    // 用 `/v1/safety-mainline` 的 `current_medications`（＝ status='active' 的那些）。
+    // `/v1/memory/state` 是**双时态快照**，会把已停用的行一并列出——拿它当"当前药单"
+    // 会得出"药甲还在用"这种错结论。
+    const currentMeds = async () => {
+      const mainline = await fetch(`http://127.0.0.1:${apiPort}/v1/safety-mainline`)
+        .then((r) => r.json());
+      return (mainline.current_medications ?? []).map((m) => m.display_name);
+    };
+    const activeBefore = await currentMeds();
+    record('5 确认之前当前药单没有变',
+      activeBefore.includes('合成药甲') && !activeBefore.includes('合成药丙'),
+      `在用=${activeBefore.join('、')}`);
+
     // 7c) 确认整组 —— 一次事务原子写入。
     const groupButton = page.locator('[data-candidate-confirm-group]').first();
     if (await groupButton.count()) {
@@ -315,6 +334,138 @@ async function main() {
     record('7f 换药之后必要检查确实被登记过', (checks.total ?? 0) > 0,
       `total=${checks.total}`);
     fs.writeFileSync(path.join(out, 'final-page.txt'), confirmedBody.slice(0, 20000), 'utf-8');
+
+    // 8) 最终交付流程：事项继续、跟进安排全过程、重启恢复。
+    const apiGet = (suffix) => fetch(`http://127.0.0.1:${apiPort}${suffix}`)
+      .then((r) => r.json());
+
+    // 7) 事项继续，未决风险没有被自动清除。
+    const caseAfter = await apiGet(`/v1/safety-cases/${encodeURIComponent(info.case_id)}`);
+    const closure = await apiGet(
+      `/v1/safety-cases/${encodeURIComponent(info.case_id)}/closure-evidence`);
+    record('7 相关事项仍在继续（没有被自动关闭）',
+      caseAfter.status !== 'resolved',
+      `status=${caseAfter.status} · ${caseAfter.status_label}`);
+    record('7 "触发条件不再出现"与"整体风险已解除"分开表达',
+      closure.nature && closure.nature.overall_risk_resolved === false
+      && typeof closure.nature.note === 'string',
+      JSON.stringify(closure.nature ?? {}).slice(0, 140));
+
+    // 8) 保存并确认跟进安排 —— 走实际页面。
+    const caseUrl = `http://localhost:${uiPort}/safety/${encodeURIComponent(info.case_id)}`;
+    await page.goto(caseUrl, { waitUntil: 'networkidle' });
+    // 等面板真的挂上再断言：这一页是先渲染骨架、再填数据的。
+    //
+    // 断言的是**面板本身**（模式单选 + 提交按钮），不是那个确认徽标：
+    // 还没有任何安排时 `FollowUpSummary` 渲染的是另一段说明文字，**不带**
+    // `data-follow-up-confirmed`——拿它当"面板在不在"会误判。
+    await page.locator('input[value="schedule"]').first()
+      .waitFor({ state: 'attached', timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(500);
+    record('8 事项页有跟进安排区（可安排 / 可确认 / 可取消）',
+      (await page.locator('input[value="schedule"]').count()) > 0
+      && (await page.locator('input[value="confirm"]').count()) > 0
+      && (await page.locator('input[value="cancel"]').count()) > 0);
+
+    const followBtn = (name) => page.getByRole('button', { name, exact: true });
+    const scheduleAt = async (value) => {
+      await page.locator('input[value="schedule"]').check();
+      await page.waitForTimeout(200);
+      await page.locator('select').first().selectOption('review_at');
+      await page.waitForTimeout(200);
+      await page.locator('input[type="datetime-local"]').fill(value);
+      await followBtn('记录这项安排').click();
+      await page.waitForTimeout(1500);
+      await drain();
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.waitForTimeout(1000);
+    };
+    const confirmedFlag = async () => page.locator('[data-follow-up-confirmed]').first()
+      .getAttribute('data-follow-up-confirmed');
+
+    const future = new Date(Date.now() + 3 * 24 * 3600 * 1000);
+    const iso = (d) => d.toISOString().slice(0, 16);
+    await scheduleAt(iso(future));
+    record('8 安排之后**尚未确认**（安排 ≠ 有人确认过）',
+      (await confirmedFlag()) === 'false', `confirmed=${await confirmedFlag()}`);
+
+    await page.locator('input[value="confirm"]').check();
+    await page.waitForTimeout(200);
+    await followBtn('确认这条安排').click();
+    await page.waitForTimeout(1500);
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(1000);
+    record('8 确认之后记为**已确认**（确认是一次单独的动作）',
+      (await confirmedFlag()) === 'true', `confirmed=${await confirmedFlag()}`);
+
+    // 9) 改期 / 取消 / 到期触发都要有**真实效果**。
+    const later = new Date(Date.now() + 10 * 24 * 3600 * 1000);
+    await scheduleAt(iso(later));
+    const rescheduled = await apiGet(`/v1/safety-cases/${encodeURIComponent(info.case_id)}`);
+    record('9 改期真的改了时间',
+      (rescheduled.follow_up?.at ?? '').startsWith(iso(later).slice(0, 10)),
+      `at=${rescheduled.follow_up?.at}`);
+    record('9 改期之后确认状态回到"尚未确认"',
+      rescheduled.follow_up?.confirmed === false,
+      `confirmed=${rescheduled.follow_up?.confirmed}`);
+
+    await page.locator('input[value="cancel"]').check();
+    await page.waitForTimeout(200);
+    await followBtn('准备好取消这条安排').click();
+    await page.waitForTimeout(400);
+    await followBtn('取消这条安排').click();
+    await page.waitForTimeout(1500);
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(1000);
+    const cancelled = await apiGet(`/v1/safety-cases/${encodeURIComponent(info.case_id)}`);
+    // 取消**故意不清空** `at`/`owner`/`note`——历史要留着，靠 `schedule_state`
+    // 表达"已取消"。所以这里断言的是状态与页面文案，不是"记录消失了"。
+    record('9 取消之后安排记为已取消（历史仍然留着）',
+      cancelled.follow_up?.schedule_state === 'cancelled'
+      && cancelled.follow_up?.at != null,
+      `state=${cancelled.follow_up?.schedule_state} at=${cancelled.follow_up?.at}`);
+    record('9 页面上说得出"已取消"',
+      /已取消/.test(await body()));
+
+    // 到期触发：排一个**过去**的时间，让 worker 把它变成一次真实触发。
+    await scheduleAt(iso(new Date(Date.now() - 3600 * 1000)));
+    const drained = await drain();
+    await page.waitForTimeout(500);
+    const triggered = await apiGet(`/v1/safety-cases/${encodeURIComponent(info.case_id)}`);
+    record('9 到期的安排真的被触发（由 worker 扫描，不靠用户再点一次）',
+      ['due', 'triggered', 'blocked'].includes(triggered.follow_up?.schedule_state),
+      `schedule_state=${triggered.follow_up?.schedule_state} · drain=${JSON.stringify(drained).slice(0, 80)}`);
+
+    // 10) 重启服务后：记录、候选、待办仍可恢复。
+    const beforeRestart = await apiGet(`/v1/safety-cases/${encodeURIComponent(info.case_id)}`);
+    const notesBefore = (beforeRestart.visit?.change_notes ?? []).length;
+    killTree(backend);
+    await new Promise((r) => setTimeout(r, 1500));
+    const restarted = spawn(python,
+      ['-m', 'stage0.safety_browser_fixture', '--port', apiPort, '--db', backendDb],
+      { cwd: ROOT, env: { ...process.env, MEMORY_ENABLE_LLM: '0', PYTHONIOENCODING: 'utf-8' } });
+    restarted.stderr.on('data', (c) => fs.appendFileSync(path.join(out, 'backend-restart.log'), c));
+    await waitForLine(restarted, 'FIXTURE_READY', 60000);
+    await waitForHttp(`http://127.0.0.1:${apiPort}/v1/health`, 30000);
+    backend = restarted;
+
+    const afterRestart = await apiGet(`/v1/safety-cases/${encodeURIComponent(info.case_id)}`);
+    record('10 重启之后补充的原文还在',
+      (afterRestart.visit?.change_notes ?? []).length === notesBefore && notesBefore > 0,
+      `notes=${(afterRestart.visit?.change_notes ?? []).length}（重启前 ${notesBefore}）`);
+    const confirmedCandidates = (afterRestart.visit?.change_candidates ?? [])
+      .filter((c) => c.status === 'confirmed');
+    record('10 重启之后已确认的候选仍是已确认（没有回退成待确认）',
+      confirmedCandidates.length > 0, `confirmed=${confirmedCandidates.length}`);
+    const namesAfter = await currentMeds();
+    record('10 重启之后当前药单仍然是确认后的样子',
+      namesAfter.includes('合成药丙') && !namesAfter.includes('合成药甲'),
+      `在用=${namesAfter.join('、')}`);
+
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(1200);
+    record('10 重启之后页面仍然读得到同一件事项',
+      await page.locator('[data-follow-up-confirmed]').count() > 0);
 
     report.status = report.failures.length === 0 ? 'pass' : 'fail';
   } catch (error) {

@@ -728,6 +728,28 @@ class FailureTests(_ChangeFlow):
         self.assertEqual([], self.pending())
         self.assertEqual('active', self.medications()['合成药甲']['status'])
 
+    def test_the_structured_entry_still_works_without_a_model(self):
+        """模型不可用时，用户仍然走得通**已有的**结构化登记与确认入口。
+
+        "没有自动理解"不等于"没法登记"——两件事必须分开说，也必须分开是真的。
+        """
+        self.interpreter.mode = 'unavailable'
+        self.submit('停了合成药甲')
+        self.assertEqual(cn.NOTE_UNAVAILABLE, self.notes()[-1]['status'])
+        self.assertEqual([], self.pending())
+
+        proposed = self.api.client.post(
+            f'/v1/safety-cases/{self.case_id}/visits/{self.visit_id}/candidates',
+            json={'key': 'structured-1', 'name': '合成药甲', 'field': 'dose',
+                  'value': '3mg'})
+        self.assertEqual(200, proposed.status_code, proposed.text)
+        candidate = proposed.json()['visit']['pending_candidates'][0]
+        confirmed = self.confirm(candidate['id'], key='structured-confirm')
+        self.assertEqual(200, confirmed.status_code, confirmed.text)
+        self.assertEqual('3mg', self.medications()['合成药甲']['dose'])
+        # 必要安全检查不依赖模型可用。
+        self.assertGreater(safety_checks.pending(self.api.store)['unfinished'], 0)
+
     def test_a_model_failure_keeps_the_text_and_offers_a_retry(self):
         self.interpreter.mode = 'error'
         self.submit('停了合成药甲')

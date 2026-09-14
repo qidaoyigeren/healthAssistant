@@ -146,25 +146,75 @@ provider 失败后当作已处理、拿旧版本的复核批准新状态、用**
 - 回访记录**只存引用与渲染后的叙述**（每条陈述标明是程序核对、用户报告、模型的解释
   还是权威记录），不复制患者事实、药单或证据。
 
+### 补充情况：一句自然语言 → 待确认候选
+
+回访页的「**补充情况**」里直接用自己的一句话记变化，不必先想清楚该填哪一格：
+停用、新增、调整用法、恢复服用、纠正之前登记错的、以及换药（一次说清时是一组）。
+
+- **四类意图分开**：已经发生 → 候选；**计划**只在页面上列为"还没发生的事"，
+  **不进**可确认列表；询问 → 什么都不生成；**漏服**记成用户报告、不改药单。
+- **指代说不清就补问**（"这个药"），**不猜**。歧义由**能不能唯一解析到一条权威
+  记录**判定，不照抄模型自己的说法。
+- **"不是药甲，是药乙"不会改动药甲**：被否定的那条待确认候选被撤回（历史留着）。
+- **时间含糊照留原话**："上周"不会被解析成某一天；记录里同时写明这个时间**来自哪里**
+  （用户报告 / 只说了个大概 / 系统登记时间）。
+- **受控写入没有被放宽**：普通补充回答不能靠一个 `action='remove'` 绕过候选确认。
+- 这一层是**可选的**：没有模型时它如实说明"尚未完成自动理解"，原文保留，
+  结构化登记入口照常可用；必要安全检查与事项推进都不依赖它。
+
 ## 运行
 
+> **唯一推荐运行目录**是 `D:\py\HealthAssistant.worktrees\integration`
+> （分支 `feat/medication-change`）。主工作区 `D:\py\HealthAssistant` 停在更早的
+> 提交上，**没有本轮的功能**——在旧目录里启动会看不到「补充情况」与完整用药变更。
+> 详细交付说明见 [FINAL-DELIVERY.md](FINAL-DELIVERY.md)。
+
 ```powershell
+cd D:\py\HealthAssistant.worktrees\integration
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r stage0/requirements-stage1.txt
 
-# 后端（单写进程）
+# 后端（单写进程；worker 随它一起起，不需要另开进程）
 python -m uvicorn stage0.server:app --host 127.0.0.1 --port 8000
 
-# 前端
+# 前端（另开一个终端）
 cd frontend; npm install; npm run dev
 ```
+
+**确认 worker 正在运行**：`http://127.0.0.1:8000/v1/health` 里的
+`"worker_thread": true` 就是它；`pending_outbox_tasks` 长期不降说明它没在推进。
+没有 worker 时页面仍会显示已保存的一切，但不会自动推进（必要检查、回访、跟进到期
+都不跑）。
+
+**模型是可选配置**：不配任何凭据也能完整使用（记录、候选确认、必要检查、事项与
+回访都不依赖模型）。只有「补充情况」的**自然语言理解**需要它；没配时界面如实说
+"尚未完成自动理解"、原文保留，用户改用结构化登记入口即可。要开就在 `stage0/.env`
+里配（该文件已被 gitignore），并显式选端点：
+
+```
+LLM_PROVIDER=siliconflow      # 显式选择器；不设则按 zhipu → tokendance → …顺序探测
+SILICONFLOW_API_KEY=…
+```
+
+**停止**：前端与后端各自 `Ctrl+C`；worker 是后端进程里的守护线程，随之退出。
+
+**备份与恢复**（用 SQLite 的 backup API，运行中也安全；**不要**直接复制 `.db` 文件）：
+
+```powershell
+python -m stage0.backup --db stage0/memory.db --backup --out stage0/backups
+python -m stage0.backup --verify stage0/backups/memory-<时间戳>.db
+python -m stage0.backup --restore stage0/backups/memory-<时间戳>.db --to stage0/restored.db
+```
+
+恢复**拒绝覆盖已存在的目标**——这是有意的：恢复不该悄悄盖掉一份还活着的库。
 
 页面入口：`/`（= `/safety`）长期用药安全事项；`/medications` 记录用药变化（变化会触发必要检查）；
 `/materials` 材料核对（**支持入口**：导入材料 → 确认信息 → 关联用药与安全事项）；
 `/tasks` 照护待办；`/alerts` `/conflicts` `/history` 证据、待核实与时间线。
 
-没有后台 worker 时，页面仍会显示已保存的一切，但不会自动推进。
+数据库默认在 `stage0/memory.db`（`STAGE0_DB_PATH` 可改）；备份/导出产物在
+`stage0/backups`、`stage0/exports`。这三处都在 `.gitignore` 里。
 
 ## 验证
 

@@ -179,6 +179,29 @@ def seed(app) -> dict:
             "url": f"http://127.0.0.1:5173/safety/{case['id']}"}
 
 
+def resume_info(app) -> dict:
+    """重启后**不重新播种**：把已经在库里的状态照实报出来。
+
+    `seed()` 每次都会建事项、建调查任务、并要求存在一条待补充的问题——那些在第一次
+    运行里已经发生过。重启时再播一次要么命中幂等回执、要么因为问题已经答过而直接
+    退出。恢复验收要的是"同一份记录还在"，不是"再来一遍"。
+    """
+    store: MemoryStore = app.state.store
+    cases = SafetyCaseStore(ProductStore(store)).objects()
+    if not cases:
+        raise SystemExit("库里没有事项——这不是一次重启；去掉 --db 重新播种")
+    case = cases[0]
+    pending = [item for item in case.get("required_inputs") or ()
+               if item.get("status") == "open"]
+    return {"case_id": case["id"], "resumed": True,
+            "request_id": pending[0]["request_id"] if pending else None,
+            "question": pending[0].get("question") if pending else None,
+            "question_kind": pending[0].get("question_kind") if pending else None,
+            "question_strategy": pending[0].get("question_strategy") if pending else None,
+            "fields": (pending[0].get("fields") or []) if pending else [],
+            "url": f"http://127.0.0.1:5173/safety/{case['id']}"}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8000)
@@ -194,7 +217,8 @@ def main() -> int:
         db_path = Path(temporary.name) / "memory.db"
 
     app = build_app(db_path)
-    info = seed(app)
+    existing = SafetyCaseStore(ProductStore(app.state.store)).objects()
+    info = resume_info(app) if existing else seed(app)
     print("FIXTURE_READY " + json.dumps(info, ensure_ascii=False), flush=True)
     uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
     if temporary is not None:
