@@ -11,7 +11,7 @@ import type {
   MemoryItemDto, MemoryStateDto, OverviewDto, Page, RecheckTasksDto,
   RunProgressDto, SafetyCaseDto, SafetyCaseListDto, SafetyClosureEvidenceDto,
   SafetyFollowUpConditionDto, SafetyFollowUpConfirmationDto, SafetyFollowUpInputDto,
-  SafetyMainlineDto,
+  SafetyMainlineDto, SafetyVisitDto,
   SessionDto, SessionEventDto, TurnTraceDto, WarningDto,
 } from './types';
 
@@ -247,7 +247,13 @@ export const api = {
    */
   safetyCaseAnswer(caseId: string, body: {
     key: string; expected_revision: number; request_id: string; value: string;
-    answer_kind?: 'provided' | 'unknown' | 'empty';
+    /**
+     * 省略时由**服务端**按内容判定,界面不猜。
+     * 回访里另加四种表态:`done` 已完成 / `not_done` 尚未完成 /
+     * `declined` 暂不回答 / `changed` 情况有变化。它们**含义不同**,
+     * 只有 `done`(且问题确实是跟进行动)才可能把那条问题答上。
+     */
+    answer_kind?: 'provided' | 'unknown' | 'empty' | 'done' | 'not_done' | 'declined' | 'changed';
   }) {
     return request<SafetyCaseDto>(`/v1/safety-cases/${encodeURIComponent(caseId)}/answer`, {
       method: 'POST', body,
@@ -311,6 +317,53 @@ export const api = {
       `/v1/safety-cases/${encodeURIComponent(caseId)}/follow-up/confirmation`, {
         method: 'POST', body,
       });
+  },
+
+  /**
+   * 开始或**继续**一次回访。
+   *
+   * 已经有未结束的回访就接着它走,不新开一次——新开会让用户已经答过的问题变成
+   * 上一访的遗留,他回来看到的第一题又是原来那道。返回新的 CaseView(`visit` 块
+   * 里有这次回访的全部内容)。
+   */
+  safetyCaseStartVisit(caseId: string, body: { key: string; expected_revision: number }) {
+    return request<SafetyCaseDto>(`/v1/safety-cases/${encodeURIComponent(caseId)}/visits`, {
+      method: 'POST', body,
+    });
+  },
+
+  /** 读一次回访的**持久结果**:本次为什么跟进、新增了什么、做完了什么、还剩什么。 */
+  safetyCaseVisit(caseId: string, visitId: string) {
+    return request<SafetyVisitDto>(
+      `/v1/safety-cases/${encodeURIComponent(caseId)}/visits/${encodeURIComponent(visitId)}`);
+  },
+
+  /**
+   * 声明一条**待确认**的用药变更候选。这不是写入:确认之前当前药单一个字节都不变。
+   * `value` 是新值;`before` 由服务端从当前权威记录取(不采信调用方自报的前值)。
+   */
+  safetyCaseProposeChange(caseId: string, visitId: string,
+                          body: { key: string; name: string; field: string; value: string; note?: string }) {
+    return request<SafetyCaseDto>(
+      `/v1/safety-cases/${encodeURIComponent(caseId)}/visits/${encodeURIComponent(visitId)}/candidates`, {
+        method: 'POST', body,
+      });
+  },
+
+  /** 确认候选 → 沿**既有权威入口**写入,必要安全检查按既有路径重新排队。 */
+  safetyCaseConfirmChange(caseId: string, visitId: string, candidateId: string,
+                          body: { key: string }) {
+    return request<SafetyCaseDto>(
+      `/v1/safety-cases/${encodeURIComponent(caseId)}/visits/${encodeURIComponent(visitId)}` +
+      `/candidates/${encodeURIComponent(candidateId)}/confirm`, { method: 'POST', body });
+  },
+
+  /** 放弃候选。**什么都不写**——权威记录本来就没被它碰过。 */
+  safetyCaseDismissChange(caseId: string, visitId: string, candidateId: string,
+                          body: { key: string }) {
+    return request<SafetyCaseDto>(
+      `/v1/safety-cases/${encodeURIComponent(caseId)}/visits/${encodeURIComponent(visitId)}` +
+      `/candidates/${encodeURIComponent(candidateId)}/dismiss`, { method: 'POST', body });
   },
 
   /** 围绕这一件事项发起一次有界调查。返回排队中的 care_task,进度另轮询。 */

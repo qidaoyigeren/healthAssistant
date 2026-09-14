@@ -147,7 +147,10 @@ CONTRACTS = {
     # 触发原因、已有结论、已失效依据、未决问题与用户补充开工，跨会话回到同一件事。
     'safety_case': {'version': 1, 'outputs': ['safety_case_report'],
                     'tools': ['memory_read', 'rag_search', 'read_evidence', 'ask_clarification',
-                              'ddi_check', 'memory_write'],
+                              'ddi_check', 'memory_write', 'answer_question',
+                              # 回访用：把"用户那句话意味着记录该改了"记成**待确认**的
+                              # 候选。它不写记录——改记录的唯一一步是用户确认。
+                              'propose_medication_change'],
                     'max_steps': 16},
 }
 
@@ -683,6 +686,12 @@ class CareTasks:
         # "等您补充"里；只答上一部分的把已知部分与剩余缺口一起显示出来。
         self._sync_questions_to_case(store, case['id'], inv)
 
+        # 这一次如果是一次**回访**，把它的结果落下来。
+        # 回访记录只存引用与渲染后的叙述（见 `review_visits`），患者事实、药单、
+        # 证据一律现取——所以这里做的是"把这一刻的样子记进这次回访"，不是
+        # 另存一份档案。
+        self._record_visit_outcome(task, store, case, inv)
+
         # 运行登记在事项上——"这件事查过几次、哪次失败"要能追溯。
         with self.p.transaction():
             current = store.get(case['id'])
@@ -818,6 +827,42 @@ class CareTasks:
                 store.derive_status(case)
                 case['revision'] += 1
                 self.p.save('safety_case', case)
+
+    def _record_visit_outcome(self, task, store, case, inv) -> None:
+        """把这一轮的结果记进**这次回访**（如果有的话）。
+
+        只是记账：结果的每一条内容都从既有真相源现取，`render_result` 是纯读的。
+        没有正在进行的回访就什么也不做——绝大多数调查不是回访，不该凭空产出一条。
+        """
+        from . import review_visits as visits_module
+        visits = visits_module.ReviewVisitStore(self.p)
+        visit = visits.open_for_case(case['id'])
+        if visit is None:
+            return
+        if visit.get('care_task_id') != task['id']:
+            visit = visits.bind_task(visit['id'], task['id'])
+        # 调查里识别出的变更候选落到这次回访的候选队列上——**仍然是候选**，
+        # 来源标成模型提议。登记之后权威记录一个字节都没变，改不改由用户确认。
+        for candidate in (inv or {}).get('pending_change_candidates') or []:
+            current = _current_field(self.p, candidate['name'], candidate['field'])
+            visits.add_candidate(
+                visit['id'], name=candidate['name'], field=candidate['field'],
+                before=current, after=candidate['value'],
+                source=visits_module.SOURCE_MODEL_PROPOSED,
+                basis={'kind': 'model_explanation',
+                       'refs': [candidate.get('question_id')] if candidate.get('question_id') else [],
+                       'note': candidate.get('quote')})
+        fresh = store.get(case['id'])
+        result = visits_module.render_result(self.p, fresh, visit, task=task)
+        # 焦点 = 这次回访真正在等用户回答的那几条。引用 request_id，不复制问题正文。
+        focus = [{'request_id': item['request_id'], 'question': item.get('question')}
+                 for item in (fresh.get('required_inputs') or [])
+                 if item.get('status') in ('open', 'unknown')]
+        visits.save_result(visit['id'], result, focus=focus,
+                           cursor_after=len(fresh.get('history') or []))
+        status = visits_module.status_from_task(task)
+        if status is not None:
+            visits.set_status(visit['id'], status)
 
     def _safety_case_context(self, task, case, contract) -> dict[str, Any]:
         """Agent 这一轮看到的**事项上下文**。

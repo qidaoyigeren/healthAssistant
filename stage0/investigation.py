@@ -384,6 +384,9 @@ def allowed_tools(inv):
         # 本来就在权威记录里。采纳的门槛在 `answer_question` 里，不在工具列表。
         if any(g['kind'] == 'question_open' and g['status'] == 'open' for g in inv.gaps):
             allowed.append('answer_question')
+            # 变更候选与采纳同一个前提：得有一条**在问的问题**，才会有"用户的回答
+            # 意味着记录该改了"这件事。没有问题时提候选，等于凭空发起一次改药。
+            allowed.append('propose_medication_change')
     elif any(g['kind'] == 'patient_fact_missing' and g['status'] == 'open' and g.get('field') for g in inv.gaps):
         allowed.append('ask_clarification')
     if any(g['kind'] == 'evidence_missing' and g['status'] == 'open' for g in inv.gaps):
@@ -442,6 +445,10 @@ class InvestigationState:
     search_keys: list = field(default_factory=list)
     retrieval_attempts: int = 0
     retrieval_feedback: list = field(default_factory=list)
+    # 调查中识别出的**待确认**用药变更候选。它们**不是记录**：任务收尾时由执行器
+    # 把它们登记进这次回访的候选队列，由**用户**决定改不改。放在这里而不是直接写
+    # 库，是为了让本模块继续"不认识数据库"——它只声明意图。
+    pending_change_candidates: list = field(default_factory=list)
     assessments: dict = field(default_factory=dict)
     no_progress_count: int = 0
     termination_reason: str | None = None
@@ -1315,6 +1322,29 @@ class InvestigationState:
                 source_ref=args.get('source_ref'), object_ref=args.get('object_ref'),
                 basis_refs=args.get('basis_refs') or ())
             observation.result = {**outcome, 'allowed_tools': list(allowed_tools(self))}
+            return
+        if observation.tool == 'propose_medication_change':
+            # 记成**候选**，不是记录。写进调查状态（本模块不认识数据库），
+            # 任务收尾时由执行器登记进这次回访，由用户确认。
+            args = observation.arguments or {}
+            candidate = {'question_id': str(args.get('question_id') or ''),
+                         'name': str(args.get('name') or '').strip(),
+                         'field': str(args.get('field') or ''),
+                         'value': str(args.get('value') or '').strip(),
+                         'quote': str(args.get('quote') or '').strip()[:300] or None}
+            existing = next((item for item in self.pending_change_candidates
+                             if item['name'] == candidate['name']
+                             and item['field'] == candidate['field']), None)
+            if existing is not None:
+                # 同一味药同一字段只留一条：两条并存，用户确认一条之后另一条
+                # 就和记录对不上了。
+                existing.update(candidate)
+                candidate = existing
+            else:
+                self.pending_change_candidates.append(candidate)
+            observation.result = {'recorded': True, 'candidate': dict(candidate),
+                                  'detail': '已记为待确认的变更候选；改不改由用户决定，'
+                                            '这一步没有改动任何记录'}
             return
         if observation.tool == 'acquire_evidence':
             # Reuse exactly the existing acquisition and assessment rules.
@@ -2350,10 +2380,13 @@ def proposal_errors(inv, proposal):
     if tool in {'rag_search', 'acquire_evidence'} and len(inv.queries) >= inv.search_limit():
         return ['search_budget_exhausted']
     if tool not in {'memory_read', 'rag_catalog', 'rag_search', 'read_evidence', 'acquire_evidence', 'ask_clarification',
-                    'ddi_check', 'list_materials', 'answer_question'}:
+                    'ddi_check', 'list_materials', 'answer_question',
+                    'propose_medication_change'}:
         return ['investigation_tool_not_allowed']
     if tool == 'answer_question':
         return _answer_question_errors(inv, args)
+    if tool == 'propose_medication_change':
+        return _propose_change_errors(inv, args)
     if tool == 'ask_clarification':
         if policy_of(inv.policy).get('typed_questions'):
             return _typed_clarification_errors(inv, args)
@@ -2370,6 +2403,31 @@ def proposal_errors(inv, proposal):
     if tool == 'ask_clarification' and not policy_of(inv.policy).get('typed_questions') \
             and args.get('question') not in {g['description'] for g in inv.gaps if g['kind'] == 'patient_fact_missing' and g.get('field')}:
         return ['question_does_not_match_missing_fact']
+    return []
+
+
+#: 变更候选能针对的字段 = 能**机械核对**的用药字段。与 `review_visits` 的那份
+#: 是同一个集合，有一条测试钉住两边一致——工具 schema、这里、以及确认时的写入，
+#: 三处漂移任何一处，模型产出的候选都会被另一处拒掉。
+CHANGE_CANDIDATE_FIELDS = ('dose', 'schedule', 'route', 'start_at')
+
+
+def _propose_change_errors(inv, args) -> list[str]:
+    """候选变更提案的**结构**校验。
+
+    这里挡的是"这条候选根本没法核对"：问题不存在、药名空、字段不可核对、新值空。
+    真正的"这句话是不是用户说的"不在这一步——那条线索由模型给出、由**用户**在
+    确认那一步定夺，所以界面上必须把来源摆出来。
+    """
+    if inv.question(str(args.get('question_id') or '')) is None:
+        return ['unknown_question_id']
+    if not str(args.get('name') or '').strip():
+        return ['change_without_medication']
+    if str(args.get('field') or '') not in CHANGE_CANDIDATE_FIELDS:
+        return ['change_field_not_checkable']
+    value = args.get('value')
+    if value is None or not str(value).strip():
+        return ['change_without_value']
     return []
 
 

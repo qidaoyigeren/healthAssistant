@@ -102,6 +102,11 @@ interface OperationOutcomeDto =
 | POST | `/v1/safety-cases/{case_id}/disposition` | body `{key, expected_revision, disposition, basis_kind, note?, decision_id?, follow_up?}`。**不含 `actor`**:身份由服务端从认证上下文取,请求体里的 `actor` 不被读取。`follow_up` = `{kind: review_at\|on_event\|arrangement, at?, condition?, owner?, note?}` |
 | POST | `/v1/safety-cases/{case_id}/follow-up` | body `{key, expected_revision, action: "schedule"\|"cancel", kind?, at?, condition?, owner?, note?, reason?}`。`kind` ∈ `review_at`/`on_event`/`arrangement`;`at` **必须带时区**(naive → 422,响应统一规范化成 `+00:00` 秒精度);`condition` 是白名单结构 `{kind, ref, ...}`,未知 kind 或自由文本 → 422(**不静默降级**)。**不接受 `confirmed`**:给了时间或条件不等于有人确认过。返回新的 CaseView |
 | POST | `/v1/safety-cases/{case_id}/follow-up/confirmation` | body `{key, expected_revision, note?}`。产生一条确认记录,使 `confirmed: true` 并写入 `confirmed_at`/`confirmed_by`/`confirmation_ref`;`confirmed_by` 取认证主体,**不接受请求体自称**。前置条件是存在 `schedule_state ∈ {scheduled, due}` 的安排,否则 409 |
+| POST | `/v1/safety-cases/{case_id}/visits` | body `{key, expected_revision}`。**开始或继续**一次回访:已有未结束的回访就接着它走(不新开——新开会让用户答过的问题变回第一题)。「本次为什么跟进」由**服务端按事实判定**(`due` > `record_change` > `input_arrived` > `user_started`),调用方不能把到期说成主动。返回 CaseView |
+| GET | `/v1/safety-cases/{case_id}/visits/{visit_id}` | 读一次回访的**持久结果**:本次为什么跟进、相对上次新增、已完成的动作、仍未解决、下一步、下一次安排及其确认状态。每条陈述带 `basis`(`program_check`/`user_report`/`model_explanation`/`record`) |
+| POST | `/v1/safety-cases/{case_id}/visits/{visit_id}/candidates` | body `{key, name, field, value, note?}`。登记一条**待确认**的用药变更候选。`field` ∈ `dose`/`schedule`/`route`/`start_at`;`before` 由服务端从当前权威记录取,不采信调用方自报。**确认之前权威记录一个字节都不动** |
+| POST | `/v1/safety-cases/{case_id}/visits/{visit_id}/candidates/{cid}/confirm` | 确认候选 → 沿**既有权威入口**(`record_input(medications=…)`)写入,必要安全检查按既有路径重新排队。只有这一步能改记录 |
+| POST | `/v1/safety-cases/{case_id}/visits/{visit_id}/candidates/{cid}/dismiss` | 放弃候选。**什么都不写**——权威记录本来就没被它碰过 |
 | POST | `/v1/safety-cases/{case_id}/investigate` | body `{key, budget?, goal?}`;建 `care_task`(goal_type=`safety_case`)并排队,返回任务;进度用 `/v1/runs/{run_id}/progress` 轮询 |
 | POST | `/v1/care-tasks/{task_id}/input` | body `{key, revision, review_request_ids: string[], answers?: [{request_id, value, kind?}]}`;kind ∈ `user_report`/`material_note`。只关闭**指名回答**的那条 request_id(安全事项的补充现在直接走上面的 `/answer`) |
 | POST | `/v1/care-tasks/{task_id}/resume` | 提交补充后用 `revision+1` 继续;`record_input` 恰好把任务版本 +1 |
@@ -122,6 +127,39 @@ CaseView 字段以 `case_view()` 序列化为准(见 `frontend/src/api/types.ts`
 `kind`(安排的种类)与 `schedule_state`(走到哪了)是两件事,不要合并。
 `schedule_state` 由 worker 周期推进;`worker_thread=False` 时不跑,界面不得
 宣称「后台已在执行」。
+
+### 回访(visit)
+
+CaseView 增加一个派生的 `visit` 块(没有回访历史时是 `null`):
+`visit_id` / `status` / `is_open` / `reason` / `focus` / `change_candidates` /
+`pending_candidates` / `result` / `first_visit` / `care_task_id` / `task_status`。
+`status` ∈ `open` / `awaiting_user` / `completed` / `blocked`,**以执行它的任务为准**
+(记录里的 `open` 在任务已跑完等用户时是不准确的,照它显示会让用户白等)。
+
+`result.since_last` 在没有新记录时**只会**说「系统尚未收到新记录;这不等于情况没有
+变化,也不表示风险已经解除」。**不得**把它渲染成「情况稳定」或「风险已解除」——
+前者是系统的信息状态,后者是一句没有人做过的判断。
+
+`change_candidates[].source` ∈ `user_declared` / `model_proposed`,**必须显示**:
+确认的人要知道自己在确认什么。
+
+### `/answer` 的回答种类(加法式扩展)
+
+原有 `provided` / `unknown` / `empty` 不变,新增四种**跟进行动表态**:
+
+| 值 | 含义 | 对请求的影响 |
+|---|---|---|
+| `done` | 已完成 | **仅当**该请求 `question_kind='follow_up_action'` 才置 `answered`;否则保持未决 |
+| `not_done` | 尚未完成 | 保持 `open`,记 `deferred_kind`/`deferred_at` |
+| `declined` | 暂不回答 | 保持 `open`,记 `deferred_kind`;**本轮不再追问同一条**(≠「不知道」) |
+| `changed` | 情况有变化 | 保持 `open`,并置 `expects_change_candidate`——要走候选→确认那条路 |
+
+四者**含义不同,不能合并成「已解决」**。与 `unknown` 的区别:`unknown` 表示
+「这位用户答不了」,系统转去找替代证据;`declined` 表示「先别问这条」,还要再等他。
+
+**推迟类的回答不唤醒调查**:未完成/暂不回答没有给出模型可以据以行动的新事实,
+「情况有变化」的下一步是候选确认。唤醒会让那一轮既没有合法动作、又终止不了,
+最后以熔断收场——用户会看到「这次回访没有跑成」,而他只是说了一句「还没做」。
 
 ### 状态与结论语义(前端必须照此显示)
 

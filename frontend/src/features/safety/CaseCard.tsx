@@ -290,9 +290,23 @@ export interface AnswerReceipt {
  *  3. 「我不知道」是**第三种**结果:不再追问这位用户,但问题**没有解决**、
  *     仍阻止关闭,改由系统从其他来源核实。它不能显示成"已回答"。
  */
-export function AnswerPanel({ view, onAnswered }: {
+/**
+ * 回访里用户对一条**跟进行动**的五种表态。它们含义不同,不能合并:把"我还没做"
+ * 和"我暂时不想说"都记成已答,用户下次回来会看到一件他其实没做过的事被标成做完了。
+ */
+const FOLLOW_UP_ACTIONS: { kind: 'done' | 'not_done' | 'unknown' | 'changed' | 'declined'; label: string }[] = [
+  { kind: 'done', label: '已完成' },
+  { kind: 'not_done', label: '尚未完成' },
+  { kind: 'unknown', label: '不清楚' },
+  { kind: 'changed', label: '情况有变化' },
+  { kind: 'declined', label: '暂不回答' },
+];
+
+export function AnswerPanel({ view, onAnswered, followUpActions = false }: {
   view: SafetyCaseDto;
   onAnswered?: (receipt: AnswerReceipt) => void;
+  /** 回访页打开它:多给一组"那件事做了没有"的表态按钮。 */
+  followUpActions?: boolean;
 }): React.ReactElement {
   const client = useQueryClient();
   const [values, setValues] = useState<Record<string, string>>({});
@@ -321,9 +335,10 @@ export function AnswerPanel({ view, onAnswered }: {
    * `kind` 只在用户**显式**点「这条我不知道」时传 `'unknown'`;普通提交不传,
    * 由服务端按内容判定——否则用户手写"不知道"也会被本页判成"有内容地回答"。
    */
-  async function submit(item: SafetyRequiredInputDto, text: string, kind?: 'unknown') {
+  async function submit(item: SafetyRequiredInputDto, text: string,
+                       kind?: 'unknown' | 'done' | 'not_done' | 'declined' | 'changed') {
     if (!text.trim()) return;
-    const key = keyFor(item, kind === 'unknown' ? `${kind}:${text}` : text);
+    const key = keyFor(item, kind ? `${kind}:${text}` : text);
     setBusy(true);
     setError('');
     try {
@@ -411,6 +426,28 @@ export function AnswerPanel({ view, onAnswered }: {
           选这条表示您确实无法提供。服务端会停止再问您这条问题，但它仍然没有解决，
           也仍然阻止关闭事项，改由系统从其他来源核实。
         </p>
+        {followUpActions && (
+          <div className="mt-3 border-t border-line pt-3">
+            <p className="text-xs font-medium text-ink-secondary">
+              如果这是问您「那件事做了没有」，也可以直接选一种：
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {FOLLOW_UP_ACTIONS.map((action) => (
+                <button key={action.kind} type="button"
+                  className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-secondary hover:bg-surface-muted disabled:opacity-50"
+                  disabled={busy}
+                  onClick={() => void submit(current, action.label, action.kind)}>
+                  {action.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-ink-muted">
+              这五种**含义各不相同**，不能合并成「已解决」：只有「已完成」可能把这条问题
+              答上（而且只对问「做了没有」的问题）；「尚未完成」「暂不回答」保持未决，
+              「不清楚」改由系统找其他来源，「情况有变化」要走变更确认那条路。
+            </p>
+          </div>
+        )}
       </div>
       {theirs.length > 0 && (
         <p className="text-sm text-caution">

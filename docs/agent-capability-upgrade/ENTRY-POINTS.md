@@ -24,6 +24,8 @@
 | `scripts/replay-agent-closeout.py` | 否 | 零网络回放既有失败提案；被 `stage0/agent_evals/run_eval.py` 调用 |
 | `scripts/create-product-dev-tasks.py` | 否 | 离线重新生成 `stage0/product_evals/tasks/dev` 夹具 |
 | `python -m stage0.test_parallel_product_acceptance --report <path>` | 否 | 独立验收：答案可信性 / 长期跟进 / 整条闭环。按类别分开报告**通过 / 未通过 / 未测到**——"未测到"**不**折算成通过。脚本化规划器，不调模型 |
+| `scripts/review-visit-live-acceptance.py --out <path>` | **是** | **有限**真实模型验收：一次回访（场景 B）。上限（`--max-calls` / `--wall-seconds` / `--max-tokens`）在开跑前打印；等待用户输入期间不消费模型。失败后不追加批次、不换模型、不扩预算 |
+| `python -m stage0.test_review_visit_flow` | 否 | 回访的三个产品场景（信息充分 / 出现相关变化 / 跟进行动未完成），走真实 HTTP 端点 + 真实 worker |
 
 ## 常用开发入口（不是脚本）
 

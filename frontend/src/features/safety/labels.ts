@@ -769,3 +769,77 @@ export const CARE_TASK_STATUS_LABELS: Record<string, string> = {
 export function careTaskStatusLabel(status: string): string {
   return CARE_TASK_STATUS_LABELS[status] ?? `未识别状态（${status}）`;
 }
+
+// ---- 回访:状态、起因、依据类型、变更候选 -------------------------------------
+
+/** 一次回访走到哪了。以**执行它的任务**为准（见 `review_visits.status_from_task`）。 */
+export const VISIT_STATUS_LABELS: Record<string, string> = {
+  open: '正在整理这次的重点',
+  awaiting_user: '在等您回答',
+  completed: '这次已经跑完',
+  blocked: '这次没能跑成',
+};
+
+export function visitStatusLabel(status: string): string {
+  return VISIT_STATUS_LABELS[status] ?? `未识别状态（${status}）`;
+}
+
+/** 这次为什么跟进。服务端按**事实**判定，界面只负责翻译。 */
+export const VISIT_REASON_LABELS: Record<string, string> = {
+  due: '已确认的跟进安排到期',
+  record_change: '相关记录发生变化',
+  input_arrived: '收到了新的补充',
+  user_started: '您主动发起',
+};
+
+export function visitReasonLabel(kind?: string | null): string {
+  if (!kind) return '未说明';
+  return VISIT_REASON_LABELS[kind] ?? `未识别的起因（${kind}）`;
+}
+
+/**
+ * 一条陈述的依据类型。四者必须分得开 —— 混成一句「系统认为」，用户就没法知道
+ * 自己看到的是程序核对的结果、自己说过的话，还是模型的解释。
+ */
+export const BASIS_KIND_LABELS: Record<string, string> = {
+  program_check: '程序核对',
+  user_report: '您的报告',
+  model_explanation: '模型的解释',
+  record: '权威记录',
+};
+
+export function basisKindLabel(kind?: string | null): string {
+  if (!kind) return '依据未标明';
+  return BASIS_KIND_LABELS[kind] ?? `未标明的依据（${kind}）`;
+}
+
+/** 变更候选能针对的字段。与后端 `review_visits.CANDIDATE_FIELDS` 一一对应。 */
+export const CHANGE_FIELD_LABELS: Record<string, string> = {
+  dose: '剂量',
+  schedule: '服用频次',
+  route: '给药途径',
+  start_at: '开始时间',
+};
+
+export function changeFieldLabel(field: string): string {
+  return CHANGE_FIELD_LABELS[field] ?? field;
+}
+
+/** 候选的来源。**必须显示**：确认的人要知道自己在确认什么。 */
+export const CANDIDATE_SOURCE_LABELS: Record<string, string> = {
+  user_declared: '您登记的',
+  model_proposed: '模型从您的话里读出来的',
+};
+
+export function candidateSourceLabel(source: string): string {
+  return CANDIDATE_SOURCE_LABELS[source] ?? `来源未标明（${source}）`;
+}
+
+/** 回答一条跟进行动的五种表态。它们含义不同，不能合并成「已解决」。 */
+export const FOLLOW_UP_ANSWER_LABELS: Record<string, string> = {
+  done: '已完成',
+  not_done: '尚未完成',
+  unknown: '不清楚',
+  changed: '情况有变化',
+  declined: '暂不回答',
+};

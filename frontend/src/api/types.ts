@@ -919,6 +919,19 @@ export interface SafetyCaseDto {
    * 视图里没有时,可以从历史里那次「持续跟进」处置记录里读到同一份安排。
    */
   follow_up?: SafetyFollowUpDto | null;
+  /**
+   * 当前(或最近一次)**回访**。没有回访历史时是 null——界面据此说「这件事项还
+   * 没有跟进过」,而不是编一个空壳。
+   *
+   * `status` 以**执行它的任务**为准:记录里的 `open` 在任务已经跑完、在等用户时
+   * 是不准确的,照它显示会让用户白等一个不会来的问题。
+   */
+  visit?: SafetyVisitDto | null;
+  /**
+   * 还没开始回访时，「这次为什么值得跟进」的**只读**预览（服务端按事实算，不写
+   * 任何东西）。已经有未结束的回访时是 null——那时该看的是那次回访自己的 reason。
+   */
+  next_visit_reason?: { kind?: string; detail?: string; refs?: string[] } | null;
   /** 与本事项关联的复核决定(事项级审查用,不用于界面主张"已获专业确认")。 */
   linked_review_case_ids?: string[];
   user_seen_at: string | null;
@@ -927,6 +940,89 @@ export interface SafetyCaseDto {
   created_at: string;
   updated_at: string;
   history: SafetyHistoryEntryDto[];
+}
+
+/**
+ * 一条**待确认**的用药变更候选。
+ *
+ * `source` 必须在界面上可见:用户声明的和模型提议的可信程度不同,确认的人要知道
+ * 自己在确认什么。**确认之前当前药单一个字节都不会变。**
+ */
+export interface SafetyChangeCandidateDto {
+  id: string;
+  visit_id: string;
+  case_id: string;
+  name: string;
+  /** dose / schedule / route / start_at —— 只有能**机械核对**的字段能被提议。 */
+  field: string;
+  before: string | null;
+  after: string;
+  source: 'user_declared' | 'model_proposed' | string;
+  basis?: { kind?: string; refs?: string[]; note?: string | null };
+  status: 'pending' | 'confirmed' | 'dismissed' | string;
+  recorded_at?: string | null;
+  decided_at?: string | null;
+  applied?: { name?: string; field?: string; value?: unknown; before?: unknown } | null;
+}
+
+/** 回访结果里的一条陈述:文字 + **它的依据是什么**。 */
+export interface SafetyVisitStatementDto {
+  text: string;
+  basis: {
+    /** program_check 程序核对 / user_report 用户报告 / model_explanation 模型解释 / record 权威记录 */
+    kind: string;
+    refs?: string[];
+    note?: string | null;
+  };
+}
+
+export interface SafetyVisitArrangementDto {
+  present: boolean;
+  confirmed: boolean;
+  schedule_state: string | null;
+  at?: string | null;
+  kind?: string | null;
+  owner?: string | null;
+  note?: string | null;
+  confirmation_ref?: string | null;
+  confirmed_at?: string | null;
+  last_triggered_at?: string | null;
+  blocked_reason?: string | null;
+}
+
+/** 一次回访的**持久结果**。每条内容都引用既有事实,不复制患者数据。 */
+export interface SafetyVisitResultDto {
+  why: { kind?: string; detail?: string; refs?: string[] };
+  since_last: SafetyVisitStatementDto[];
+  actions: SafetyVisitStatementDto[];
+  unresolved: SafetyVisitStatementDto[];
+  answered_count: number;
+  next_step: string | null;
+  next_arrangement: SafetyVisitArrangementDto | null;
+  statements: SafetyVisitStatementDto[];
+  /** 第一次回访。没有上一次就别说"相对上次"——那是假话。 */
+  first_visit: boolean;
+  rendered_at: string;
+}
+
+/** 一次回访。只引用 case / care_task,不复制任何患者数据。 */
+export interface SafetyVisitDto {
+  visit_id: string;
+  status: 'open' | 'awaiting_user' | 'completed' | 'blocked' | string;
+  /** 这一事项上是否还有**未结束**的回访。入口文案据此切换。 */
+  is_open: boolean;
+  opened_at: string;
+  closed_at?: string | null;
+  opened_by?: string | null;
+  /** 本次为什么跟进:due / record_change / input_arrived / user_started —— 服务端按事实判定。 */
+  reason: { kind?: string; detail?: string; refs?: string[] };
+  focus: { request_id: string; question?: string | null }[];
+  change_candidates?: SafetyChangeCandidateDto[];
+  pending_candidates?: SafetyChangeCandidateDto[];
+  result: SafetyVisitResultDto | null;
+  first_visit: boolean;
+  care_task_id?: string | null;
+  task_status?: string | null;
 }
 
 export interface SafetyCaseListDto {

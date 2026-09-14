@@ -7,6 +7,7 @@ import { PreferencesProvider } from '../hooks/usePreferences';
 import { OverviewPage } from '../features/overview/OverviewPage';
 import { SafetyPage } from '../features/safety/SafetyPage';
 import { SafetyCaseDetailPage } from '../features/safety/SafetyCaseDetailPage';
+import { ReviewVisitPage } from '../features/safety/ReviewVisitPage';
 import { ProfilePage } from '../features/profile/ProfilePage';
 import { MedicationsPage } from '../features/medications/MedicationsPage';
 import { AlertsPage } from '../features/alerts/AlertsPage';
@@ -44,6 +45,9 @@ export function App(): React.ReactElement {
                   <Route path="/" element={<SafetyPage />} />
                   <Route path="/safety" element={<SafetyPage />} />
                   <Route path="/safety/:caseId" element={<SafetyCaseDetailPage />} />
+                  {/* 回访做成子路由：它是一个可寻址的东西，「中途离开回来继续同一次回访」
+                      就是回到同一个 URL，刷新与后退天然可用。 */}
+                  <Route path="/safety/:caseId/visit" element={<ReviewVisitPage />} />
                   {/* 旧总览保留可访问(计数与最近变化),但不再占首页。 */}
                   <Route path="/overview" element={<OverviewPage />} />
                   <Route path="/profile" element={<ProfilePage />} />

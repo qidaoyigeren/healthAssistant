@@ -25,6 +25,14 @@ except ImportError:  # pragma: no cover - script-style import
     from errors import ToolErrorKind, ToolExecutionError  # type: ignore
 
 
+#: 候选变更能针对的字段。与 `review_visits.CANDIDATE_FIELDS` 同一个来源——
+#: 工具 schema 里另抄一份，两边就会漂移：模型按工具描述产出的候选，服务端
+#: 会因为"字段不可核对"拒绝掉。
+try:  # pragma: no cover - import shim 同上面几个
+    from ..review_visits import CANDIDATE_FIELDS as _CANDIDATE_FIELDS
+except ImportError:  # pragma: no cover
+    _CANDIDATE_FIELDS = ('dose', 'schedule', 'route', 'start_at')
+
 MEMORY_READ_QUERIES = (
     "snapshot", "current_medications", "medication_timeline", "conflicts",
     "context_packet", "pending_rechecks",
@@ -204,6 +212,35 @@ ANSWER_QUESTION_SPEC = ToolSpec(
     result_shape=("dict(accepted, partial, answered[], still_open[], provenance, "
                   "assessment{status, reason, source_ref, locator, dependency_refs}, detail, "
                   "question[{question_id, information_state, blocking}])"),
+    kind="read",
+    required_permission="answer:submit",
+    idempotency="pure",
+)
+
+
+PROPOSE_MEDICATION_CHANGE_SPEC = ToolSpec(
+    name="propose_medication_change",
+    description=("把「用户说的某句话意味着用药记录该改了」记成一条**待用户确认的候选**。"
+                 "**这不是写入**：确认之前当前药单一个字节都不会变——界面会把候选连同"
+                 "它的来源摆给用户看，由用户决定改不改。"
+                 "只用于用户**自己陈述过**的变更（回答、补充里说到的）；"
+                 "不要拿它把自己的推测、或「这样可能更好」写进记录。"
+                 "quote 放用户的原话片段：确认的人要能看出这条候选是从哪句话来的。"),
+    argument_schema={
+        "type": "object",
+        "properties": {
+            "question_id": {"type": "string",
+                            "description": "这条线索是在回答哪条问题时出现的"},
+            "name": {"type": "string", "description": "哪一味药"},
+            "field": {"type": "string", "enum": list(_CANDIDATE_FIELDS)},
+            "value": {"type": "string", "description": "用户陈述的新值"},
+            "quote": {"type": "string", "description": "用户原话片段"},
+        },
+        "required": ["question_id", "name", "field", "value"],
+    },
+    result_shape="dict(recorded, candidate, detail)",
+    # 它**不写权威记录**，所以按 read 口径要权限：改记录的那一步是**用户确认**，
+    # 那一步不在模型的工具集里。
     kind="read",
     required_permission="answer:submit",
     idempotency="pure",
@@ -408,6 +445,15 @@ def build_default_executor(agent: Any, *, hooks: Any = None,
                 "note": "采纳结果由调查状态在这一步给出，见同一条观察的 accepted 字段。"}
 
     executor.register(ANSWER_QUESTION_SPEC, _answer_question_handler)
+
+    def _propose_change_handler(request):
+        # 同 answer_question：executor 不改任何状态，只回显它看到了什么。候选的
+        # 登记发生在观察阶段（`InvestigationState.observe`），结果再回填到这条
+        # observation 上——否则模型会看到一份"已记录"而持久状态里什么都没有。
+        return {"submitted": request.arguments, "status": "pending_adoption",
+                "note": "候选是否登记由调查状态在这一步给出，见同一条观察的 recorded 字段。"}
+
+    executor.register(PROPOSE_MEDICATION_CHANGE_SPEC, _propose_change_handler)
 
     if evidence_store is not None:
         executor.register(READ_EVIDENCE_SPEC, lambda request: evidence_store.read(

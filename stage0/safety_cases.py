@@ -118,6 +118,36 @@ ANSWER_UNKNOWN = 'unknown'    # 用户明说不知道 —— 结束追问，但�
 ANSWER_EMPTY = 'empty'        # 空值/缺失 —— 什么都不关
 ANSWER_IRRELEVANT = 'irrelevant'  # 答非所问（可由模型提示，但不由模型定论）
 
+#: 回访里用户对一条**跟进行动**的五种表态。它们含义各不相同，**不能合并成
+#: "问题已解决"**：把"我还没做"和"我暂时不想说"都记成已答，用户下次回来会看到
+#: 一件他其实没做过的事被标成做完了。
+ANSWER_DONE = 'done'          # 已完成 —— 只有跟进行动类的问题才算把问题答上
+ANSWER_NOT_DONE = 'not_done'  # 尚未完成 —— 未决仍然是未决
+ANSWER_DECLINED = 'declined'  # 暂不回答 —— 推迟 ≠ 不知道 ≠ 解决；本轮不再追问同一条
+ANSWER_CHANGED = 'changed'    # 情况有变化 —— 要走候选→确认那条路，不当成答案
+
+#: `apply_input` 认识的**全部**回答种类。`empty` 不在其中：空值连"收到了一条回答"
+#: 都算不上，它只写历史，不碰请求状态。
+ANSWER_KINDS = (ANSWER_PROVIDED, ANSWER_UNKNOWN, ANSWER_DONE, ANSWER_NOT_DONE,
+                ANSWER_DECLINED, ANSWER_CHANGED)
+
+#: 推迟类：问题保持未决，但这一轮不再拿同一条去追问用户。反复换一种措辞追问
+#: 同一件事，是让人放弃填表最快的方式。
+ANSWER_DEFERRED_KINDS = (ANSWER_NOT_DONE, ANSWER_DECLINED, ANSWER_CHANGED)
+
+#: 只有被这样标注过的问题，"已完成"才等于把问题答上。
+QUESTION_KIND_FOLLOW_UP_ACTION = 'follow_up_action'
+
+
+def _is_follow_up_action(item: dict[str, Any] | None) -> bool:
+    """这条请求问的是不是"那件跟进行动做了没有"。
+
+    是它，"已完成"才真的回答了问题；不是它，"已完成"只是用户说了一句别的事。
+    """
+    if not isinstance(item, dict):
+        return False
+    return str(item.get('question_kind') or '') == QUESTION_KIND_FOLLOW_UP_ACTION
+
 #: 明说"不知道"的常见说法。这是一份**输入归一化**表，不是安全判定：
 #: 它只决定"这条回答算不算有内容"，不决定风险是否存在。
 _UNKNOWN_PHRASES = ('不知道', '不清楚', '不确定', '不记得', '记不清', '说不好',
@@ -697,14 +727,18 @@ class SafetyCaseStore:
             # "开始时间是什么"标成已解决。判断放在写历史**之前**：历史里的
             # `answered` 必须是这件事的实际结论，不能是判断完成前的默认值。
             unsatisfied = field_mismatch(target.get('fields') or (), value)
+        # 「已完成」只对**跟进行动**类的问题才等于"这件事做完了"。对一条事实问题
+        # 答"已完成"，那是在陈述一件跟问题无关的事——照实记下来，但**不关**这条问题。
+        answered_now = bool(matched and not unsatisfied and (
+            kind == ANSWER_PROVIDED
+            or (kind == ANSWER_DONE and _is_follow_up_action(target))))
         case['history'].append({'at': utc_now(), 'event': 'input_recorded',
                                 'request_id': request_id, 'answer_ref': answer_ref,
                                 'value': value, 'answer_kind': kind,
-                                'answered': bool(matched and kind == ANSWER_PROVIDED
-                                                 and not unsatisfied),
+                                'answered': answered_now,
                                 'unsatisfied_fields': list(unsatisfied),
                                 'for_professional': for_professional})
-        if matched and kind in (ANSWER_PROVIDED, ANSWER_UNKNOWN):
+        if matched and kind in ANSWER_KINDS:
             for item in case['required_inputs']:
                 if item['request_id'] != matched:
                     continue
@@ -716,12 +750,26 @@ class SafetyCaseStore:
                     item['status'] = 'open'
                     item['unsatisfied_fields'] = list(unsatisfied)
                     item['received_value'] = str(value or '')[:120]
+                    continue
+                item.pop('unsatisfied_fields', None)
+                if answered_now:
+                    item['status'] = 'answered'
+                    continue
+                # 剩下的四种**都不关**这条问题——它们含义不同，但共同点是
+                # "这件事还没有结论"。把任何一个写成 `answered`，用户下次回来
+                # 就会发现系统把"我还没做""我暂时不想说"记成了"已解决"。
+                if kind == ANSWER_UNKNOWN:
+                    # 明说不知道：不再等这位用户，但问题本身**没有解决**。
+                    item['status'] = ANSWER_UNKNOWN
+                    item['needs_alternative_evidence'] = True
                 else:
-                    item.pop('unsatisfied_fields', None)
-                    item['status'] = ('answered' if kind == ANSWER_PROVIDED else ANSWER_UNKNOWN)
-                    if kind == ANSWER_UNKNOWN:
-                        # 明说不知道：不再等这位用户，但问题本身**没有解决**。
-                        item['needs_alternative_evidence'] = True
+                    item['status'] = 'open'
+                    item['deferred_at'] = utc_now()
+                    item['deferred_kind'] = kind
+                    if kind == ANSWER_CHANGED:
+                        # 情况有变化 ≠ 系统知道了新值。它意味着一件事：
+                        # 需要走**候选 → 确认**那条路，而不是拿这句话去改记录。
+                        item['expects_change_candidate'] = True
         case['updated_at'] = utc_now()
         case['revision'] += 1
         self.derive_status(case)
@@ -1257,6 +1305,167 @@ def _conclusion_view(store, ref: str) -> dict[str, Any]:
                         if isinstance(source, dict) and source.get('uri')]}
 
 
+def _current_field(product, name: str, field: str) -> Any:
+    """当前权威记录里这味药的这个字段是什么——候选的 `before` 取**记录里的**，
+    不取调用方自报的"原来是 X"。自报的前值会让用户对着一个不存在的变化做确认。"""
+    for item in product.memory.current_medications():
+        if item.get('display_name') == name:
+            return item.get(field if field != 'start_at' else 'start_at')
+    return None
+
+
+def _visit_task(product, case_id: str, visit: dict[str, Any]) -> dict[str, Any] | None:
+    """这次回访正在用的 care_task（引用，不复制状态）。"""
+    task_id = visit.get('care_task_id')
+    if not task_id:
+        return None
+    try:
+        return product.get(task_id, 'care_task')
+    except Exception:
+        return None
+
+
+def _ensure_visit_task(product, case: dict[str, Any], visit: dict[str, Any],
+                       key: str | None) -> dict[str, Any] | None:
+    """保证这次回访有一件在跑的 care_task，并**经既有队列**把它唤醒。
+
+    没有新调度：用的就是 `care_task` + outbox + 租约 + 预算那一条。已经有等待中的
+    任务就唤醒它（补充到了、继续走）；没有就按既有契约建一件。
+    """
+    from .care_tasks import CareTasks
+    tasks = CareTasks(product)
+    existing = _visit_task(product, case['id'], visit)
+    if existing is not None and existing['status'] in ('queued', 'running'):
+        return existing
+    if existing is not None and existing['status'] == 'waiting_input':
+        return tasks.resume(existing['id'],
+                            f"{key or existing['id']}:visit:{existing['revision']}",
+                            existing['revision'], 'continue', enqueue=True)
+    if existing is not None and existing['status'] == 'ready':
+        return tasks.resume(existing['id'],
+                            f"{key or existing['id']}:visit:{existing['revision']}",
+                            existing['revision'], 'continue', enqueue=True)
+    if existing is not None and existing['status'] in ('completed', 'failed', 'cancelled'):
+        # 这一件已经收尾了：这次回访再往前走要**新开一件**，不能复活旧的那件
+        # ——复活会把上一次的结论当成这一次的中间状态。
+        existing = None
+    running = [t for t in product.objects('care_task')
+               if t.get('goal_type') == 'safety_case'
+               and t.get('safety_case_id') == case['id']
+               and t['status'] not in ('completed', 'cancelled', 'failed')]
+    if running:
+        # 同一事项上不得同时跑两件调查：它们各自花预算、最后互相改写状态。
+        return running[-1]
+    created = tasks.create(f"visit:{visit['id']}:{len(visit.get('focus') or [])}",
+                           'safety_case', case['id'], due_at=None)
+    return tasks.resume(created['id'], f"{key or created['id']}:visit-run",
+                        created['revision'], 'continue', enqueue=True)
+
+
+def _apply_candidate(product, store, case_id: str, candidate: dict[str, Any],
+                     task_id: str | None, key: str | None) -> dict[str, Any]:
+    """把一条**已确认**的候选沿既有权威入口写入。
+
+    只有一条写路径：`CareTasks.record_input(medications=…)`——它自己会校验、写
+    权威表、留下前后值，并让必要安全检查按既有路径重新排队。这里不另开一条。
+    """
+    from .care_tasks import CareTasks
+    if not task_id:
+        raise ProductError('这次回访还没有可以承载写入的任务，请先开始回访', 409)
+    task = product.get(task_id, 'care_task')
+    if task['status'] not in ('ready', 'waiting_input'):
+        raise ProductError('本次回访正在处理中，请稍候再确认这条变更', 409)
+    field = candidate['field']
+    change = {'name': candidate['name'], 'action': 'dose_change'}
+    if field == 'start_at':
+        change['start_at'] = candidate['after']
+    else:
+        change[field] = candidate['after']
+    tasks = CareTasks(product)
+    tasks.record_input(task_id, f"{key or candidate['id']}:confirm", task['revision'],
+                       medications=[change])
+    return {'name': candidate['name'], 'field': field, 'value': candidate['after'],
+            'before': candidate['before']}
+
+
+def _refresh_visit_result(product, store, case_id: str, visit_id: str) -> None:
+    """候选被确认/放弃之后**重算一次结果**。
+
+    结果是调查跑完那一刻渲染的；用户随后确认了一条变更，那份结果里就还没有它——
+    停留在旧结果上，用户会看到"已确认"的候选却读不到"这次改变了什么"。
+    重算是纯读的（`render_result` 不改任何东西），只是把最新的事实重新叙述一遍。
+    """
+    from . import review_visits as _visits
+    visits = _visits.ReviewVisitStore(product)
+    visit = visits.get(visit_id)
+    fresh = store.get(case_id)
+    task = None
+    if visit.get('care_task_id'):
+        try:
+            task = product.get(visit['care_task_id'], 'care_task')
+        except Exception:
+            task = None
+    result = _visits.render_result(product, fresh, visit, task=task)
+    focus = [{'request_id': item['request_id'], 'question': item.get('question')}
+             for item in (fresh.get('required_inputs') or [])
+             if item.get('status') in ('open', 'unknown')]
+    visits.save_result(visit_id, result, focus=focus,
+                       cursor_after=len(fresh.get('history') or []))
+
+
+def _next_visit_reason(product, case: dict[str, Any]) -> dict[str, Any] | None:
+    """还没开始回访时，"这次为什么值得跟进"的**只读**预览。
+
+    算不出来就返回 null，不编一个理由。已经有一次未结束的回访时返回 null——
+    那时该看的是那次回访自己的 `reason`，不是另一个预览。
+    """
+    from . import review_visits as _visits
+    if _visits.ReviewVisitStore(product).open_for_case(case['id']) is not None:
+        return None
+    return _visits.derive_reason(product, case)
+
+
+def _visit_view(store: SafetyCaseStore, case: dict[str, Any]) -> dict[str, Any] | None:
+    """事项视图里的**当前回访**块。派生，不新开集合、不复制患者数据。
+
+    状态以**执行它的任务**为准（`status_from_task`），不以回访记录自己说的为准：
+    记录里的 `open` 在任务已经跑完在等用户时是不准确的，界面会据此让用户白等。
+    """
+    from . import review_visits as _visits
+    visits = _visits.ReviewVisitStore(store.p)
+    open_visit = visits.open_for_case(case['id'])
+    visit = open_visit or visits.last_closed_for_case(case['id'])
+    if visit is None:
+        return None
+    task = None
+    if visit.get('care_task_id'):
+        try:
+            task = store.p.get(visit['care_task_id'], 'care_task')
+        except Exception:
+            task = None
+    status = visit['status']
+    if open_visit is not None:
+        status = _visits.status_from_task(task) or status
+    return {
+        'visit_id': visit['id'],
+        'status': status,
+        'is_open': open_visit is not None,
+        'opened_at': visit.get('opened_at'),
+        'closed_at': visit.get('closed_at'),
+        'opened_by': visit.get('opened_by'),
+        'reason': dict(visit.get('reason') or {}),
+        'focus': [dict(item) for item in visit.get('focus') or []],
+        'change_candidates': [dict(item) for item in visit.get('change_candidates') or []],
+        'pending_candidates': [dict(item) for item in
+                               visit.get('change_candidates') or []
+                               if item.get('status') == _visits.CANDIDATE_PENDING],
+        'result': visit.get('result'),
+        'first_visit': visit.get('previous_visit_id') is None,
+        'care_task_id': visit.get('care_task_id'),
+        'task_status': (task or {}).get('status'),
+    }
+
+
 def case_view(store: SafetyCaseStore, case: dict[str, Any]) -> dict[str, Any]:
     """一个事项的完整视图：触发原因、涉及记录、已知信息、依据、进展、未决、下一步、历史。"""
     inputs = case.get('required_inputs') or []
@@ -1290,6 +1499,13 @@ def case_view(store: SafetyCaseStore, case: dict[str, Any]) -> dict[str, Any]:
         # 投影是只读的：拿不出确认记录的 `confirmed=True` 一律按 `false` 读。
         # 在此之前"给了一个时间"会被读成"已确认"，而那个确认从来没有人做过。
         'follow_up': _follow_up.project_follow_up(case.get('follow_up')),
+        # 当前（或最近一次）回访。没有回访历史时是 null——界面据此说"这件事项还
+        # 没有跟进过"，而不是编一个空壳出来。
+        'visit': _visit_view(store, case),
+        # **还没开始回访时**，"这次为什么值得跟进"就已经能算出来（纯读，不写任何
+        # 东西）。不给它，用户要先点一下"开始回访"才看得见原因——而"进入之后按顺序
+        # 看到的第一件事"恰恰就是这个原因。
+        'next_visit_reason': _next_visit_reason(store.p, case),
         'linked_review_case_ids': case.get('linked_review_case_ids') or [],
         'linked_run_ids': case.get('linked_run_ids') or [],
         'next_action_summary': case.get('next_action_summary'),
@@ -1526,6 +1742,134 @@ def register_safety_routes(app, product, access, invoke, principal=None,
             case_id, expected_revision=body.get('expected_revision'),
             actor=actor, note=body.get('note'), command_key=body.get('key'))))
 
+    # ---- 回访：开始/继续、读结果、变更候选 --------------------------------
+    @app.post('/v1/safety-cases/{case_id}/visits')
+    def start_visit(case_id: str, request: Request, body: dict):
+        """开始或**继续**一次回访。
+
+        已经有未结束的回访就接着它走，不新开一次——新开会让用户已经答过的问题
+        变成上一访的遗留，他回来看到的第一题又是原来那道。
+
+        "本次为什么跟进"由**服务端按事实判定**（`derive_reason`），调用方只能在
+        用户主动发起这一档上表达意图；把到期说成主动，会让真正该跟进的那件事
+        永远不算数。
+        """
+        from . import review_visits as _visits
+        access(request, True)
+        store = SafetyCaseStore(product)
+        actor, _roles = _actor(request)
+
+        def run():
+            case = store.get(case_id)
+            if case['revision'] != body.get('expected_revision'):
+                raise ProductError('事项已被其他操作更新，请刷新', 409)
+            visits = _visits.ReviewVisitStore(product)
+            reason = _visits.derive_reason(product, case)
+            visit, _created = visits.open_or_continue(
+                str(body.get('key') or ''), case_id=case_id, reason=reason, actor=actor,
+                history_length=len(case.get('history') or []))
+            task = _ensure_visit_task(product, case, visit, body.get('key'))
+            if task is not None:
+                visits.bind_task(visit['id'], task['id'])
+            return case_view(store, store.get(case_id))
+
+        return invoke(run)
+
+    @app.get('/v1/safety-cases/{case_id}/visits/{visit_id}')
+    def get_visit(case_id: str, visit_id: str, request: Request):
+        """读一次回访的**持久结果**：本次为什么跟进、新增了什么、做完了什么、
+        还剩什么、下一步。可追溯，不随事项继续往前走而消失。"""
+        from . import review_visits as _visits
+        access(request)
+        visits = _visits.ReviewVisitStore(product)
+        return invoke(lambda: visits.get(visit_id))
+
+    @app.post('/v1/safety-cases/{case_id}/visits/{visit_id}/candidates')
+    def propose_change(case_id: str, visit_id: str, request: Request, body: dict):
+        """登记一条**待确认**的用药变更候选（用户结构化声明）。
+
+        写在这里的东西**不是**权威记录：确认之前当前药单一个字节都不动。
+        """
+        from . import review_visits as _visits
+        access(request, True)
+        actor, _roles = _actor(request)
+        visits = _visits.ReviewVisitStore(product)
+
+        def run():
+            visit = visits.get(visit_id)
+            if visit['case_id'] != case_id:
+                raise ProductError('这条变更候选不属于该事项', 404)
+            medicine = str(body.get('name') or '').strip()
+            field = str(body.get('field') or '')
+            before = _current_field(product, medicine, field)
+            visits.add_candidate(
+                visit_id, name=medicine, field=field, before=before,
+                after=body.get('value'), source=_visits.SOURCE_USER_DECLARED,
+                basis={'kind': 'user_report', 'refs': [],
+                       'note': str(body.get('note') or '')[:200] or None},
+                command_key=body.get('key'))
+            return case_view(SafetyCaseStore(product),
+                             SafetyCaseStore(product).get(case_id))
+
+        return invoke(run)
+
+    @app.post('/v1/safety-cases/{case_id}/visits/{visit_id}/candidates/{candidate_id}/confirm')
+    def confirm_change(case_id: str, visit_id: str, candidate_id: str,
+                       request: Request, body: dict):
+        """确认一条候选 → 沿**既有权威入口**写入。
+
+        确认是唯一能改记录的一步，而且改法只有一条：`record_input(medications=…)`。
+        确认之后必要安全检查按既有路径重新排队，不需要在这里另做一套。
+        """
+        from . import review_visits as _visits
+        access(request, True)
+        actor, _roles = _actor(request)
+        visits = _visits.ReviewVisitStore(product)
+        store = SafetyCaseStore(product)
+
+        def run():
+            visit = visits.get(visit_id)
+            if visit['case_id'] != case_id:
+                raise ProductError('这条变更候选不属于该事项', 404)
+            candidate = visits.candidate(visit_id, candidate_id)
+            if candidate['status'] != _visits.CANDIDATE_PENDING:
+                raise ProductError('这条候选已经处理过了', 409)
+            task_id = visit.get('care_task_id')
+            applied = _apply_candidate(product, store, case_id, candidate, task_id,
+                                       body.get('key'))
+            visits.decide_candidate(visit_id, candidate_id, status=_visits.CANDIDATE_CONFIRMED,
+                                    actor=actor, applied=applied, command_key=body.get('key'))
+            _refresh_visit_result(product, store, case_id, visit_id)
+            # **确认之后才唤醒**：这一刻记录真的变了，模型有了可以据以行动的新事实
+            # （"根据新结果继续或调整回访重点"）。在候选还没确认时唤醒，它面对的
+            # 是一句没有落地的话，什么也做不了。
+            _wake_investigation(product, case_id, body.get('key'))
+            return case_view(store, store.get(case_id))
+
+        return invoke(run)
+
+    @app.post('/v1/safety-cases/{case_id}/visits/{visit_id}/candidates/{candidate_id}/dismiss')
+    def dismiss_change(case_id: str, visit_id: str, candidate_id: str,
+                       request: Request, body: dict):
+        """放弃一条候选。**什么都不写**——权威记录本来就没被它碰过。"""
+        from . import review_visits as _visits
+        access(request, True)
+        actor, _roles = _actor(request)
+        visits = _visits.ReviewVisitStore(product)
+        store = SafetyCaseStore(product)
+
+        def run():
+            visit = visits.get(visit_id)
+            if visit['case_id'] != case_id:
+                raise ProductError('这条变更候选不属于该事项', 404)
+            visits.decide_candidate(visit_id, candidate_id,
+                                    status=_visits.CANDIDATE_DISMISSED, actor=actor,
+                                    command_key=body.get('key'))
+            _refresh_visit_result(product, store, case_id, visit_id)
+            return case_view(store, store.get(case_id))
+
+        return invoke(run)
+
     @app.post('/v1/safety-cases/{case_id}/answer')
     def answer(case_id: str, request: Request, body: dict):
         """回答事项上的一条补问。
@@ -1550,7 +1894,14 @@ def register_safety_routes(app, product, access, invoke, principal=None,
             # investigation 的问题永远停在未决，下一轮又把同一件事问一遍。
             _sync_answer_to_investigation(product, case_id, request_id,
                                           body.get('value'), body.get('key'))
-            _wake_investigation(product, case_id, body.get('key'))
+            # **推迟类的回答不唤醒调查。** 未完成、暂不回答没有给出任何模型可以
+            # 据以行动的新事实；「情况有变化」的下一步是**候选确认**，也不是再跑
+            # 一轮模型。唤醒了它，那一轮既没有合法动作可做（唯一未决的问题在等
+            # 用户），又因为"有新信息没看过"而终止不了，最后以熔断收场——用户
+            # 会看到"这次回访没有跑成"，而他其实只是说了一句"还没做"。
+            kind = body.get('answer_kind')
+            if kind not in ANSWER_DEFERRED_KINDS:
+                _wake_investigation(product, case_id, body.get('key'))
             return case_view(store, updated)
         return invoke(run)
 

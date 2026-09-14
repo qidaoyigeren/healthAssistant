@@ -15,7 +15,7 @@
 import React, { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, FileSearch, HelpCircle, Info } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileSearch, HelpCircle, Info } from 'lucide-react';
 import { api } from '../../api/client';
 import { request, newIdempotencyKey } from '../../api/http';
 import { qk } from '../../api/queryKeys';
@@ -40,7 +40,7 @@ import {
   UNKNOWN_ANSWER_NOTICE, answerKindLabel, basisText, careTaskStatusLabel,
   caseTypeLabel, dispositionLabel, dispositionOutcome, followUpOf, followUpText,
   historyText, informationStateText, informationTargetText, partyActionLabel,
-  questionStrategyText, serverMessage, stateLabel, statusTone,
+  questionStrategyText, serverMessage, stateLabel, statusTone, visitStatusLabel,
   traceId, triggerStateLabel, triggerText,
 } from './labels';
 
@@ -105,8 +105,21 @@ export function SafetyCaseDetailPage(): React.ReactElement {
                 {view.next_action_summary ?? '服务端未记录下一步。'}
               </span>
             </p>
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap items-center gap-3">
               <SeenButton view={view} />
+              {/* 回访入口。文案随"有没有未结束的回访"切换——同一件事项上
+                  已经开始的回访是**接着走**，不是重新开始。 */}
+              <Link to={`/safety/${encodeURIComponent(view.case_id)}/visit`}
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+                {view.visit?.is_open ? '继续本次跟进' : '开始回访'}
+                <ArrowRight size={13} aria-hidden />
+              </Link>
+              {view.visit && (
+                <span className="text-xs text-ink-muted">
+                  {visitStatusLabel(view.visit.status)}
+                  {view.visit.first_visit ? ' · 第一次回访' : ''}
+                </span>
+              )}
             </div>
           </header>
 
