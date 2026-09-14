@@ -456,6 +456,83 @@ class AQuestionReadAsAnsweredShowsWhatAnsweredItTests(AcceptanceTest):
             f'问题是：{question.get("statement")!r}')
 
 
+class MatchingFrequencyRAG(SyntheticRAG):
+    """语料**真的**在讲这条问题问的那件事：同一味药，同一个属性。
+
+    正文同时是既有 `evidence_quality` 词法筛认可的形状（"增加…风险"）——
+    那条 scope 判的是这句断言有没有支持，与本 scope 判的"这句话落没落在片段里"
+    是两件事，两个都得过，一条 claim 才算成立。
+    """
+
+    def __init__(self):
+        self.chunks = [{
+            'chunk_id': 'acceptance-label-frequency', 'drug_name': '合成药甲',
+            'section': '用法用量',
+            'text': '【验收材料】合成药甲的服药频次为每日两次，增加出血风险。',
+            'source_url': 'https://acceptance.invalid/label/frequency',
+        }]
+
+
+class AQuestionReadAsAvailableNamesItsAnswerTests(AcceptanceTest):
+    """**正面对照**。上一个类是这条性质的否定方向。
+
+    只有否定方向，"O-2 已修"就无从判断：一条判据从此再也不判 `available`，
+    和一条判据修好了、只是这次没有正例，在否定方向上看长得一模一样。
+    所以要有一条材料**确实**回答了问题的用例，断言 `available` 带得出答案与来源。
+    """
+
+    rag_factory = MatchingFrequencyRAG
+
+    @staticmethod
+    def _provider():
+        def provider(payload):
+            inv = payload['investigation']
+            if not (inv.get('questions') or []):
+                return _declare('合成药甲目前的服药频次是什么？',
+                                target='general_reference',
+                                strategy='general_reference', field='schedule',
+                                subjects=('合成药甲',))
+            if not inv.get('evidence_searched_count'):
+                gap = _gap_for(inv, 'rag_search')
+                if gap is None:
+                    return {'decision': 'respond'}
+                return {'decision': 'tool', 'tool': 'rag_search', 'gap_id': gap,
+                        'expected_observation': '检索说明书原文',
+                        'arguments': {'query': '合成药甲 服药频次'}}
+            unread = inv.get('evidence_unread') or []
+            if unread:
+                gap = _gap_for(inv, 'read_evidence')
+                if gap is None:
+                    return {'decision': 'respond'}
+                return {'decision': 'tool', 'tool': 'read_evidence', 'gap_id': gap,
+                        'expected_observation': '回读原文',
+                        'arguments': {'evidence_id': unread[0]}}
+            return {'decision': 'respond'}
+        return provider
+
+    def test_an_available_question_names_the_evidence_that_answered_it(self):
+        task = self.run_investigation(self._provider(), 'matching-1')
+        questions = self.questions_of(task)
+        available = [question for question in questions
+                     if question.get('information_state') == 'available']
+        self.require_implemented(
+            bool(available),
+            '本轮没有把任何问题读到 available，这条性质无从检验',
+            evidence=f'问题的信息状态：'
+                     f'{[q.get("information_state") for q in questions]}')
+        for question in available:
+            answers = question.get('answers') or []
+            self.assertTrue(
+                answers,
+                '这条问题被读成"已有依据"，却一个答案元素都没有：'
+                '界面只能显示"已回答"，显示不出回答是什么。'
+                f'问题={question.get("statement")!r} '
+                f'answered_by={question.get("answered_by")!r}')
+            self.assertTrue(
+                any(answer.get('source_ref') for answer in answers),
+                f'答案没有来源，说不出是哪条证据支撑了它：{answers!r}')
+
+
 # ---------------------------------------------------------------------------
 class CitationTests(AcceptanceTest):
     rag_factory = SyntheticRAG

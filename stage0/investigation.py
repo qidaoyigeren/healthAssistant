@@ -1455,6 +1455,11 @@ class InvestigationState:
                 assessment['support_status'] = support['status']
                 assessment['support_scope'] = support['scope']
                 assessment['support_reasons'] = support['reasons']
+                if support['status'] == 'supported_by_span':
+                    # 记下**命中支持的那段文字本身**。只记状态不记片段，正是
+                    # "问题读成已有依据、却说不出是什么让它变成这样"的成因——
+                    # settle 时要拿它写答案元素。
+                    claim.setdefault('support_spans', {})[ref] = text[:600]
                 self.assessments.setdefault(claim['claim_id'], {})[ref] = assessment
                 if conditional_namespaces and conditional_namespaces.issubset(namespaces):
                     assessment['unresolved'].append('recorded_context_does_not_verify_applicability')
@@ -1945,6 +1950,19 @@ class InvestigationState:
         # 只答了一个对象，剩下的对象按"字段@对象"逐条写清楚缺哪一条。
         return [f'{target}@{obj}' for obj in objects if obj not in covered]
 
+    def claim_support_span(self, claim_id: str) -> tuple[str | None, str | None]:
+        """这条 claim 被哪一条证据的哪一段文字支持。指不出来就返回 (None, None)。"""
+        claim = next((c for c in self.claims if c['claim_id'] == claim_id), None)
+        if claim is None:
+            return None, None
+        spans = claim.get('support_spans') or {}
+        assessments = self.assessments.get(claim_id, {})
+        for ref in (claim.get('supporting_evidence') or []):
+            if (assessments.get(ref, {}).get('support_status') == 'supported_by_span'
+                    and spans.get(ref)):
+                return ref, spans[ref]
+        return None, None
+
     def _sync_question_from_claim(self, claim) -> None:
         """把一条 claim 的证据状态同步到它对应的问题上。"""
         # 旧契约的 questions 是 {'gap_id','field','question'} 投影，没有
@@ -1956,10 +1974,32 @@ class InvestigationState:
         if question is None or is_question_answered(question):
             return
         if claim['status'] == 'supported' and claim.get('support_status') == 'supported_by_span':
+            ref, span = self.claim_support_span(claim['claim_id'])
+            if ref is None:
+                # 判定说"被支持"，却指不出是哪一段让它成立——那就**不 settle**。
+                # 把问题读成"已有依据"却没有任何东西支撑它，正是要修的那类缺陷：
+                # 界面只能显示"已回答"，显示不出回答是什么。
+                return
+            # 答案元素与状态一起写。"已有依据"必须能指认是什么回答了它。
+            question.setdefault('answers', []).append({
+                'value': span, 'field': question.get('target_field'),
+                'source': 'evidence', 'provenance': 'external_evidence',
+                'source_ref': ref, 'quote': span, 'origin': 'code',
+                'answer_ref': ref, 'at': utcnow_iso(),
+                'version': dict(self.patient_version or {}),
+                'object_ref': None, 'still_uncertain': [],
+                # assessment 复用既有判定，不另立一套口径。
+                'assessment': {
+                    'status': grounding.STATUS_VERIFIED,
+                    'reason': f'{ref} 的片段支持该断言（逐字引用见 quote）',
+                    'source_ref': ref, 'locator': ref,
+                    'dependency_refs': list(claim.get('dependency_refs') or [])},
+            })
+            question['answer_ref'] = ref
             self.settle_question(question['question_id'], QUESTION_STATUS_ANSWERED,
                                  information_state=INFO_AVAILABLE,
                                  answered_by='evidence',
-                                 evidence_refs=list(claim.get('supporting_evidence') or []))
+                                 evidence_refs=[ref])
         elif claim['status'] == 'contradicted' or claim['status'] == 'insufficient':
             # 有内容但没形成支持关系：**保持未决**，如实记为"读到但未建立支持"。
             if (claim.get('opposing_evidence') or claim.get('supporting_evidence')):
